@@ -30,6 +30,7 @@ stalled lane. It is not an orchestration-only role.
    assigned or planned work as a running lane, and do not start a lane for an
    Issue whose check says `claimed`. `capacity` is the count; `claim` refuses
    when remaining capacity is zero.
+
 3. Reject candidate pairs that touch the same collision surface: the API
    client and schemas (`src/api.ts`), build and base-URL configuration,
    packaging and release workflow, or `package.json` and the lockfile. Run
@@ -147,8 +148,8 @@ Lane brief
 
 Keep one ledger for the run and return it with the final report:
 
-| Issue | Branch | Base SHA | Owner | State | PR | Evidence | Blockers | Cleanup |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Issue | Branch | Base SHA | Owner | State | PR  | Evidence | Blockers | Cleanup |
+| ----- | ------ | -------- | ----- | ----- | --- | -------- | -------- | ------- |
 
 States are `claimed`, `implementing`, `verified`, `published`, `landed`,
 `blocked`, `released`, and `handed over`. Report verified outcomes with links,

@@ -22,7 +22,7 @@ jobs:
           node-version: 26
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck && pnpm lint && pnpm test && pnpm build
+      - run: pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build
       - run: VERSION="${GITHUB_REF_NAME}" sh scripts/package.sh
       - uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
         with:

@@ -24,7 +24,7 @@ GitHub state unless the maintainer explicitly authorizes that action.
      outside the origin;
    - authentication, approval, and security-relevant UI behavior;
    - the pin Tenkai must update (URL and SHA-256 behind the `ui` feature).
-   Complete when every applicable item is resolved or a named blocker.
+     Complete when every applicable item is resolved or a named blocker.
 4. Use `verify-change` for the full local gates. Confirm current GitHub CI and
    security checks when access is available. Do not run live-provider tests
    without intentional prerequisites. Complete when evidence is current for the

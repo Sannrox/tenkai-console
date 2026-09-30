@@ -20,9 +20,7 @@ export const App = () => {
           {health.health.status} · {health.health.profile}
         </p>
       )}
-      {health?.kind === "unreachable" && (
-        <p role="alert">unreachable: {health.reason}</p>
-      )}
+      {health?.kind === "unreachable" && <p role="alert">unreachable: {health.reason}</p>}
     </main>
   );
 };

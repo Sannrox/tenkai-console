@@ -15,14 +15,14 @@ Run the narrowest useful checks first, then expand according to change risk.
 2. Run focused tests for the affected module first (`pnpm vitest run <path>`).
    Add checks based on the surface:
 
-   | Surface | Required evidence |
-   | --- | --- |
-   | TypeScript / React source | focused Vitest, `pnpm typecheck`, `pnpm lint` |
+   | Surface                              | Required evidence                                                                   |
+   | ------------------------------------ | ----------------------------------------------------------------------------------- |
+   | TypeScript / React source            | focused Vitest, `pnpm typecheck`, `pnpm lint`                                       |
    | Tenkai API client or ArkType schemas | schema tests against recorded responses; compare with Tenkai's versioned public API |
-   | routing, base URL, or asset paths | `pnpm build`, then serve `dist/` under `/ui/` and `/<prefix>/ui/` |
-   | packaging or release workflow | `VERSION=v0.0.0-dev pnpm package`, inspect the zip and `SHA256SUMS` |
-   | dependencies | `pnpm install --frozen-lockfile`, pinned versions, no new outbound origins |
-   | docs/Skills | syntax, links, and commands where practical |
+   | routing, base URL, or asset paths    | `pnpm build`, then serve `dist/` under `/ui/` and `/<prefix>/ui/`                   |
+   | packaging or release workflow        | `VERSION=v0.0.0-dev pnpm package`, inspect the zip and `SHA256SUMS`                 |
+   | dependencies                         | `pnpm install --frozen-lockfile`, pinned versions, no new outbound origins          |
+   | docs/Skills                          | syntax, links, and commands where practical                                         |
 
 3. Before ship-level handoff, run the normal repository gates (the same steps
    as CI) unless the user explicitly requested a narrower check:
@@ -37,6 +37,7 @@ Run the narrowest useful checks first, then expand according to change risk.
    ```
 
    Complete when every applicable local gate has a result.
+
 4. Keep checks that need a running `tenkai-server` out of the default suite
    unless one is intentionally available (`TENKAI_URL=... pnpm dev`). Never
    print secrets or persist live server payloads. Complete when skipped checks

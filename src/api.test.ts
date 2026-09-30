@@ -6,21 +6,17 @@ const json = (body: unknown, status = 200) =>
 
 describe("apiBase", () => {
   it("resolves the API root at the origin root", () => {
-    expect(apiBase("https://hub.test/ui/assets/index-a1.js", false).href).toBe(
-      "https://hub.test/",
-    );
+    expect(apiBase("https://hub.test/ui/assets/index-a1.js", false).href).toBe("https://hub.test/");
   });
 
   it("resolves the API root behind a proxy prefix", () => {
-    expect(
-      apiBase("https://hub.test/tenkai/ui/assets/index-a1.js", false).href,
-    ).toBe("https://hub.test/tenkai/");
+    expect(apiBase("https://hub.test/tenkai/ui/assets/index-a1.js", false).href).toBe(
+      "https://hub.test/tenkai/",
+    );
   });
 
   it("uses the dev server origin in development", () => {
-    expect(apiBase("http://localhost:5173/src/main.tsx", true).href).toBe(
-      "http://localhost:5173/",
-    );
+    expect(apiBase("http://localhost:5173/src/main.tsx", true).href).toBe("http://localhost:5173/");
   });
 });
 
@@ -28,12 +24,12 @@ describe("fetchHealth", () => {
   const base = new URL("https://hub.test/tenkai/");
 
   it("calls healthz relative to the API root", async () => {
-    let called = "";
+    let called: RequestInfo | URL | undefined;
     await fetchHealth(base, (input) => {
-      called = String(input);
+      called = input;
       return json({ status: "ok", profile: "community", capabilities: [] });
     });
-    expect(called).toBe("https://hub.test/tenkai/healthz");
+    expect(called).toHaveProperty("href", "https://hub.test/tenkai/healthz");
   });
 
   it("accepts a valid status", async () => {
@@ -52,11 +48,9 @@ describe("fetchHealth", () => {
   });
 
   it("reports HTTP and network failures", async () => {
-    expect((await fetchHealth(base, () => json({}, 503))).kind).toBe(
+    expect((await fetchHealth(base, () => json({}, 503))).kind).toBe("unreachable");
+    expect((await fetchHealth(base, () => Promise.reject(new Error("down")))).kind).toBe(
       "unreachable",
     );
-    expect(
-      (await fetchHealth(base, () => Promise.reject(new Error("down")))).kind,
-    ).toBe("unreachable");
   });
 });
