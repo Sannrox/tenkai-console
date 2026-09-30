@@ -25,6 +25,7 @@ When failed cleanup leaves the external target unknown:
 
    Omit `--deployed` only after verifying that cleanup left no deployed
    version.
+
 5. Re-inspect the environment, create a fresh plan, and resume normal delivery.
 
 `env reconcile` records an observation; it does not repair the external target.

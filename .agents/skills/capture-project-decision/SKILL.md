@@ -19,7 +19,7 @@ Promote the durable result, not the conversation that produced it.
    - example: a supported path is best taught and tested as executable code;
    - Skill: a repeated project-specific AI procedure or high-risk checklist;
    - none: the outcome is local to the closed work item.
-   Complete when every artifact has a future audience and owner.
+     Complete when every artifact has a future audience and owner.
 3. Preserve one source of truth. Link to code/protocols rather than duplicating
    exhaustive details. Put rationale in the ADR and usage in docs. Complete when
    the same rule is not maintained in multiple prose locations.

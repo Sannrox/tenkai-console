@@ -58,6 +58,7 @@ force-pushing protected branches, or weakening repository protections.
    maintainer before claiming. Then inspect this machine with
    `git worktree list --porcelain` and `git branch --list '*/<issue>*'`; a
    local lane for the Issue is somebody's isolation, not yours.
+
 5. Confirm that the issue is open, unblocked, focused enough for one pull
    request, and has testable acceptance evidence.
 
@@ -84,6 +85,7 @@ ambiguous. Report the smallest action that would unblock delivery.
    Implement-only ceiling, do not claim; state in the report that the Issue
    stays unclaimed and invisible to other machines, or ask for claim
    authority first.
+
 3. Check the claim branch out in the lane worktree and confirm the base SHA:
 
    ```sh
@@ -95,6 +97,7 @@ ambiguous. Report the smallest action that would unblock delivery.
    On a machine without an existing checkout, a fresh clone on the claim branch
    is the lane worktree. Do all further work inside it. If the worktree already
    exists, another lane on this machine owns it; return to step 1.4.
+
 4. When other lanes are active on the machine, serialize shared Git mutations:
    `fetch --prune`, worktree creation or removal, local branch deletion, and
    merges happen one at a time and never while a sibling lane runs them.
@@ -204,6 +207,7 @@ mark the Issue unless documented maintainer policy requires it.
    `bash .agents/skills/deliver-ready-issue/scripts/issue-lane.sh release <issue>`,
    which refuses to delete a branch with
    commits or an open Pull Request unless told to.
+
 5. Invoke `advance-issue-frontier` in report-only mode unless the user also
    authorized frontier status updates.
 

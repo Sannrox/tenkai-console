@@ -31,12 +31,12 @@ gh attestation verify "tenkai-console-$tag.zip" -R Sannrox/tenkai-console
 ```sh
 pnpm install
 TENKAI_URL=http://127.0.0.1:8080 pnpm dev   # proxies /v1 and /healthz to tenkai-server
-pnpm typecheck && pnpm lint && pnpm test && pnpm build
+pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build
 VERSION=v0.0.0-dev pnpm package             # release/ zip + SHA256SUMS
 ```
 
 Stack: TypeScript (strict), React, Vite, ArkType for runtime validation of
-server responses, Biome, Vitest, pnpm.
+server responses, Oxlint (type-aware) and Oxfmt, Vitest, pnpm.
 
 ## License
 

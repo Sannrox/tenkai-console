@@ -46,6 +46,7 @@ issues and pull requests. Do not rely on a stale local backlog export.
    from the Issue timeline. Do not run `git fetch --prune` while another lane
    on this machine is mutating shared Git state; the GitHub reads above do not
    need it.
+
 2. Parse dependencies only from each issue's `## Dependencies` section. Resolve
    referenced issues in the same repository unless the text explicitly names
    another repository.

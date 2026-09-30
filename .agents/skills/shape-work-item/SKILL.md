@@ -22,12 +22,12 @@ explicitly authorizes publishing to GitHub.
    - `feature`: a new observable operator outcome in the console;
    - `refactor`: preserved behavior with concrete structural evidence; or
    - `research`: a time-boxed question that ends in a decision.
-   Route sensitive or exploitable behavior through a private maintainer report
-   or GitHub security advisory rather than a public Issue. Route cross-boundary,
-   public-contract, trust-model, or difficult-to-reverse choices to a Design
-   Discussion before implementation. Work that needs a new or changed Tenkai
-   API belongs in a Tenkai Issue first; the console consumes it after. Complete when exactly one primary route
-   is selected and exceptions are explained.
+     Route sensitive or exploitable behavior through a private maintainer report
+     or GitHub security advisory rather than a public Issue. Route cross-boundary,
+     public-contract, trust-model, or difficult-to-reverse choices to a Design
+     Discussion before implementation. Work that needs a new or changed Tenkai
+     API belongs in a Tenkai Issue first; the console consumes it after. Complete when exactly one primary route
+     is selected and exceptions are explained.
 4. Draft the work item with a problem statement, observable outcome, non-goals,
    acceptance evidence, affected boundary, and compatibility/security/data
    risks. Preserve uncertainty as an explicit question. Complete when another

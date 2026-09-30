@@ -27,7 +27,7 @@ Build an evidence-backed impact map before implementation or review.
      re-implemented or bypassed in the browser;
    - the release contract Tenkai pins: `tenkai-console-vX.Y.Z.zip`,
      `SHA256SUMS`, and the artifact attestation.
-   Complete when each applicable boundary has an owner and expected invariant.
+     Complete when each applicable boundary has an owner and expected invariant.
 3. Identify compatibility obligations: older and newer `tenkai-server` API
    versions, error semantics, and the pinned release a Tenkai build embeds.
    Complete when partial-failure and version-skew paths are accounted for.
@@ -44,7 +44,7 @@ Build an evidence-backed impact map before implementation or review.
 Return a compact matrix with columns:
 
 | Surface | Evidence found | Required change/check | Risk if missed |
-| --- | --- | --- | --- |
+| ------- | -------------- | --------------------- | -------------- |
 
 Then list scope boundaries, blocking questions, and the smallest safe PR split.
 Do not approve an architecture, perform a full security audit, or claim API
