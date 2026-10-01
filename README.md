@@ -9,13 +9,16 @@ The design is recorded in Tenkai
 ## How it ships
 
 Each tag `vX.Y.Z` publishes `tenkai-console-vX.Y.Z.zip`, `SHA256SUMS`, and a
-GitHub artifact attestation. Tenkai pins one release by URL and SHA-256 and
-compiles it into `tenkai-server` behind the `ui` feature, which serves it at
-`/ui/` on the API's origin.
+GitHub artifact attestation. Tenkai is to pin one release by URL and SHA-256
+and compile it into `tenkai-server` behind a `ui` feature that serves it at
+`/ui/` on the API's origin; that server side is tracked in
+[Sannrox/tenkai#463](https://github.com/Sannrox/tenkai/issues/463).
 
 The build uses only relative URLs and finds the API two levels above its own
 entry module, so the same zip works at `/ui/` and at `/<prefix>/ui/` behind a
-reverse proxy. It makes no requests outside its origin and works air-gapped.
+reverse proxy. The bundle loads no assets from outside its origin. With a
+pasted token it talks only to its own origin and works air-gapped; OIDC
+sign-in additionally needs the identity provider (see below).
 
 Verify a release before pinning it:
 
@@ -36,11 +39,18 @@ these with the identity provider for client `tenkai-console`:
 - redirect URI: `<public console URL>/auth/callback`, for example
   `https://tenkai.example.com/ui/auth/callback`;
 - post-logout redirect URI: the console URL itself;
+- web origin (CORS): the console's origin, for example
+  `https://tenkai.example.com`, because the browser calls the provider's
+  discovery and token endpoints directly. A Content-Security-Policy in front of
+  the console must allow the issuer in `connect-src`;
 - access tokens as signed JWTs (RS256 or ES256) whose `aud` includes the
   audience in Tenkai's OIDC config, carrying the groups claim Tenkai maps to
   grants.
 
-Tokens stay in memory: a reload signs in again. Only the PKCE verifier and
+Tokens stay in memory. While the tab is open, the console renews the session
+with the refresh token shortly before the access token expires, when the
+provider issues one; otherwise the session ends at expiry. A reload signs in
+again. Only the PKCE verifier and
 `state` survive the redirect, in `sessionStorage`. Servers without OIDC accept
 a pasted bearer token instead, also held in memory.
 
