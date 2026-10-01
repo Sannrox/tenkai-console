@@ -1,13 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { ApiError, request } from "../api/http";
-import type { FleetStatusReport, OidcClientDiscovery } from "../api/tenkai.gen";
+import { ApiError } from "../api/http";
+import type { OidcClientDiscovery } from "../api/tenkai.gen";
 import { type Session, useSession } from "../auth/session";
 import { useSignOut } from "../auth/use-sign-out";
+import { attention } from "../delivery/model";
+import { useDelivery } from "../delivery/use-delivery";
 import { Button, Centered, Title } from "../ui/kit";
+import { Delivery } from "./delivery";
 import { TopBar } from "./top-bar";
 
-/** Signed-in landing. The matrix (decision 2B) arrives with console#2. */
+/** Signed-in landing: the delivery matrix (decision 2B). */
 export const Home = ({
   session,
   settings,
@@ -17,12 +19,8 @@ export const Home = ({
 }) => {
   const signOut = useSession((state) => state.signOut);
   const leave = useSignOut(settings);
-  const fleet = useQuery({
-    queryKey: ["fleet", session.accessToken],
-    queryFn: () => request<FleetStatusReport>("v1/fleet/status", { token: session.accessToken }),
-    retry: false,
-  });
-  const status = fleet.error instanceof ApiError ? fleet.error.status : undefined;
+  const delivery = useDelivery(session.accessToken);
+  const status = delivery.error instanceof ApiError ? delivery.error.status : undefined;
 
   useEffect(() => {
     if (status === 401) {
@@ -44,7 +42,7 @@ export const Home = ({
     );
   }
 
-  const report = fleet.data;
+  const needs = attention(delivery.reports).length;
   return (
     <div className="min-h-screen bg-surface">
       <TopBar active="Delivery" session={session} settings={settings} />
@@ -52,13 +50,16 @@ export const Home = ({
         <div className="mb-4 flex items-center gap-3">
           <h1 className="m-0 text-lg font-semibold">Delivery</h1>
           <span className="text-xs text-muted">
-            {report
-              ? `${report.environment_count} environments, ${report.environments_unhealthy} unhealthy, ${report.environments_behind} behind`
-              : fleet.error
-                ? fleet.error.message
-                : "Loading"}
+            {delivery.error
+              ? delivery.error.message
+              : delivery.loading
+                ? "Loading"
+                : needs === 0
+                  ? `${delivery.reports.length} environments, all current`
+                  : `${needs} need attention`}
           </span>
         </div>
+        {!delivery.loading && !delivery.error && <Delivery reports={delivery.reports} />}
       </main>
     </div>
   );
