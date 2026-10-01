@@ -1,22 +1,31 @@
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
 import type { OidcClientDiscovery } from "../api/tenkai.gen";
 import type { Session } from "../auth/session";
 import { useSignOut } from "../auth/use-sign-out";
 import { Button } from "../ui/kit";
 
-const TABS = ["Delivery", "Releases", "Environments", "Access"] as const;
+const TABS = [
+  { label: "Delivery", to: "/" },
+  { label: "Releases", to: "/releases" },
+  { label: "Environments", to: "/environments" },
+  { label: "Access", to: "/access" },
+] as const;
+
+/** The plan page belongs to Delivery; every other tab owns its path. */
+const activeTab = (path: string) =>
+  TABS.find((tab) => tab.to !== "/" && path === tab.to)?.label ?? "Delivery";
 
 /** Decision 4D: four top-level tabs, no second menu, account menu on the right. */
 export const TopBar = ({
-  active,
   session,
   settings,
 }: {
-  active: (typeof TABS)[number];
   session: Session;
   settings: OidcClientDiscovery | null;
 }) => {
   const leave = useSignOut(settings);
+  const active = activeTab(useRouterState({ select: (state) => state.location.pathname }));
   const [open, setOpen] = useState(false);
 
   return (
@@ -25,16 +34,17 @@ export const TopBar = ({
       <span className="text-xs text-muted">{window.location.host}</span>
       <nav className="ml-3 flex gap-4 text-[13px] font-medium">
         {TABS.map((tab) => (
-          <span
-            key={tab}
+          <Link
+            key={tab.label}
+            to={tab.to}
             className={
-              tab === active
-                ? "py-1.5 text-fg shadow-[inset_0_-2px_0_var(--color-primary)]"
-                : "py-1.5 text-muted"
+              tab.label === active
+                ? "py-1.5 text-fg no-underline shadow-[inset_0_-2px_0_var(--color-primary)]"
+                : "py-1.5 text-muted no-underline"
             }
           >
-            {tab}
-          </span>
+            {tab.label}
+          </Link>
         ))}
       </nav>
       <div className="relative ml-auto">
