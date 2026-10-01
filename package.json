@@ -12,21 +12,32 @@
     "test": "vitest run",
     "package": "sh scripts/package.sh",
     "lint:fix": "oxlint --type-aware --fix && pnpm format",
-    "format:check": "oxfmt --check"
+    "format:check": "oxfmt --check",
+    "api:sync": "node scripts/api.mjs sync",
+    "api:gen": "node scripts/api.mjs gen",
+    "api:check": "node scripts/api.mjs check"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.104.0",
+    "@tanstack/react-router": "^1.170.40",
     "arktype": "^2.2.5",
+    "oauth4webapi": "^3.8.8",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "happy-dom": "^20.14.5",
+    "json-schema-to-typescript": "^16.0.0",
     "oxfmt": "0.68.0",
     "oxlint": "1.83.0",
     "oxlint-tsgolint": "7.0.2002",
+    "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.1",
     "vitest": "^5.0.2"

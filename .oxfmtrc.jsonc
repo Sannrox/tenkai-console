@@ -25,5 +25,12 @@
   "tabWidth": 2,
   "trailingComma": "all",
   "useTabs": false,
-  "ignorePatterns": ["dist/", "release/", "**/*.json", "node_modules/", "pnpm-lock.yaml"],
+  "ignorePatterns": [
+    "dist/",
+    "release/",
+    "src/api/tenkai.gen.ts",
+    "**/*.json",
+    "node_modules/",
+    "pnpm-lock.yaml",
+  ],
 }
