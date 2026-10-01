@@ -3,11 +3,14 @@ import { Outlet, createRootRoute, createRoute, createRouter } from "@tanstack/re
 import { checkServer, consoleRoot, fetchOidcSettings } from "./api/http";
 import { useSession } from "./auth/session";
 import { useSessionRefresh } from "./auth/use-session-refresh";
+import { Access } from "./screens/access";
 import { AuthCallback } from "./screens/auth-callback";
+import { Environments } from "./screens/environments";
 import { Home } from "./screens/home";
 import { PlanPage } from "./screens/plan-page";
+import { Releases } from "./screens/releases";
 import { ServerStatus } from "./screens/server-status";
-import { SignIn } from "./screens/sign-in";
+import { SignedIn } from "./screens/signed-in";
 import { Centered, Title } from "./ui/kit";
 
 const useServer = () =>
@@ -42,32 +45,43 @@ const Root = () => {
 
 const rootRoute = createRootRoute({ component: Root });
 
-const indexRoute = createRoute({
+const appRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/",
-  component: function Index() {
-    const settings = useServer().data?.oidc ?? null;
-    const session = useSession((state) => state.session);
-    return session ? (
-      <Home session={session} settings={settings} />
-    ) : (
-      <SignIn settings={settings} />
-    );
+  id: "app",
+  component: function App() {
+    return <SignedIn settings={useServer().data?.oidc ?? null} />;
   },
 });
 
+const indexRoute = createRoute({ getParentRoute: () => appRoute, path: "/", component: Home });
+
 const planRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: "/environments/$environment/plan",
   component: function Plan() {
     const { environment } = planRoute.useParams();
-    const settings = useServer().data?.oidc ?? null;
-    const session = useSession((state) => state.session);
-    return session ? (
-      <PlanPage environment={environment} session={session} settings={settings} />
-    ) : (
-      <SignIn settings={settings} />
-    );
+    const token = useSession((state) => state.session?.accessToken);
+    return token ? <PlanPage environment={environment} token={token} /> : null;
+  },
+});
+
+const environmentsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/environments",
+  component: Environments,
+});
+
+const releasesRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/releases",
+  component: Releases,
+});
+
+const accessRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/access",
+  component: function AccessPage() {
+    return <Access settings={useServer().data?.oidc ?? null} />;
   },
 });
 
@@ -87,7 +101,10 @@ const callbackRoute = createRoute({
 });
 
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, planRoute, callbackRoute]),
+  routeTree: rootRoute.addChildren([
+    appRoute.addChildren([indexRoute, planRoute, environmentsRoute, releasesRoute, accessRoute]),
+    callbackRoute,
+  ]),
   basepath: consoleRoot.pathname,
 });
 

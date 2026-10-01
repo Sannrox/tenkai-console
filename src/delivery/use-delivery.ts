@@ -3,10 +3,11 @@ import { request } from "../api/http";
 import type { EnvironmentInspectReport, EnvironmentListEntry } from "../api/tenkai.gen";
 
 /** Environment list plus one inspect per environment, fetched in parallel. */
-export const useDelivery = (token: string) => {
+export const useDelivery = (token: string | undefined) => {
   const list = useQuery({
     queryKey: ["environments", token],
     queryFn: () => request<EnvironmentListEntry[]>("v1/environments", { token }),
+    enabled: token !== undefined,
     retry: false,
   });
   const inspects = useQueries({
