@@ -5,6 +5,7 @@ import { useSession } from "./auth/session";
 import { useSessionRefresh } from "./auth/use-session-refresh";
 import { AuthCallback } from "./screens/auth-callback";
 import { Home } from "./screens/home";
+import { PlanPage } from "./screens/plan-page";
 import { ServerStatus } from "./screens/server-status";
 import { SignIn } from "./screens/sign-in";
 import { Centered, Title } from "./ui/kit";
@@ -55,6 +56,21 @@ const indexRoute = createRoute({
   },
 });
 
+const planRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/environments/$environment/plan",
+  component: function Plan() {
+    const { environment } = planRoute.useParams();
+    const settings = useServer().data?.oidc ?? null;
+    const session = useSession((state) => state.session);
+    return session ? (
+      <PlanPage environment={environment} session={session} settings={settings} />
+    ) : (
+      <SignIn settings={settings} />
+    );
+  },
+});
+
 const callbackRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/auth/callback",
@@ -71,7 +87,7 @@ const callbackRoute = createRoute({
 });
 
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, callbackRoute]),
+  routeTree: rootRoute.addChildren([indexRoute, planRoute, callbackRoute]),
   basepath: consoleRoot.pathname,
 });
 
