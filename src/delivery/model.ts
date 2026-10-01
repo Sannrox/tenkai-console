@@ -123,7 +123,7 @@ export const attention = (reports: EnvironmentInspectReport[]): Attention[] => {
         product: undefined,
         environment: report.name,
         detail: plan.status_detail || `failed: ${planSummary(plan)}`,
-        next: "inspect failure",
+        next: "Inspect failure",
       });
     } else if (plan?.state === "blocked") {
       items.push({
@@ -131,7 +131,7 @@ export const attention = (reports: EnvironmentInspectReport[]): Attention[] => {
         product: undefined,
         environment: report.name,
         detail: plan.status_detail || `blocked: ${planSummary(plan)}`,
-        next: "review plan",
+        next: "Review plan",
       });
     } else if (plan?.state === "computed") {
       items.push({
@@ -139,7 +139,7 @@ export const attention = (reports: EnvironmentInspectReport[]): Attention[] => {
         product: undefined,
         environment: report.name,
         detail: plan.status_detail || `ready: ${planSummary(plan)}`,
-        next: "review plan",
+        next: "Review plan",
       });
     }
     for (const subscription of report.subscriptions) {
@@ -152,28 +152,28 @@ export const attention = (reports: EnvironmentInspectReport[]): Attention[] => {
           ...at,
           tone: "bad",
           detail: `${subscription.deployed ?? "none"} unhealthy${subscription.error ? `: ${subscription.error}` : ""}`,
-          next: "roll back",
+          next: "Roll back",
         });
       } else if (subscription.state === "missing") {
         items.push({
           ...at,
           tone: "bad",
           detail: `subscribed to ${subscription.channel}, nothing deployed`,
-          next: "plan",
+          next: "Plan",
         });
       } else if (subscription.state === "behind") {
         items.push({
           ...at,
           tone: "warn",
           detail: `${subscription.deployed} behind, head ${subscription.head}`,
-          next: "plan",
+          next: "Plan",
         });
       } else if (subscription.state === "config_stale") {
         items.push({
           ...at,
           tone: "warn",
           detail: "configuration changed since deploy",
-          next: "plan",
+          next: "Plan",
         });
       }
     }

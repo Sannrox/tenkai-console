@@ -122,10 +122,10 @@ describe("attention", () => {
       ]),
     ]);
     expect(items.map((item) => [item.tone, item.environment, item.product, item.next])).toEqual([
-      ["bad", "prod-us", "scheduler", "plan"],
-      ["bad", "staging", "web", "roll back"],
-      ["warn", "prod-eu", undefined, "review plan"],
-      ["warn", "prod-eu", "worker", "plan"],
+      ["bad", "prod-us", "scheduler", "Plan"],
+      ["bad", "staging", "web", "Roll back"],
+      ["warn", "prod-eu", undefined, "Review plan"],
+      ["warn", "prod-eu", "worker", "Plan"],
     ]);
     expect(items[2]?.detail).toBe("awaiting signed approval");
   });

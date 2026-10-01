@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import type { EnvironmentInspectReport } from "../api/tenkai.gen";
 import { type Tone, attention, matrix } from "../delivery/model";
 import { Card } from "../ui/kit";
@@ -39,7 +40,13 @@ export const Delivery = ({ reports }: { reports: EnvironmentInspectReport[] }) =
                 </div>
                 <div className="text-xs text-muted">{item.detail}</div>
               </div>
-              <span className="text-xs text-muted">{item.next}</span>
+              <Link
+                to="/environments/$environment/plan"
+                params={{ environment: item.environment }}
+                className="inline-flex items-center rounded-md border border-field px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap text-fg no-underline"
+              >
+                {item.next}
+              </Link>
             </div>
           ))}
         </Card>
@@ -80,13 +87,17 @@ export const Delivery = ({ reports }: { reports: EnvironmentInspectReport[] }) =
                       className="border-b border-l border-line px-3 py-2 whitespace-nowrap"
                     >
                       {value ? (
-                        <>
+                        <Link
+                          to="/environments/$environment/plan"
+                          params={{ environment: column.environment }}
+                          className="block text-inherit no-underline"
+                        >
                           <span className={`font-mono ${TEXT[value.tone]}`}>{value.version}</span>
                           <span className="block text-[11px] text-muted">
                             {value.status}
                             {!column.channel && ` · ${value.channel}`}
                           </span>
-                        </>
+                        </Link>
                       ) : (
                         <span className="text-muted">·</span>
                       )}
