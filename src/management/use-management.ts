@@ -31,7 +31,16 @@ export const refusesCredential = (error: unknown): boolean =>
     error.message.startsWith("runtime credentials "));
 
 /**
- * One management call per confirmed click; the client never retries or defers
+ * A fresh identity for one click's request. `crypto.randomUUID` needs a
+ * secure context, and the console may be served over plain http.
+ */
+export const newRequestId = (): string =>
+  Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+
+/**
+ * One management call, with its own request identity, per confirmed click; the client never retries or defers
  * mutations (main.tsx). A credential refusal hides the scope's controls for the
  * session, and
  * every settled call refreshes the environment reads so the screen shows the
@@ -47,7 +56,12 @@ export const useManagementCall = <T>(
   const refuse = useSession((state) => state.refuse);
   const mutation = useMutation({
     mutationFn: (call: { path: string; body?: unknown }) =>
-      request<T>(call.path, { token, method: "POST", body: call.body }),
+      request<T>(call.path, {
+        token,
+        method: "POST",
+        body: call.body,
+        requestId: newRequestId(),
+      }),
     onError: (error) => {
       if (refusesCredential(error)) {
         refuse(token, scope);
