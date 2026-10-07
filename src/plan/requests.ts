@@ -72,7 +72,7 @@ const Envelope = type({
   },
 });
 
-const TrustRoots = type({
+export const TrustRoots = type({
   version: "number",
   signers: type({ identity: "string", key_id: "string", public_key: "string" }).array(),
 });
@@ -80,7 +80,7 @@ const TrustRoots = type({
 export type Evidence = Pick<ApproveRequest, "approval" | "trust_roots">;
 
 /** `dev sign-approval` writes trust roots as TOML; JSON is accepted too. */
-const parseRoots = (text: string): unknown => {
+export const parseRoots = (text: string): unknown => {
   try {
     return JSON.parse(text);
   } catch {
