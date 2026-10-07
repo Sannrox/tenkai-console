@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../api/http";
-import { failure, refusesCredential } from "./use-management";
+import { failure, newRequestId, refusesCredential } from "./use-management";
 
 describe("failure", () => {
   it("shows the server's refusal as sent", () => {
@@ -25,5 +25,12 @@ describe("refusesCredential", () => {
     ).toBe(true);
     expect(refusesCredential(new ApiError(403, "release signature does not verify"))).toBe(false);
     expect(refusesCredential(new ApiError(409, "insufficient delivery capability"))).toBe(false);
+  });
+});
+
+describe("newRequestId", () => {
+  it("gives every click its own identity", () => {
+    expect(newRequestId()).toMatch(/^[0-9a-f]{32}$/);
+    expect(newRequestId()).not.toBe(newRequestId());
   });
 });

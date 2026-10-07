@@ -29,7 +29,13 @@ export class ApiError extends Error {
 /** Typed JSON request against the Tenkai API. */
 export const request = async <T>(
   path: string,
-  init: { token?: string | undefined; method?: "GET" | "POST"; body?: unknown } = {},
+  init: {
+    token?: string | undefined;
+    method?: "GET" | "POST";
+    body?: unknown;
+    /** Sent as `x-request-id`; the server uses it to correlate audit records. */
+    requestId?: string;
+  } = {},
   fetcher: typeof fetch = fetch,
 ): Promise<T> => {
   const headers = new Headers({ accept: "application/json" });
@@ -38,6 +44,9 @@ export const request = async <T>(
   }
   if (init.body !== undefined) {
     headers.set("content-type", "application/json");
+  }
+  if (init.requestId) {
+    headers.set("x-request-id", init.requestId);
   }
   const response = await fetcher(new URL(path, apiRoot), {
     method: init.method ?? "GET",
