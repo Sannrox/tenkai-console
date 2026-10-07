@@ -1,21 +1,24 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ApiError, request } from "../api/http";
 import type {
   EnvironmentInspectReport,
   ManagementLifecycleResult,
   RetireEnvironmentRequest,
 } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
-import { environmentRows } from "../delivery/configuration";
+import { channelTable, environmentRows } from "../delivery/configuration";
 import { useDelivery } from "../delivery/use-delivery";
-import { Button, Card } from "../ui/kit";
+import { useManagementCall } from "../management/use-management";
+import { expectedGeneration, subscribeBody } from "../plan/requests";
+import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2 align-top";
 
-/** Decision 4D: environments as a top tab, one table, the selected row's detail below. */
+/**
+ * Decision 4D: environments as a top tab, one table, the selected row's detail
+ * below. The detail subscribes a product channel and retires the environment.
+ */
 export const Environments = () => {
   const token = useSession((state) => state.session?.accessToken);
   const delivery = useDelivery(token);
@@ -24,6 +27,7 @@ export const Environments = () => {
   // A retired or vanished selection falls back to the first environment.
   const shown = rows.some((row) => row.name === selected) ? selected : rows[0]?.name;
   const report = delivery.reports.find((candidate) => candidate.name === shown);
+  const { products, channels } = channelTable(delivery.reports);
 
   return (
     <>
@@ -70,26 +74,35 @@ export const Environments = () => {
           </tbody>
         </table>
       </Card>
-      {report && token && <Detail report={report} token={token} />}
+      {report && token && (
+        <Detail key={report.name} report={report} token={token} known={{ products, channels }} />
+      )}
     </>
   );
 };
 
-const Detail = ({ report, token }: { report: EnvironmentInspectReport; token: string }) => {
-  const queryClient = useQueryClient();
+const field =
+  "min-w-0 flex-1 rounded-md border border-field bg-white/4 px-2.5 py-1.5 text-xs text-fg placeholder:text-muted";
+const message = (result: ManagementLifecycleResult) => result.message;
+
+const Detail = ({
+  report,
+  token,
+  known,
+}: {
+  report: EnvironmentInspectReport;
+  token: string;
+  known: { products: string[]; channels: string[] };
+}) => {
+  const scope = `environment:${report.name}` as const;
+  const path = `v1/environments/${encodeURIComponent(report.name)}`;
+  const generation = expectedGeneration(report.lease);
+  const retire = useManagementCall(token, scope, message);
+  const subscribe = useManagementCall(token, scope, message);
   const [reason, setReason] = useState("");
-  const retire = useMutation({
-    mutationFn: () =>
-      request<ManagementLifecycleResult>(
-        `v1/environments/${encodeURIComponent(report.name)}/retire`,
-        {
-          token,
-          method: "POST",
-          body: { version: 1, operation: "retire", reason } satisfies RetireEnvironmentRequest,
-        },
-      ),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["environments"] }),
-  });
+  const [product, setProduct] = useState("");
+  const [channel, setChannel] = useState("");
+  const spec = `${product.trim()}=${channel.trim()}`;
 
   return (
     <>
@@ -130,6 +143,52 @@ const Detail = ({ report, token }: { report: EnvironmentInspectReport; token: st
               ))}
             </tbody>
           </table>
+          {subscribe.allowed && (
+            <div className="flex flex-wrap gap-2 border-t border-line px-3.5 py-3">
+              <input
+                aria-label="Product"
+                placeholder="Product"
+                list="known-products"
+                value={product}
+                onChange={(event) => setProduct(event.target.value)}
+                className={field}
+              />
+              <input
+                aria-label="Channel"
+                placeholder="Channel"
+                list="known-channels"
+                value={channel}
+                onChange={(event) => setChannel(event.target.value)}
+                className={field}
+              />
+              <datalist id="known-products">
+                {known.products.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+              <datalist id="known-channels">
+                {known.channels.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+              <ConfirmButton
+                label="Subscribe"
+                confirm={`Subscribe ${report.name} to ${spec}`}
+                disabled={!product.trim() || !channel.trim() || subscribe.isPending}
+                onConfirm={() =>
+                  subscribe.mutate({
+                    path: `${path}/subscriptions`,
+                    body: subscribeBody(report.name, generation, product.trim(), channel.trim()),
+                  })
+                }
+              />
+            </div>
+          )}
+          {subscribe.outcome && (
+            <div className="px-3.5 pb-3">
+              <Notice tone={subscribe.outcome.tone}>{subscribe.outcome.text}</Notice>
+            </div>
+          )}
         </Card>
         <Card>
           <dl className="m-0 grid grid-cols-[120px_1fr] gap-x-3 gap-y-1 px-3.5 py-3 text-xs">
@@ -144,27 +203,36 @@ const Detail = ({ report, token }: { report: EnvironmentInspectReport; token: st
               {report.lease.held ? `held, generation ${report.lease.generation ?? 0}` : "free"}
             </dd>
           </dl>
-          <div className="flex gap-2 border-t border-line px-3.5 py-3">
-            <input
-              aria-label="Retirement reason"
-              placeholder="Reason to retire"
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              className="min-w-0 flex-1 rounded-md border border-field bg-white/4 px-2.5 py-1.5 text-xs text-fg placeholder:text-muted"
-            />
-            <Button disabled={!reason.trim() || retire.isPending} onClick={() => retire.mutate()}>
-              Retire
-            </Button>
-          </div>
-          {retire.error && (
-            <p role="alert" className="mx-3.5 mb-3 text-xs text-danger">
-              {retire.error instanceof ApiError ? retire.error.message : String(retire.error)}
-            </p>
+          {retire.allowed && (
+            <div className="flex gap-2 border-t border-line px-3.5 py-3">
+              <input
+                aria-label="Retirement reason"
+                placeholder="Reason to retire"
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                className={field}
+              />
+              <Button
+                disabled={!reason.trim() || retire.isPending}
+                onClick={() =>
+                  retire.mutate({
+                    path: `${path}/retire`,
+                    body: {
+                      version: 1,
+                      operation: "retire",
+                      reason,
+                    } satisfies RetireEnvironmentRequest,
+                  })
+                }
+              >
+                Retire
+              </Button>
+            </div>
           )}
-          {retire.data && (
-            <p role="status" className="mx-3.5 mb-3 text-xs text-ok">
-              {retire.data.message}
-            </p>
+          {retire.outcome && (
+            <div className="px-3.5 pb-3">
+              <Notice tone={retire.outcome.tone}>{retire.outcome.text}</Notice>
+            </div>
           )}
         </Card>
       </div>
