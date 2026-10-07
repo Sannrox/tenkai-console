@@ -6,6 +6,7 @@ import type {
   EnvironmentLeaseInspect,
   PlanRequest,
   RollbackRequest,
+  SubscribeRequest,
 } from "../api/tenkai.gen";
 
 /**
@@ -26,6 +27,20 @@ export const planBody = (environment: string, generation: number): PlanRequest =
   operation: "plan",
   environment,
   expected_generation: generation,
+});
+
+/** Same spec as `tenkaictl env subscribe <env> <product>=<channel>`. */
+export const subscribeBody = (
+  environment: string,
+  generation: number,
+  product: string,
+  channel: string,
+): SubscribeRequest => ({
+  version: VERSION,
+  operation: "subscribe",
+  environment,
+  expected_generation: generation,
+  spec: `${product}=${channel}`,
 });
 
 export const rollbackBody = (

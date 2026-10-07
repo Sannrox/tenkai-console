@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { applyBody, expectedGeneration, parseEvidence, planBody, signCommand } from "./requests";
+import {
+  applyBody,
+  expectedGeneration,
+  parseEvidence,
+  planBody,
+  signCommand,
+  subscribeBody,
+} from "./requests";
 
 const envelope = (environment: string) =>
   JSON.stringify({
@@ -35,6 +42,13 @@ describe("lifecycle requests", () => {
       operation: "plan",
       environment: "prod-eu",
       expected_generation: 0,
+    });
+    expect(subscribeBody("prod-eu", 41, "api", "stable")).toEqual({
+      version: 1,
+      operation: "subscribe",
+      environment: "prod-eu",
+      expected_generation: 41,
+      spec: "api=stable",
     });
     const evidence = parseEvidence("prod-eu", envelope("prod-eu"), roots);
     if (typeof evidence === "string") {
