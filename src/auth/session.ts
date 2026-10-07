@@ -22,9 +22,9 @@ type SessionState = {
   /** Why the last session ended, shown on the sign-in screen. */
   ended: "expired" | null;
   /**
-   * Scopes where the server answered 403 to a management call. Tenkai serves
-   * no grant listing, so a refusal is the only way to learn a credential may
-   * not manage; their controls stay hidden until sign-out.
+   * Scopes where the server refused this credential a management call.
+   * Tenkai serves no grant listing, so a refusal is the only way to learn a
+   * credential may not manage; their controls stay hidden until sign-out.
    */
   refused: Scope[];
   signIn: (session: Session) => void;

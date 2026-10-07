@@ -17,8 +17,23 @@ export const failure = (error: unknown): Outcome =>
       };
 
 /**
+ * Whether a refusal is about the credential rather than the request. Tenkai
+ * also answers 403 to bad signatures, trust roots, and approvals, which a
+ * corrected request can pass. These are its credential refusals; any other
+ * 403 leaves the controls in place.
+ */
+export const refusesCredential = (error: unknown): boolean =>
+  error instanceof ApiError &&
+  error.status === 403 &&
+  (error.message === "insufficient delivery capability" ||
+    error.message === "invalid management credential" ||
+    error.message.startsWith("environment-scoped credentials ") ||
+    error.message.startsWith("runtime credentials "));
+
+/**
  * One management call per confirmed click; the client never retries or defers
- * mutations (main.tsx). A 403 hides the scope's controls for the session, and
+ * mutations (main.tsx). A credential refusal hides the scope's controls for the
+ * session, and
  * every settled call refreshes the environment reads so the screen shows the
  * server's state.
  */
@@ -34,7 +49,7 @@ export const useManagementCall = <T>(
     mutationFn: (call: { path: string; body?: unknown }) =>
       request<T>(call.path, { token, method: "POST", body: call.body }),
     onError: (error) => {
-      if (error instanceof ApiError && error.status === 403) {
+      if (refusesCredential(error)) {
         refuse(token, scope);
       }
     },
