@@ -2,6 +2,9 @@ import type { OidcClientDiscovery } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
 import { Card } from "../ui/kit";
 
+export const GRANT_SUMMARY =
+  "read, publish, and management, decided by the server for each request from your groups";
+
 /** Who you are signed in as. Grants are decided by the server on every request. */
 export const Access = ({ settings }: { settings: OidcClientDiscovery | null }) => {
   const session = useSession((state) => state.session);
@@ -28,7 +31,7 @@ export const Access = ({ settings }: { settings: OidcClientDiscovery | null }) =
             </>
           )}
           <dt className="text-muted">grants</dt>
-          <dd className="m-0">decided by the server for each request, from your groups</dd>
+          <dd className="m-0">{GRANT_SUMMARY}</dd>
         </dl>
       </Card>
     </>

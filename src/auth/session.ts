@@ -17,20 +17,31 @@ export type Session = {
 /** Where a management call applies: catalog and fleet-wide, or one environment. */
 export type Scope = "fleet" | `environment:${string}`;
 
+/** Delivery capability the server enforces after authentication. */
+export type DeliveryCapability = "read" | "publish" | "management";
+
+export type Refusal = { scope: Scope; capability: DeliveryCapability };
+
+export const isRefused = (
+  refused: Refusal[],
+  scope: Scope,
+  capability: DeliveryCapability,
+): boolean => refused.some((entry) => entry.scope === scope && entry.capability === capability);
+
 type SessionState = {
   session: Session | null;
   /** Why the last session ended, shown on the sign-in screen. */
   ended: "expired" | null;
   /**
-   * Scopes where the server refused this credential a management call.
-   * Tenkai serves no grant listing, so a refusal is the only way to learn a
-   * credential may not manage; their controls stay hidden until sign-out.
+   * Capability refusals for this credential. Tenkai serves no grant listing,
+   * so a 403 is the only way to learn a credential lacks a capability; those
+   * controls stay hidden until sign-out.
    */
-  refused: Scope[];
+  refused: Refusal[];
   signIn: (session: Session) => void;
   signOut: (reason?: "expired") => void;
   /** Records a refusal only while `token` is still the signed-in credential. */
-  refuse: (token: string, scope: Scope) => void;
+  refuse: (token: string, scope: Scope, capability: DeliveryCapability) => void;
 };
 
 export const useSession = create<SessionState>()((set) => ({
@@ -45,11 +56,11 @@ export const useSession = create<SessionState>()((set) => ({
       refused: state.session ? state.refused : [],
     })),
   signOut: (reason) => set({ session: null, ended: reason ?? null, refused: [] }),
-  refuse: (token, scope) =>
+  refuse: (token, scope, capability) =>
     set((state) =>
-      state.session?.accessToken !== token || state.refused.includes(scope)
+      state.session?.accessToken !== token || isRefused(state.refused, scope, capability)
         ? state
-        : { refused: [...state.refused, scope] },
+        : { refused: [...state.refused, { scope, capability }] },
     ),
 }));
 

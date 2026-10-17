@@ -79,9 +79,9 @@ const field =
 const message = (result: ManagementLifecycleResult) => result.message;
 
 const Catalog = ({ token, channels }: { token: string; channels: string[] }) => {
-  const publish = useManagementCall(token, "fleet", message);
-  const promote = useManagementCall(token, "fleet", message);
-  const recall = useManagementCall(token, "fleet", message);
+  const publish = useManagementCall(token, "fleet", "publish", message);
+  const promote = useManagementCall(token, "fleet", "publish", message);
+  const recall = useManagementCall(token, "fleet", "management", message);
   const [manifest, setManifest] = useState("");
   const [signature, setSignature] = useState("");
   const [roots, setRoots] = useState("");
@@ -91,12 +91,11 @@ const Catalog = ({ token, channels }: { token: string; channels: string[] }) => 
   const parsed = pasted ? parsePublish(manifest, signature, roots) : undefined;
   const spec = release.trim();
   const target = channel.trim();
+  const publishRefusal = [publish, promote].find((call) => refusesCredential(call.error))?.outcome;
+  const recallRefusal = refusesCredential(recall.error) ? recall.outcome : undefined;
 
-  if (!publish.allowed) {
-    // The refusal that hid the controls stays readable.
-    const refusal = [publish, promote, recall].find((call) =>
-      refusesCredential(call.error),
-    )?.outcome;
+  if (!publish.allowed && !recall.allowed) {
+    const refusal = publishRefusal ?? recallRefusal;
     return refusal ? (
       <div className="mt-[18px]">
         <Notice tone={refusal.tone}>{refusal.text}</Notice>
@@ -105,97 +104,115 @@ const Catalog = ({ token, channels }: { token: string; channels: string[] }) => 
   }
   return (
     <>
-      <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Publish</h2>
-      <div className="grid gap-3 md:grid-cols-3">
-        <textarea
-          rows={6}
-          aria-label="Release manifest"
-          placeholder="Paste tenkai.toml"
-          value={manifest}
-          onChange={(event) => setManifest(event.target.value)}
-          className={field}
-        />
-        <textarea
-          rows={6}
-          aria-label="Release signature"
-          placeholder="Paste the release signature JSON"
-          value={signature}
-          onChange={(event) => setSignature(event.target.value)}
-          className={field}
-        />
-        <textarea
-          rows={6}
-          aria-label="Release trust roots"
-          placeholder="Paste the release trust-roots TOML"
-          value={roots}
-          onChange={(event) => setRoots(event.target.value)}
-          className={field}
-        />
-      </div>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <ConfirmButton
-          label="Publish"
-          confirm={`Publish ${typeof parsed === "object" ? parsed.release : ""}`}
-          disabled={typeof parsed !== "object" || publish.isPending}
-          onConfirm={() => {
-            if (typeof parsed === "object") {
-              publish.mutate({ path: "v1/releases", body: parsed.body });
-            }
-          }}
-        />
-        {typeof parsed === "string" && <Notice tone="bad">{parsed}</Notice>}
-        {publish.outcome && <Notice tone={publish.outcome.tone}>{publish.outcome.text}</Notice>}
-      </div>
+      {publish.allowed ? (
+        <>
+          <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Publish</h2>
+          <div className="grid gap-3 md:grid-cols-3">
+            <textarea
+              rows={6}
+              aria-label="Release manifest"
+              placeholder="Paste tenkai.toml"
+              value={manifest}
+              onChange={(event) => setManifest(event.target.value)}
+              className={field}
+            />
+            <textarea
+              rows={6}
+              aria-label="Release signature"
+              placeholder="Paste the release signature JSON"
+              value={signature}
+              onChange={(event) => setSignature(event.target.value)}
+              className={field}
+            />
+            <textarea
+              rows={6}
+              aria-label="Release trust roots"
+              placeholder="Paste the release trust-roots TOML"
+              value={roots}
+              onChange={(event) => setRoots(event.target.value)}
+              className={field}
+            />
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <ConfirmButton
+              label="Publish"
+              confirm={`Publish ${typeof parsed === "object" ? parsed.release : ""}`}
+              disabled={typeof parsed !== "object" || publish.isPending}
+              onConfirm={() => {
+                if (typeof parsed === "object") {
+                  publish.mutate({ path: "v1/releases", body: parsed.body });
+                }
+              }}
+            />
+            {typeof parsed === "string" && <Notice tone="bad">{parsed}</Notice>}
+            {publish.outcome && <Notice tone={publish.outcome.tone}>{publish.outcome.text}</Notice>}
+          </div>
+        </>
+      ) : (
+        publishRefusal && (
+          <div className="mt-[18px]">
+            <Notice tone={publishRefusal.tone}>{publishRefusal.text}</Notice>
+          </div>
+        )
+      )}
 
-      <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Promote or recall</h2>
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          aria-label="Release"
-          placeholder="product@version"
-          value={release}
-          onChange={(event) => setRelease(event.target.value)}
-          className={field}
-        />
-        <input
-          aria-label="Channel"
-          placeholder="Channel"
-          list="catalog-channels"
-          value={channel}
-          onChange={(event) => setChannel(event.target.value)}
-          className={field}
-        />
-        <datalist id="catalog-channels">
-          {channels.map((name) => (
-            <option key={name} value={name} />
-          ))}
-        </datalist>
-        <ConfirmButton
-          label="Promote"
-          confirm={`Promote ${spec} to ${target}`}
-          disabled={!isReleaseSpec(spec) || !target || promote.isPending}
-          onConfirm={() =>
-            promote.mutate({
-              path: `v1/channels/${encodeURIComponent(target)}/promote`,
-              body: promoteBody(spec),
-            })
-          }
-        />
-        <ConfirmButton
-          label="Recall"
-          confirm={`Recall ${spec}`}
-          disabled={!isReleaseSpec(spec) || recall.isPending}
-          onConfirm={() =>
-            recall.mutate({
-              path: `v1/releases/${encodeURIComponent(spec)}/recall`,
-              body: recallBody,
-            })
-          }
-        />
-      </div>
-      <div className="mt-2 grid gap-1">
-        {promote.outcome && <Notice tone={promote.outcome.tone}>{promote.outcome.text}</Notice>}
-        {recall.outcome && <Notice tone={recall.outcome.tone}>{recall.outcome.text}</Notice>}
-      </div>
+      {(publish.allowed || recall.allowed) && (
+        <>
+          <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Promote or recall</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              aria-label="Release"
+              placeholder="product@version"
+              value={release}
+              onChange={(event) => setRelease(event.target.value)}
+              className={field}
+            />
+            <input
+              aria-label="Channel"
+              placeholder="Channel"
+              list="catalog-channels"
+              value={channel}
+              onChange={(event) => setChannel(event.target.value)}
+              className={field}
+            />
+            <datalist id="catalog-channels">
+              {channels.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+            {publish.allowed && (
+              <ConfirmButton
+                label="Promote"
+                confirm={`Promote ${spec} to ${target}`}
+                disabled={!isReleaseSpec(spec) || !target || promote.isPending}
+                onConfirm={() =>
+                  promote.mutate({
+                    path: `v1/channels/${encodeURIComponent(target)}/promote`,
+                    body: promoteBody(spec),
+                  })
+                }
+              />
+            )}
+            {recall.allowed && (
+              <ConfirmButton
+                label="Recall"
+                confirm={`Recall ${spec}`}
+                disabled={!isReleaseSpec(spec) || recall.isPending}
+                onConfirm={() =>
+                  recall.mutate({
+                    path: `v1/releases/${encodeURIComponent(spec)}/recall`,
+                    body: recallBody,
+                  })
+                }
+              />
+            )}
+          </div>
+          <div className="mt-2 grid gap-1">
+            {promote.outcome && <Notice tone={promote.outcome.tone}>{promote.outcome.text}</Notice>}
+            {recall.outcome && <Notice tone={recall.outcome.tone}>{recall.outcome.text}</Notice>}
+          </div>
+        </>
+      )}
     </>
   );
 };

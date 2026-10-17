@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at ee98ea9a532a7be6ddb6c0f0b98ea5047f95018b (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 41781cfabc891497e96d18ec389f0e7eb09f3f0a (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -11,6 +11,69 @@ export type CheckpointClass = ("reversible" | "compensating" | "irreversible")
  * via the `definition` "CompatibilityStatus".
  */
 export type CompatibilityStatus = ("compatible" | "incompatible")
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ComponentPin".
+ */
+export type ComponentPin = ({
+kind: "revision"
+value: string
+} | {
+kind: "digest"
+value: string
+})
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "MigrationState".
+ */
+export type MigrationState = ("stable" | "pending")
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "CompatibilityFailure".
+ */
+export type CompatibilityFailure = ({
+reason: "missing_evidence"
+} | {
+reason: "invalid_evidence"
+} | {
+reason: "ambiguous_evidence"
+} | {
+reason: "preflight_unavailable"
+} | {
+component: string
+reason: "ambiguous_component"
+} | {
+reason: "release_binding"
+} | {
+reason: "environment_binding"
+} | {
+reason: "stale_evidence"
+} | {
+component: string
+reason: "missing_component"
+} | {
+component: string
+reason: "component_changed"
+} | {
+capability: string
+reason: "missing_capability"
+} | {
+fact: string
+reason: "unsatisfied_fact"
+} | {
+contract: string
+reason: "missing_contract"
+} | {
+contract: string
+reason: "ambiguous_contract"
+} | {
+contract: string
+reason: "incompatible_contract"
+} | {
+reason: "unsupported_schema"
+} | {
+reason: "migration_state"
+})
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "EnvironmentStatus".
@@ -55,14 +118,22 @@ CheckpointClass?: CheckpointClass
 CheckpointDecl?: CheckpointDecl
 CheckpointReceipt?: CheckpointReceipt
 CompatibilityEvidence?: CompatibilityEvidence
+CompatibilityEvidence2?: CompatibilityEvidence2
+CompatibilityFailure?: CompatibilityFailure
+CompatibilityReport?: CompatibilityReport
 CompatibilityStatus?: CompatibilityStatus
+ComponentObservation?: ComponentObservation
+ComponentPin?: ComponentPin
+EnvironmentConstraint?: EnvironmentConstraint
 EnvironmentInspectReport?: EnvironmentInspectReport
 EnvironmentLeaseInspect?: EnvironmentLeaseInspect
 EnvironmentListEntry?: EnvironmentListEntry
+EnvironmentMaintenanceInspect?: EnvironmentMaintenanceInspect1
+EnvironmentMaintenanceWindow?: EnvironmentMaintenanceWindow
 EnvironmentPlanStepSummary?: EnvironmentPlanStepSummary
 EnvironmentPlanSummary?: EnvironmentPlanSummary
 EnvironmentResult?: EnvironmentResult
-EnvironmentRetirement?: EnvironmentRetirement
+EnvironmentRetirement?: EnvironmentRetirement1
 EnvironmentStatus?: EnvironmentStatus
 EnvironmentSubscriptionView?: EnvironmentSubscriptionView
 ErrorBody?: ErrorBody
@@ -73,6 +144,7 @@ MigrationApprovalEnvelope?: MigrationApprovalEnvelope
 MigrationApprovalStatement?: MigrationApprovalStatement
 MigrationDeclaration?: MigrationDeclaration
 MigrationRecord?: MigrationRecord
+MigrationState?: MigrationState
 MigrationStatus?: MigrationStatus
 ModuleActivationReceipt?: ModuleActivationReceipt
 OidcClientDiscovery?: OidcClientDiscovery
@@ -84,7 +156,7 @@ PackagePin?: PackagePin
 PlanApprovalTrustRoots?: PlanApprovalTrustRoots
 PlanApprovalTrustedSigner?: PlanApprovalTrustedSigner
 PlanRequest?: PlanRequest
-PreviewInspect?: PreviewInspect
+PreviewInspect?: PreviewInspect1
 PromoteRequest?: PromoteRequest
 Provenance?: Provenance
 PublishRequest?: PublishRequest
@@ -204,7 +276,7 @@ checkpoint_id: string
 class: CheckpointClass
 effect: string
 fence_generation: number
-plan_id?: (string | null)
+plan_id?: string
 result: string
 }
 /**
@@ -217,12 +289,79 @@ status: CompatibilityStatus
 version: number
 }
 /**
+ * Observations describe the candidate's constituents and installed dependencies.
+ * The environment owner supplies this evidence; it grants no execution authority.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "CompatibilityEvidence2".
+ */
+export interface CompatibilityEvidence2 {
+capabilities: string[]
+components: {
+[k: string]: ComponentObservation
+}
+contracts: {
+[k: string]: string
+}
+environment: string
+migration: MigrationState
+observed_at_ms: number
+release_digest: string
+schema_version?: (number | null)
+version: number
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ComponentObservation".
+ */
+export interface ComponentObservation {
+pin: ComponentPin
+provides: {
+[k: string]: string
+}
+requires?: {
+[k: string]: string
+}
+}
+/**
+ * Public reports contain requirement identifiers, never observed facts or payloads.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "CompatibilityReport".
+ */
+export interface CompatibilityReport {
+failures: CompatibilityFailure[]
+release_digest: string
+version: number
+}
+/**
+ * One environment constraint, as set by `tenkaictl env constraints set`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EnvironmentConstraint".
+ */
+export interface EnvironmentConstraint {
+/**
+ * `version_pin`, `version_range`, or `require_fact`.
+ */
+kind: string
+/**
+ * Product for version constraints; fact key for `require_fact`.
+ */
+name: string
+value: string
+}
+/**
  * Detailed inspect report for one environment (no credentials).
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "EnvironmentInspectReport".
  */
 export interface EnvironmentInspectReport {
+/**
+ * Environment constraints (`version_pin`, `version_range`, `require_fact`).
+ */
+constraints?: EnvironmentConstraint[]
 description: string
 /**
  * Execution ownership note: Tenkai never prints runtime bearer tokens.
@@ -237,6 +376,7 @@ id: string
  */
 latest_plan?: (EnvironmentPlanSummary | null)
 lease: EnvironmentLeaseInspect
+maintenance?: EnvironmentMaintenanceInspect
 /**
  * Accepted workshop-module activation receipts for this environment.
  */
@@ -245,25 +385,19 @@ name: string
 /**
  * Observed runtime digest used for workshop-module compatibility admission.
  */
-observed_runtime_digest?: (string | null)
+observed_runtime_digest?: string
 /**
  * Observed type digest used for workshop-module compatibility admission.
  */
-observed_type_digest?: (string | null)
+observed_type_digest?: string
 /**
  * Non-secret product overlays as `product.key=value`.
  */
 overlays?: {
 [k: string]: string
 }
-/**
- * Present only for preview environments bound to a branch pin.
- */
-preview?: (PreviewInspect | null)
-/**
- * Present after this environment has been retired from operational use.
- */
-retirement?: (EnvironmentRetirement | null)
+preview?: PreviewInspect
+retirement?: EnvironmentRetirement
 subscriptions: EnvironmentSubscriptionView[]
 /**
  * Bounded terminal-outcome identities and outbox delivery state. Event
@@ -277,6 +411,12 @@ terminal_outcomes?: TerminalOutcomeProjection[]
  */
 export interface EnvironmentPlanSummary {
 created_at: number
+/**
+ * `sha256:` digest of the versioned executable-plan encoding, the value
+ * the plan route returns and approvals bind to. Absent for projections
+ * without an executable plan, such as development fixtures.
+ */
+digest?: string
 id: string
 state: string
 /**
@@ -326,6 +466,55 @@ owner?: (string | null)
 status: string
 }
 /**
+ * Maintenance windows and their eligibility at inspect time. Absent for
+ * projections that do not read Tenkai-owned environment configuration.
+ */
+export interface EnvironmentMaintenanceInspect {
+/**
+ * When `invalid`: why the configuration cannot be evaluated.
+ */
+detail?: string
+/**
+ * `unrestricted` (no environment windows), `open`, `closed`, or
+ * `invalid`. Invalid configuration blocks apply until it is corrected.
+ */
+eligibility: string
+/**
+ * When `closed`: next opening of any window, in Unix milliseconds.
+ */
+next_opens_at_ms?: number
+/**
+ * When `open`: end of the current window, in Unix milliseconds.
+ */
+open_until_ms?: number
+windows: EnvironmentMaintenanceWindow[]
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EnvironmentMaintenanceWindow".
+ */
+export interface EnvironmentMaintenanceWindow {
+duration_minutes: number
+identity: string
+/**
+ * Next start of this window strictly after inspect time, in Unix
+ * milliseconds; absent when the window cannot be evaluated.
+ */
+next_opens_at_ms?: number
+/**
+ * Local wall-clock start in HH:MM form.
+ */
+start: string
+/**
+ * IANA timezone of `start`.
+ */
+timezone: string
+/**
+ * ISO weekday numbers: Monday is 1 and Sunday is 7.
+ */
+weekdays: number[]
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "ModuleActivationReceipt".
  */
@@ -343,22 +532,18 @@ schema: string
 type_digest: string
 }
 /**
- * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
- * via the `definition` "PreviewInspect".
+ * Present only for preview environments bound to a branch pin.
  */
 export interface PreviewInspect {
 expires_at: number
 pin_digest: string
 plan_digest: string
 status: string
-teardown_at?: (number | null)
-teardown_reason?: (string | null)
+teardown_at?: number
+teardown_reason?: string
 }
 /**
- * Durable evidence explaining why an environment is no longer operational.
- * 
- * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
- * via the `definition` "EnvironmentRetirement".
+ * Present after this environment has been retired from operational use.
  */
 export interface EnvironmentRetirement {
 actor: string
@@ -426,12 +611,52 @@ name: string
 subscription_count: number
 }
 /**
+ * Read-only view of the environment's own maintenance schedule, evaluated
+ * with the same rules as apply admission. Product maintenance windows
+ * (`tenkaictl product maintenance`) are not included and may further
+ * restrict when a plan touching that product can apply.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EnvironmentMaintenanceInspect".
+ */
+export interface EnvironmentMaintenanceInspect1 {
+/**
+ * When `invalid`: why the configuration cannot be evaluated.
+ */
+detail?: string
+/**
+ * `unrestricted` (no environment windows), `open`, `closed`, or
+ * `invalid`. Invalid configuration blocks apply until it is corrected.
+ */
+eligibility: string
+/**
+ * When `closed`: next opening of any window, in Unix milliseconds.
+ */
+next_opens_at_ms?: number
+/**
+ * When `open`: end of the current window, in Unix milliseconds.
+ */
+open_until_ms?: number
+windows: EnvironmentMaintenanceWindow[]
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "EnvironmentResult".
  */
 export interface EnvironmentResult {
 environment: string
 status: EnvironmentStatus
+}
+/**
+ * Durable evidence explaining why an environment is no longer operational.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EnvironmentRetirement".
+ */
+export interface EnvironmentRetirement1 {
+actor: string
+reason: string
+retired_at: number
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -503,10 +728,10 @@ environments_unhealthy: number
  * via the `definition` "ManagementLifecycleResult".
  */
 export interface ManagementLifecycleResult {
-digest?: (string | null)
+digest?: string
 message: string
 operation: string
-resource?: (string | null)
+resource?: string
 version: number
 }
 /**
@@ -557,15 +782,15 @@ version: string
  */
 export interface MigrationRecord {
 approval_digest: string
-backup_receipt_digest?: (string | null)
+backup_receipt_digest?: string
 declaration: MigrationDeclaration
 environment: string
 fence_generation: number
 identity_digest: string
 name: string
-partition?: (string | null)
-pending_plan_id?: (string | null)
-pending_rollback_plan_id?: (string | null)
+partition?: string
+pending_plan_id?: string
+pending_rollback_plan_id?: string
 receipts: CheckpointReceipt[]
 status: MigrationStatus
 }
@@ -579,6 +804,7 @@ status: MigrationStatus
 export interface OidcClientDiscovery {
 audience: string
 client_id: string
+display_name?: string
 issuer: string
 scopes: string[]
 }
@@ -638,6 +864,18 @@ environment: string
 expected_generation: number
 operation: string
 version: number
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "PreviewInspect".
+ */
+export interface PreviewInspect1 {
+expires_at: number
+pin_digest: string
+plan_digest: string
+status: string
+teardown_at?: number
+teardown_reason?: string
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
