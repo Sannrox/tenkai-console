@@ -39,7 +39,7 @@ export const Home = () => {
  * reads refresh once it settles; a lost response stays unknown until then.
  */
 const Reconcile = ({ token }: { token: string }) => {
-  const tick = useManagementCall<TickReport>(token, "fleet", tickSummary);
+  const tick = useManagementCall<TickReport>(token, "fleet", "management", tickSummary);
   const refused = refusesCredential(tick.error);
   if (!tick.allowed && !refused) {
     return null;

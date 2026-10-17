@@ -10,6 +10,21 @@ describe("failure", () => {
     });
   });
 
+  it("names the missing capability when the server is generic", () => {
+    expect(failure(new ApiError(403, "insufficient delivery capability"), "publish")).toEqual({
+      tone: "bad",
+      text: "missing publish capability",
+    });
+    expect(failure(new ApiError(403, "insufficient delivery capability"), "management")).toEqual({
+      tone: "bad",
+      text: "missing management capability",
+    });
+    expect(failure(new ApiError(403, "release signature does not verify"), "publish")).toEqual({
+      tone: "bad",
+      text: "release signature does not verify",
+    });
+  });
+
   it("never reads a lost response as success or failure", () => {
     expect(failure(new TypeError("Failed to fetch")).tone).toBe("unknown");
   });
