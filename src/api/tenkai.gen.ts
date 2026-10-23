@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at b7981306c3a0d2000606e9da5a844fb8e46affc1 (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 7d5a5b98836d4937c9e9f2ac479b86c6b0f4a85e (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -191,6 +191,10 @@ ApprovalStatement?: ApprovalStatement
 ApprovalTrustRoots?: ApprovalTrustRoots
 ApprovalTrustedSigner?: ApprovalTrustedSigner
 ApproveRequest?: ApproveRequest
+BackupFailure?: BackupFailure
+BackupHealth?: BackupHealth
+BackupManifest?: BackupManifest
+BackupStatus?: BackupStatus
 ChangeEvent?: ChangeEvent
 ChangeEventKind?: ChangeEventKind
 ChangeEventPage?: ChangeEventPage
@@ -211,6 +215,7 @@ ConnectivityClass?: ConnectivityClass
 DeliveryHold?: DeliveryHold
 DeliveryHoldRequest?: DeliveryHoldRequest
 DeliveryHoldView?: DeliveryHoldView
+DrillEvidence?: DrillEvidence
 EffectiveApprovalPolicy?: EffectiveApprovalPolicy
 EnvironmentConfigChange?: EnvironmentConfigChange
 EnvironmentConfigRequest?: EnvironmentConfigRequest
@@ -370,6 +375,76 @@ expected_generation: number
 operation: string
 trust_roots: PlanApprovalTrustRoots
 version: number
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "BackupFailure".
+ */
+export interface BackupFailure {
+at_ms: number
+error: string
+}
+/**
+ * Backup age as health reports it.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "BackupHealth".
+ */
+export interface BackupHealth {
+age_seconds?: number
+max_age_seconds: number
+/**
+ * `ok`, `stale` (older than the threshold), `missing` (none taken yet)
+ * or `unreadable` (the status file cannot be read).
+ */
+state: string
+}
+/**
+ * One completed backup, as its manifest records it.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "BackupManifest".
+ */
+export interface BackupManifest {
+/**
+ * File name inside the backup directory.
+ */
+file: string
+schema: string
+sha256: string
+size_bytes: number
+taken_at_ms: number
+}
+/**
+ * `GET /v1/backups`: `status.json` plus the newest drill.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "BackupStatus".
+ */
+export interface BackupStatus {
+last_drill?: DrillEvidence
+last_failure?: BackupFailure
+last_success?: BackupManifest
+schema: string
+}
+/**
+ * Evidence that one backup restored into a scratch store and opened.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DrillEvidence".
+ */
+export interface DrillEvidence {
+environments: number
+file: string
+/**
+ * `PRAGMA integrity_check` of the restored store.
+ */
+integrity: string
+plans: number
+releases: number
+restored_at_ms: number
+schema: string
+sha256: string
 }
 /**
  * One durable change. `cursor` is the opaque resume token (monotonic sequence).
@@ -1461,6 +1536,7 @@ version: number
  * via the `definition` "ServiceStatus".
  */
 export interface ServiceStatus {
+backup?: BackupHealth1
 capabilities: string[]
 /**
  * API contract ids this server serves, for client compatibility checks.
@@ -1468,6 +1544,18 @@ capabilities: string[]
 contracts: string[]
 profile: string
 status: string
+}
+/**
+ * Backup age as health reports it.
+ */
+export interface BackupHealth1 {
+age_seconds?: number
+max_age_seconds: number
+/**
+ * `ok`, `stale` (older than the threshold), `missing` (none taken yet)
+ * or `unreadable` (the status file cannot be read).
+ */
+state: string
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
