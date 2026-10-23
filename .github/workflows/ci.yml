@@ -20,8 +20,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm api:check
-      # Fails when the vendored contract falls behind tenkai main.
-      - run: pnpm api:drift
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check

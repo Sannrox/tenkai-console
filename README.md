@@ -62,7 +62,7 @@ at the commit in `api/TENKAI_REF`. `src/api/tenkai.gen.ts` is generated from it.
 ```sh
 pnpm api:sync <tenkai-commit-sha>   # update the vendored schema and regenerate
 pnpm api:check                      # CI: fail when generated types are stale
-pnpm api:drift                      # CI: fail when the schema is behind tenkai main
+pnpm api:drift                      # scheduled: fail when the schema is behind tenkai main
 ```
 
 At startup the console requires `/healthz` to list the contract it was built
