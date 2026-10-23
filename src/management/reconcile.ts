@@ -3,7 +3,8 @@ import type { EnvironmentStatus, TickReport } from "../api/tenkai.gen";
 /**
  * One reconcile tick as the server reported it: a line per environment, in
  * the server's terms. Nothing is inferred; `busy` and `deferred` mean the
- * tick did not act on that environment this time.
+ * tick did not act on that environment this time, and `held` that a delivery
+ * hold paused it until released.
  */
 
 export type TickLine = { environment: string; tone: "ok" | "warn" | "bad"; text: string };
@@ -18,6 +19,12 @@ const line = (status: EnvironmentStatus): Pick<TickLine, "tone" | "text"> => {
       return { tone: "warn", text: `awaiting runtime, plan ${status.plan_id}` };
     case "awaiting_approval":
       return { tone: "warn", text: `awaiting approval, plan ${status.plan_id}` };
+    case "held":
+      // A durable delivery pause, not contention: name what holds it and why.
+      return {
+        tone: "warn",
+        text: `held by ${status.scope}: ${status.reason}, plan ${status.plan_id}`,
+      };
     case "failed":
       return { tone: "bad", text: `failed: ${status.error}` };
     case "deferred":

@@ -15,7 +15,8 @@
     "format:check": "oxfmt --check",
     "api:sync": "node scripts/api.mjs sync",
     "api:gen": "node scripts/api.mjs gen",
-    "api:check": "node scripts/api.mjs check"
+    "api:check": "node scripts/api.mjs check",
+    "api:drift": "node scripts/api.mjs drift"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.0",

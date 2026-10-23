@@ -237,7 +237,8 @@
     },
     {
       "files": ["src/**/*.{ts,tsx}"],
-      "excludeFiles": ["**/*.test.*"],
+      // Generated from the vendored contract (`pnpm api:gen`); its size is the contract's.
+      "excludeFiles": ["**/*.test.*", "src/api/*.gen.ts"],
       "rules": {
         "max-lines": ["error", { "max": 700, "skipBlankLines": true, "skipComments": true }]
       }

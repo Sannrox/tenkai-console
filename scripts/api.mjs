@@ -2,6 +2,7 @@
 //   node scripts/api.mjs sync <tenkai-commit>  download api/tenkai-http-v1.schema.json at that commit
 //   node scripts/api.mjs gen                   write src/api/tenkai.gen.ts from the vendored schema
 //   node scripts/api.mjs check                 fail when src/api/tenkai.gen.ts is stale
+//   node scripts/api.mjs drift                 fail when the vendored schema is behind tenkai main
 import { readFile, writeFile } from "node:fs/promises";
 import { compile } from "json-schema-to-typescript";
 
@@ -51,6 +52,31 @@ if (command === "sync") {
     console.error(`${OUT} is stale; run \`pnpm api:gen\``);
     process.exit(1);
   }
+} else if (command === "drift") {
+  // The contract tenkai serves is the one on its main branch; a console built
+  // against an older schema misses fields and routes the server already has.
+  const head = await fetch("https://api.github.com/repos/Sannrox/tenkai/commits/main", {
+    headers: { accept: "application/vnd.github+json" },
+  });
+  if (!head.ok) {
+    throw new Error(`tenkai main: HTTP ${head.status}`);
+  }
+  const { sha } = await head.json();
+  const url = `https://raw.githubusercontent.com/Sannrox/tenkai/${sha}/${SCHEMA}`;
+  const latest = await fetch(url);
+  if (!latest.ok) {
+    throw new Error(`${url}: HTTP ${latest.status}`);
+  }
+  const same =
+    JSON.stringify(JSON.parse(await latest.text())) ===
+    JSON.stringify(JSON.parse(await readFile(SCHEMA, "utf8")));
+  if (!same) {
+    const ref = (await readFile(REF, "utf8")).trim();
+    console.error(
+      `${SCHEMA} (tenkai ${ref}) is behind tenkai main ${sha}; run \`pnpm api:sync ${sha}\``,
+    );
+    process.exit(1);
+  }
 } else {
-  throw new Error("usage: api.mjs sync <sha> | gen | check");
+  throw new Error("usage: api.mjs sync <sha> | gen | check | drift");
 }

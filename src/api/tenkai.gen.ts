@@ -1,6 +1,13 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 41781cfabc891497e96d18ec389f0e7eb09f3f0a (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 8ddeb034bc4ab36ef015c2f6cc7bcad6fba27b0b (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
+/**
+ * Closed set of change-event kinds advertised on the HTTP contract.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ChangeEventKind".
+ */
+export type ChangeEventKind = ("plan_created" | "plan_approved" | "plan_applied" | "target_failed" | "target_held" | "target_retried" | "hold_set" | "hold_released" | "release_published" | "release_promoted" | "release_recalled" | "compatibility_result_recorded")
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "CheckpointClass".
@@ -93,6 +100,12 @@ plan_id: string
 state: "awaiting_approval"
 steps: number
 } | {
+plan_id: string
+reason: string
+scope: string
+state: "held"
+steps: number
+} | {
 error: string
 state: "failed"
 } | {
@@ -101,6 +114,11 @@ state: "deferred"
 } | {
 state: "busy"
 })
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EvaluationOutcome".
+ */
+export type EvaluationOutcome = ("passed" | "failed")
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "MigrationStatus".
@@ -114,6 +132,12 @@ ApprovalStatement?: ApprovalStatement
 ApprovalTrustRoots?: ApprovalTrustRoots
 ApprovalTrustedSigner?: ApprovalTrustedSigner
 ApproveRequest?: ApproveRequest
+ChangeEvent?: ChangeEvent
+ChangeEventKind?: ChangeEventKind
+ChangeEventPage?: ChangeEventPage
+ChannelHoldRequest?: ChannelHoldRequest
+ChannelListEntry?: ChannelListEntry
+ChannelPage?: ChannelPage
 CheckpointClass?: CheckpointClass
 CheckpointDecl?: CheckpointDecl
 CheckpointReceipt?: CheckpointReceipt
@@ -124,6 +148,10 @@ CompatibilityReport?: CompatibilityReport
 CompatibilityStatus?: CompatibilityStatus
 ComponentObservation?: ComponentObservation
 ComponentPin?: ComponentPin
+DeliveryHold?: DeliveryHold
+DeliveryHoldRequest?: DeliveryHoldRequest
+DeliveryHoldView?: DeliveryHoldView
+EffectiveApprovalPolicy?: EffectiveApprovalPolicy
 EnvironmentConstraint?: EnvironmentConstraint
 EnvironmentInspectReport?: EnvironmentInspectReport
 EnvironmentLeaseInspect?: EnvironmentLeaseInspect
@@ -134,37 +162,56 @@ EnvironmentPlanStepSummary?: EnvironmentPlanStepSummary
 EnvironmentPlanSummary?: EnvironmentPlanSummary
 EnvironmentResult?: EnvironmentResult
 EnvironmentRetirement?: EnvironmentRetirement1
+EnvironmentRuntimeReport?: EnvironmentRuntimeReport
 EnvironmentStatus?: EnvironmentStatus
 EnvironmentSubscriptionView?: EnvironmentSubscriptionView
 ErrorBody?: ErrorBody
+EvaluationOutcome?: EvaluationOutcome
+EvaluationTrustRoots?: EvaluationTrustRoots
+EvaluationTrustedSigner?: EvaluationTrustedSigner
+EvidenceSigner?: EvidenceSigner
 FleetEnvironmentRow?: FleetEnvironmentRow
 FleetStatusReport?: FleetStatusReport
+HoldAuditEvent?: HoldAuditEvent
 ManagementLifecycleResult?: ManagementLifecycleResult
 MigrationApprovalEnvelope?: MigrationApprovalEnvelope
 MigrationApprovalStatement?: MigrationApprovalStatement
 MigrationDeclaration?: MigrationDeclaration
+MigrationListEntry?: MigrationListEntry
+MigrationPage?: MigrationPage
 MigrationRecord?: MigrationRecord
 MigrationState?: MigrationState
 MigrationStatus?: MigrationStatus
+ModelEvaluationEvidence?: ModelEvaluationEvidence
+ModelReleaseIdentity?: ModelReleaseIdentity
 ModuleActivationReceipt?: ModuleActivationReceipt
+ObservedInitJob?: ObservedInitJob
+ObservedModelRuntime?: ObservedModelRuntime
+ObservedRuntimeComponent?: ObservedRuntimeComponent
+ObservedRuntimeUnit?: ObservedRuntimeUnit
 OidcClientDiscovery?: OidcClientDiscovery
 PackageMigrationApplyRequest?: PackageMigrationApplyRequest
 PackageMigrationMutateRequest?: PackageMigrationMutateRequest
 PackageMigrationPreviewRequest?: PackageMigrationPreviewRequest
 PackageMigrationResult?: PackageMigrationResult
 PackagePin?: PackagePin
+PageQuery?: PageQuery
 PlanApprovalTrustRoots?: PlanApprovalTrustRoots
 PlanApprovalTrustedSigner?: PlanApprovalTrustedSigner
+PlanApprovalView?: PlanApprovalView1
 PlanRequest?: PlanRequest
 PreviewInspect?: PreviewInspect1
 PromoteRequest?: PromoteRequest
 Provenance?: Provenance
 PublishRequest?: PublishRequest
 RecallRequest?: RecallRequest
+ReleaseListEntry?: ReleaseListEntry
+ReleasePage?: ReleasePage
 ReleaseStatement?: ReleaseStatement
 ReleaseTrustRoots?: ReleaseTrustRoots
 ReleaseTrustedSigner?: ReleaseTrustedSigner
 RetireEnvironmentRequest?: RetireEnvironmentRequest
+RetryFailedTargetRequest?: RetryFailedTargetRequest
 RollbackRequest?: RollbackRequest
 ServiceStatus?: ServiceStatus
 SignatureEnvelope?: SignatureEnvelope
@@ -225,8 +272,10 @@ version: number
  * via the `definition` "PlanApprovalTrustedSigner".
  */
 export interface PlanApprovalTrustedSigner {
+environments?: string[]
 identity: string
 key_id: string
+providers?: string[]
 public_key: string
 }
 /**
@@ -257,6 +306,72 @@ expected_generation: number
 operation: string
 trust_roots: PlanApprovalTrustRoots
 version: number
+}
+/**
+ * One durable change. `cursor` is the opaque resume token (monotonic sequence).
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ChangeEvent".
+ */
+export interface ChangeEvent {
+cursor: string
+environment?: string
+kind: ChangeEventKind
+occurred_at: number
+resource: string
+}
+/**
+ * Bounded page of change events plus the cursor to resume from.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ChangeEventPage".
+ */
+export interface ChangeEventPage {
+events: ChangeEvent[]
+next_cursor: string
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ChannelHoldRequest".
+ */
+export interface ChannelHoldRequest {
+operation: string
+reason?: (string | null)
+version: number
+}
+/**
+ * Identifying fields, current head, and active hold for one channel.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ChannelListEntry".
+ */
+export interface ChannelListEntry {
+head: string
+hold?: DeliveryHold
+id: string
+name: string
+product: string
+}
+/**
+ * Durable evidence that delivery is paused for a scope.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DeliveryHold".
+ */
+export interface DeliveryHold {
+actor: string
+held_at: number
+reason: string
+}
+/**
+ * One page of [`ChannelListEntry`] values.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ChannelPage".
+ */
+export interface ChannelPage {
+items: ChannelListEntry[]
+next_cursor?: string
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -335,6 +450,54 @@ release_digest: string
 version: number
 }
 /**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DeliveryHoldRequest".
+ */
+export interface DeliveryHoldRequest {
+environment: string
+expected_generation: number
+operation: string
+reason?: (string | null)
+version: number
+}
+/**
+ * Active hold plus set/clear/retry history for one scope.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DeliveryHoldView".
+ */
+export interface DeliveryHoldView {
+audit: HoldAuditEvent[]
+hold?: DeliveryHold
+}
+/**
+ * One immutable set, clear, or retry transition.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "HoldAuditEvent".
+ */
+export interface HoldAuditEvent {
+action: string
+actor: string
+at: number
+reason: string
+}
+/**
+ * Operator-facing policy: automatic signer key ids, human rules, and TTL.
+ * Never includes seed bytes or file contents.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EffectiveApprovalPolicy".
+ */
+export interface EffectiveApprovalPolicy {
+auto_signers?: string[]
+configured: boolean
+digest?: string
+mode: string
+require_human?: string[]
+ttl_ms?: number
+}
+/**
  * One environment constraint, as set by `tenkaictl env constraints set`.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -362,6 +525,7 @@ export interface EnvironmentInspectReport {
  * Environment constraints (`version_pin`, `version_range`, `require_fact`).
  */
 constraints?: EnvironmentConstraint[]
+delivery_hold?: DeliveryHold1
 description: string
 /**
  * Execution ownership note: Tenkai never prints runtime bearer tokens.
@@ -406,10 +570,19 @@ subscriptions: EnvironmentSubscriptionView[]
 terminal_outcomes?: TerminalOutcomeProjection[]
 }
 /**
+ * Durable evidence that delivery is paused for a scope.
+ */
+export interface DeliveryHold1 {
+actor: string
+held_at: number
+reason: string
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "EnvironmentPlanSummary".
  */
 export interface EnvironmentPlanSummary {
+approval?: PlanApprovalView
 created_at: number
 /**
  * `sha256:` digest of the versioned executable-plan encoding, the value
@@ -432,6 +605,17 @@ steps?: EnvironmentPlanStepSummary[]
  * True when `step_count` exceeds the number of returned summaries.
  */
 steps_truncated?: boolean
+}
+/**
+ * Whether the latest plan was approved by policy or still needs a human.
+ */
+export interface PlanApprovalView {
+policy_provider?: string
+reason?: string
+/**
+ * `policy`, `human`, `development`, or `required`.
+ */
+source: string
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -557,6 +741,7 @@ retired_at: number
 export interface EnvironmentSubscriptionView {
 applied_overlay?: (string | null)
 channel: string
+delivery_hold?: DeliveryHold2
 deployed?: (string | null)
 error?: (string | null)
 head: string
@@ -564,6 +749,14 @@ health?: (string | null)
 overlay_digest?: (string | null)
 product: string
 state: string
+}
+/**
+ * Durable evidence that delivery is paused for a scope.
+ */
+export interface DeliveryHold2 {
+actor: string
+held_at: number
+reason: string
 }
 /**
  * Bounded, authenticated read projection of one Tenkai-owned terminal
@@ -603,6 +796,10 @@ terminal_state: string
  * via the `definition` "EnvironmentListEntry".
  */
 export interface EnvironmentListEntry {
+/**
+ * The environment or one of its subscribed channels is held.
+ */
+delivery_held?: boolean
 deployed_product_count: number
 description: string
 id: string
@@ -659,11 +856,94 @@ reason: string
 retired_at: number
 }
 /**
+ * GET `/v1/environments/{environment}/runtime` body.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EnvironmentRuntimeReport".
+ */
+export interface EnvironmentRuntimeReport {
+components: ObservedRuntimeComponent[]
+environment: string
+}
+/**
+ * Observed state of one deployed product on an environment.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ObservedRuntimeComponent".
+ */
+export interface ObservedRuntimeComponent {
+executor_kind: string
+health?: string
+last_init_job?: ObservedInitJob
+model_runtime?: ObservedModelRuntime
+product: string
+units?: ObservedRuntimeUnit[]
+}
+/**
+ * Last completed one-shot init job for a Docker topology.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ObservedInitJob".
+ */
+export interface ObservedInitJob {
+exit_code?: number
+name: string
+status: string
+}
+/**
+ * Observed model_runtime identity and accelerator fit facts.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ObservedModelRuntime".
+ */
+export interface ObservedModelRuntime {
+accelerator?: string
+variant: string
+verified_weight_digest: string
+}
+/**
+ * One running or declared Docker unit.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ObservedRuntimeUnit".
+ */
+export interface ObservedRuntimeUnit {
+health?: string
+image_digest: string
+name: string
+restart_policy: string
+running: boolean
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "ErrorBody".
  */
 export interface ErrorBody {
 error: string
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EvaluationTrustRoots".
+ */
+export interface EvaluationTrustRoots {
+signers: EvaluationTrustedSigner[]
+version: number
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EvaluationTrustedSigner".
+ */
+export interface EvaluationTrustedSigner {
+key_id: string
+public_key: string
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EvidenceSigner".
+ */
+export interface EvidenceSigner {
+key_id: string
+signature: string
 }
 /**
  * One environment's row in a fleet posture table (no credentials).
@@ -777,6 +1057,28 @@ product: string
 version: string
 }
 /**
+ * Identifying fields and current state for one stored package migration.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "MigrationListEntry".
+ */
+export interface MigrationListEntry {
+environment: string
+id: string
+name: string
+status: MigrationStatus
+}
+/**
+ * One page of [`MigrationListEntry`] values.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "MigrationPage".
+ */
+export interface MigrationPage {
+items: MigrationListEntry[]
+next_cursor?: string
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "MigrationRecord".
  */
@@ -793,6 +1095,35 @@ pending_plan_id?: string
 pending_rollback_plan_id?: string
 receipts: CheckpointReceipt[]
 status: MigrationStatus
+}
+/**
+ * Chisei → Tenkai evaluation result for the same identity.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ModelEvaluationEvidence".
+ */
+export interface ModelEvaluationEvidence {
+eval_run_id: string
+eval_suite_id: string
+expires_at: number
+identity: ModelReleaseIdentity
+observed_at: number
+outcome: EvaluationOutcome
+schema: string
+signer: EvidenceSigner
+}
+/**
+ * Shared model identity for both evidence directions.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ModelReleaseIdentity".
+ */
+export interface ModelReleaseIdentity {
+artifact_digest: string
+endpoint: string
+model: string
+profile_version: string
+provider: string
 }
 /**
  * Unauthenticated `GET /v1/auth/oidc` body: what a browser needs to start
@@ -854,6 +1185,30 @@ version: number
 export interface PackageMigrationResult {
 record: MigrationRecord
 version: number
+}
+/**
+ * Query parameters for cursor-paged catalog lists.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "PageQuery".
+ */
+export interface PageQuery {
+cursor?: (string | null)
+limit?: (number | null)
+}
+/**
+ * Whether a plan was approved by policy or still needs a human, and why.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "PlanApprovalView".
+ */
+export interface PlanApprovalView1 {
+policy_provider?: string
+reason?: string
+/**
+ * `policy`, `human`, `development`, or `required`.
+ */
+source: string
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -955,12 +1310,46 @@ operation: string
 version: number
 }
 /**
+ * Identifying fields and current digest/version for one published release.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ReleaseListEntry".
+ */
+export interface ReleaseListEntry {
+digest: string
+id: string
+product: string
+version: string
+}
+/**
+ * One page of [`ReleaseListEntry`] values.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ReleasePage".
+ */
+export interface ReleasePage {
+items: ReleaseListEntry[]
+next_cursor?: string
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "RetireEnvironmentRequest".
  */
 export interface RetireEnvironmentRequest {
 operation: string
 reason: string
+version: number
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RetryFailedTargetRequest".
+ */
+export interface RetryFailedTargetRequest {
+environment: string
+expected_generation: number
+operation: string
+product: string
+reason?: (string | null)
 version: number
 }
 /**
@@ -994,12 +1383,21 @@ status: string
  */
 export interface StatusRow {
 channel: string
+delivery_hold?: DeliveryHold3
 deployed?: (string | null)
 error?: (string | null)
 head: string
 health?: (string | null)
 overlay_stale?: boolean
 product: string
+}
+/**
+ * Durable evidence that delivery is paused for a scope.
+ */
+export interface DeliveryHold3 {
+actor: string
+held_at: number
+reason: string
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
