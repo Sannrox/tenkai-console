@@ -27,4 +27,6 @@ jobs:
       - run: pnpm format:check
       - run: pnpm test
       - run: pnpm build
+      # Initial JS stays under 200 KB gzipped and within 10% of the baseline.
+      - run: pnpm perf:bundle
       - run: VERSION=ci sh scripts/package.sh

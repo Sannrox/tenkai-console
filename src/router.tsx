@@ -1,17 +1,25 @@
 import { useQuery } from "@tanstack/react-query";
-import { Outlet, createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
+import {
+  Outlet,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  lazyRouteComponent,
+} from "@tanstack/react-router";
 import { checkServer, consoleRoot, fetchOidcSettings } from "./api/http";
 import { useSession } from "./auth/session";
 import { useSessionRefresh } from "./auth/use-session-refresh";
-import { Access } from "./screens/access";
-import { AuthCallback } from "./screens/auth-callback";
-import { Environments } from "./screens/environments";
 import { Home } from "./screens/home";
-import { PlanPage } from "./screens/plan-page";
-import { Releases } from "./screens/releases";
 import { ServerStatus } from "./screens/server-status";
 import { SignedIn } from "./screens/signed-in";
 import { Centered, Title } from "./ui/kit";
+
+// Screens other than home load on first visit, so the initial bundle stays small.
+const PlanPage = lazyRouteComponent(() => import("./screens/plan-page"), "PlanPage");
+const Environments = lazyRouteComponent(() => import("./screens/environments"), "Environments");
+const Releases = lazyRouteComponent(() => import("./screens/releases"), "Releases");
+const Access = lazyRouteComponent(() => import("./screens/access"), "Access");
+const AuthCallback = lazyRouteComponent(() => import("./screens/auth-callback"), "AuthCallback");
 
 const useServer = () =>
   useQuery({

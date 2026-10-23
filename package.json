@@ -16,7 +16,10 @@
     "api:sync": "node scripts/api.mjs sync",
     "api:gen": "node scripts/api.mjs gen",
     "api:check": "node scripts/api.mjs check",
-    "api:drift": "node scripts/api.mjs drift"
+    "api:drift": "node scripts/api.mjs drift",
+    "perf:bundle": "node scripts/bundle-budget.mjs check",
+    "perf:bundle:update": "node scripts/bundle-budget.mjs update",
+    "perf:load": "playwright test"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.0",
@@ -29,6 +32,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",

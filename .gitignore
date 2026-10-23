@@ -8,3 +8,5 @@ release/
 
 # Delivery lane worktrees (deliver-ready-issue)
 /.worktrees/
+test-results/
+playwright-report/
