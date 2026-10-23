@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 8ddeb034bc4ab36ef015c2f6cc7bcad6fba27b0b (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at b7981306c3a0d2000606e9da5a844fb8e46affc1 (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -83,6 +83,65 @@ reason: "migration_state"
 })
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ConnectivityClass".
+ */
+export type ConnectivityClass = ("connected" | "intermittent" | "isolated")
+/**
+ * One configuration change. The variant decides the route: its resource
+ * path and whether it is a `PUT` or a `DELETE`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EnvironmentConfigChange".
+ */
+export type EnvironmentConfigChange = ({
+key: string
+kind: "set_fact"
+value: string
+} | {
+key: string
+kind: "clear_fact"
+} | {
+constraint: string
+kind: "set_constraint"
+name: string
+value: string
+} | {
+constraint: string
+kind: "clear_constraint"
+name: string
+} | {
+duration_minutes: number
+kind: "set_maintenance_window"
+name: string
+start: string
+timezone: string
+weekdays: number[]
+} | {
+kind: "remove_maintenance_window"
+name: string
+} | {
+events?: WebhookEvent[]
+kind: "set_webhook"
+secret_env: string
+url: string
+} | {
+kind: "clear_webhooks"
+url?: (string | null)
+} | {
+kind: "set_approval_policy"
+path: string
+} | {
+kind: "clear_approval_policy"
+})
+/**
+ * Stable apply-lifecycle events a webhook endpoint may subscribe to.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "WebhookEvent".
+ */
+export type WebhookEvent = ("apply.succeeded" | "apply.failed" | "apply.rolled_back")
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "EnvironmentStatus".
  */
 export type EnvironmentStatus = ({
@@ -148,10 +207,13 @@ CompatibilityReport?: CompatibilityReport
 CompatibilityStatus?: CompatibilityStatus
 ComponentObservation?: ComponentObservation
 ComponentPin?: ComponentPin
+ConnectivityClass?: ConnectivityClass
 DeliveryHold?: DeliveryHold
 DeliveryHoldRequest?: DeliveryHoldRequest
 DeliveryHoldView?: DeliveryHoldView
 EffectiveApprovalPolicy?: EffectiveApprovalPolicy
+EnvironmentConfigChange?: EnvironmentConfigChange
+EnvironmentConfigRequest?: EnvironmentConfigRequest
 EnvironmentConstraint?: EnvironmentConstraint
 EnvironmentInspectReport?: EnvironmentInspectReport
 EnvironmentLeaseInspect?: EnvironmentLeaseInspect
@@ -205,6 +267,7 @@ PromoteRequest?: PromoteRequest
 Provenance?: Provenance
 PublishRequest?: PublishRequest
 RecallRequest?: RecallRequest
+RegisterEnvironmentRequest?: RegisterEnvironmentRequest
 ReleaseListEntry?: ReleaseListEntry
 ReleasePage?: ReleasePage
 ReleaseStatement?: ReleaseStatement
@@ -219,6 +282,7 @@ StatusRow?: StatusRow
 SubscribeRequest?: SubscribeRequest
 TerminalOutcomeProjection?: TerminalOutcomeProjection
 TickReport?: TickReport
+WebhookEvent?: WebhookEvent
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -496,6 +560,20 @@ digest?: string
 mode: string
 require_human?: string[]
 ttl_ms?: number
+}
+/**
+ * Body of every `PUT`/`DELETE` configuration route.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EnvironmentConfigRequest".
+ */
+export interface EnvironmentConfigRequest {
+change: EnvironmentConfigChange
+environment: string
+expected_generation: number
+operation: string
+reason: string
+version: number
 }
 /**
  * One environment constraint, as set by `tenkaictl env constraints set`.
@@ -1307,6 +1385,20 @@ public_key: string
  */
 export interface RecallRequest {
 operation: string
+version: number
+}
+/**
+ * Body of `POST /v1/environments`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RegisterEnvironmentRequest".
+ */
+export interface RegisterEnvironmentRequest {
+connectivity_class?: (ConnectivityClass | null)
+description?: string
+environment: string
+operation: string
+reason: string
 version: number
 }
 /**
