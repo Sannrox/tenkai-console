@@ -1,6 +1,7 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { configDefaults } from "vitest/config";
 
 // Relative base: one build works at `/ui/` and at `/<prefix>/ui/` behind a proxy.
 // `pnpm dev` proxies API calls to a local tenkai-server (TENKAI_URL).
@@ -13,4 +14,6 @@ export default defineConfig({
   server: {
     proxy: { "/v1": tenkai, "/healthz": tenkai },
   },
+  // perf/ holds the Playwright load measurement (`pnpm perf:load`), not unit tests.
+  test: { exclude: [...configDefaults.exclude, "perf/**"] },
 });
