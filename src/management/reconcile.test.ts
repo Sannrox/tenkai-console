@@ -10,12 +10,27 @@ const report = {
       status: { state: "awaiting_approval" as const, plan_id: "plan:1", steps: 2 },
     },
     { environment: "edge", status: { state: "busy" as const } },
+    {
+      environment: "dr",
+      status: {
+        state: "held" as const,
+        plan_id: "plan:2",
+        steps: 1,
+        scope: "environment dr",
+        reason: "freeze",
+      },
+    },
   ],
 };
 
 describe("reconcile tick", () => {
   it("reports each environment in the server's terms, sorted by name", () => {
     expect(tickLines(report)).toStrictEqual([
+      {
+        environment: "dr",
+        tone: "warn",
+        text: "held by environment dr: freeze, plan plan:2",
+      },
       { environment: "edge", tone: "warn", text: "busy, skipped this tick" },
       { environment: "local", tone: "ok", text: "current" },
       { environment: "prod", tone: "warn", text: "awaiting approval, plan plan:1" },
@@ -24,7 +39,7 @@ describe("reconcile tick", () => {
   });
 
   it("summarizes the tick without calling a failed tick success", () => {
-    expect(tickSummary(report)).toBe("Tick ran: 4 environments, 1 failed");
+    expect(tickSummary(report)).toBe("Tick ran: 5 environments, 1 failed");
     expect(tickSummary({ environments: [] })).toBe("Tick ran: 0 environments");
   });
 });

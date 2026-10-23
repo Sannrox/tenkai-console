@@ -193,6 +193,140 @@
       ],
       "type": "object"
     },
+    "ChangeEvent": {
+      "description": "One durable change. `cursor` is the opaque resume token (monotonic sequence).",
+      "properties": {
+        "cursor": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ChangeEventKind"
+        },
+        "occurred_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "resource": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cursor",
+        "occurred_at",
+        "kind",
+        "resource"
+      ],
+      "type": "object"
+    },
+    "ChangeEventKind": {
+      "description": "Closed set of change-event kinds advertised on the HTTP contract.",
+      "enum": [
+        "plan_created",
+        "plan_approved",
+        "plan_applied",
+        "target_failed",
+        "target_held",
+        "target_retried",
+        "hold_set",
+        "hold_released",
+        "release_published",
+        "release_promoted",
+        "release_recalled",
+        "compatibility_result_recorded"
+      ],
+      "type": "string"
+    },
+    "ChangeEventPage": {
+      "description": "Bounded page of change events plus the cursor to resume from.",
+      "properties": {
+        "events": {
+          "items": {
+            "$ref": "#/$defs/ChangeEvent"
+          },
+          "type": "array"
+        },
+        "next_cursor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "events",
+        "next_cursor"
+      ],
+      "type": "object"
+    },
+    "ChannelHoldRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation"
+      ],
+      "type": "object"
+    },
+    "ChannelListEntry": {
+      "description": "Identifying fields, current head, and active hold for one channel.",
+      "properties": {
+        "head": {
+          "type": "string"
+        },
+        "hold": {
+          "$ref": "#/$defs/DeliveryHold"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "product",
+        "name",
+        "head"
+      ],
+      "type": "object"
+    },
+    "ChannelPage": {
+      "description": "One page of [`ChannelListEntry`] values.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/ChannelListEntry"
+          },
+          "type": "array"
+        },
+        "next_cursor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object"
+    },
     "CheckpointClass": {
       "enum": [
         "reversible",
@@ -675,6 +809,116 @@
         }
       ]
     },
+    "DeliveryHold": {
+      "description": "Durable evidence that delivery is paused for a scope.",
+      "properties": {
+        "actor": {
+          "type": "string"
+        },
+        "held_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
+        "actor",
+        "held_at"
+      ],
+      "type": "object"
+    },
+    "DeliveryHoldRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "environment": {
+          "type": "string"
+        },
+        "expected_generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "environment",
+        "expected_generation"
+      ],
+      "type": "object"
+    },
+    "DeliveryHoldView": {
+      "description": "Active hold plus set/clear/retry history for one scope.",
+      "properties": {
+        "audit": {
+          "items": {
+            "$ref": "#/$defs/HoldAuditEvent"
+          },
+          "type": "array"
+        },
+        "hold": {
+          "$ref": "#/$defs/DeliveryHold"
+        }
+      },
+      "required": [
+        "audit"
+      ],
+      "type": "object"
+    },
+    "EffectiveApprovalPolicy": {
+      "description": "Operator-facing policy: automatic signer key ids, human rules, and TTL.\nNever includes seed bytes or file contents.",
+      "properties": {
+        "auto_signers": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "configured": {
+          "type": "boolean"
+        },
+        "digest": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "require_human": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ttl_ms": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "configured",
+        "mode"
+      ],
+      "type": "object"
+    },
     "EnvironmentConstraint": {
       "description": "One environment constraint, as set by `tenkaictl env constraints set`.",
       "properties": {
@@ -707,6 +951,10 @@
             "$ref": "#/$defs/EnvironmentConstraint"
           },
           "type": "array"
+        },
+        "delivery_hold": {
+          "$ref": "#/$defs/DeliveryHold",
+          "description": "Present while delivery is paused for this environment."
         },
         "description": {
           "type": "string"
@@ -844,6 +1092,11 @@
     "EnvironmentListEntry": {
       "description": "Summary row for fleet listing (no credentials).",
       "properties": {
+        "delivery_held": {
+          "default": false,
+          "description": "The environment or one of its subscribed channels is held.",
+          "type": "boolean"
+        },
         "deployed_product_count": {
           "format": "uint",
           "minimum": 0,
@@ -994,6 +1247,10 @@
     },
     "EnvironmentPlanSummary": {
       "properties": {
+        "approval": {
+          "$ref": "#/$defs/PlanApprovalView",
+          "description": "Whether the latest plan was approved by policy or still needs a human."
+        },
         "created_at": {
           "format": "int64",
           "type": "integer"
@@ -1073,6 +1330,25 @@
         "reason",
         "actor",
         "retired_at"
+      ],
+      "type": "object"
+    },
+    "EnvironmentRuntimeReport": {
+      "description": "GET `/v1/environments/{environment}/runtime` body.",
+      "properties": {
+        "components": {
+          "items": {
+            "$ref": "#/$defs/ObservedRuntimeComponent"
+          },
+          "type": "array"
+        },
+        "environment": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "environment",
+        "components"
       ],
       "type": "object"
     },
@@ -1158,6 +1434,36 @@
         },
         {
           "properties": {
+            "plan_id": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string"
+            },
+            "state": {
+              "const": "held",
+              "type": "string"
+            },
+            "steps": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "state",
+            "plan_id",
+            "steps",
+            "reason",
+            "scope"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
             "error": {
               "type": "string"
             },
@@ -1215,6 +1521,10 @@
         "channel": {
           "type": "string"
         },
+        "delivery_hold": {
+          "$ref": "#/$defs/DeliveryHold",
+          "description": "Present while the subscribed channel is held."
+        },
         "deployed": {
           "type": [
             "string",
@@ -1266,6 +1576,66 @@
       },
       "required": [
         "error"
+      ],
+      "type": "object"
+    },
+    "EvaluationOutcome": {
+      "enum": [
+        "passed",
+        "failed"
+      ],
+      "type": "string"
+    },
+    "EvaluationTrustRoots": {
+      "additionalProperties": false,
+      "properties": {
+        "signers": {
+          "items": {
+            "$ref": "#/$defs/EvaluationTrustedSigner"
+          },
+          "type": "array"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "signers"
+      ],
+      "type": "object"
+    },
+    "EvaluationTrustedSigner": {
+      "additionalProperties": false,
+      "properties": {
+        "key_id": {
+          "type": "string"
+        },
+        "public_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key_id",
+        "public_key"
+      ],
+      "type": "object"
+    },
+    "EvidenceSigner": {
+      "additionalProperties": false,
+      "properties": {
+        "key_id": {
+          "type": "string"
+        },
+        "signature": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key_id",
+        "signature"
       ],
       "type": "object"
     },
@@ -1384,6 +1754,31 @@
         "environments_behind",
         "environments_unhealthy",
         "environments_empty"
+      ],
+      "type": "object"
+    },
+    "HoldAuditEvent": {
+      "description": "One immutable set, clear, or retry transition.",
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "actor": {
+          "type": "string"
+        },
+        "at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "reason",
+        "actor",
+        "at"
       ],
       "type": "object"
     },
@@ -1507,6 +1902,48 @@
       ],
       "type": "object"
     },
+    "MigrationListEntry": {
+      "description": "Identifying fields and current state for one stored package migration.",
+      "properties": {
+        "environment": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/MigrationStatus"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "environment",
+        "status"
+      ],
+      "type": "object"
+    },
+    "MigrationPage": {
+      "description": "One page of [`MigrationListEntry`] values.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/MigrationListEntry"
+          },
+          "type": "array"
+        },
+        "next_cursor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object"
+    },
     "MigrationRecord": {
       "additionalProperties": false,
       "properties": {
@@ -1582,6 +2019,78 @@
       ],
       "type": "string"
     },
+    "ModelEvaluationEvidence": {
+      "additionalProperties": false,
+      "description": "Chisei → Tenkai evaluation result for the same identity.",
+      "properties": {
+        "eval_run_id": {
+          "type": "string"
+        },
+        "eval_suite_id": {
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "identity": {
+          "$ref": "#/$defs/ModelReleaseIdentity"
+        },
+        "observed_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "outcome": {
+          "$ref": "#/$defs/EvaluationOutcome"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "signer": {
+          "$ref": "#/$defs/EvidenceSigner"
+        }
+      },
+      "required": [
+        "schema",
+        "identity",
+        "eval_suite_id",
+        "eval_run_id",
+        "outcome",
+        "observed_at",
+        "expires_at",
+        "signer"
+      ],
+      "type": "object"
+    },
+    "ModelReleaseIdentity": {
+      "additionalProperties": false,
+      "description": "Shared model identity for both evidence directions.",
+      "properties": {
+        "artifact_digest": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "profile_version": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "profile_version",
+        "artifact_digest",
+        "endpoint"
+      ],
+      "type": "object"
+    },
     "ModuleActivationReceipt": {
       "additionalProperties": false,
       "properties": {
@@ -1631,6 +2140,103 @@
         "closure_digest",
         "pin_digest",
         "receipt_digest"
+      ],
+      "type": "object"
+    },
+    "ObservedInitJob": {
+      "description": "Last completed one-shot init job for a Docker topology.",
+      "properties": {
+        "exit_code": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "status"
+      ],
+      "type": "object"
+    },
+    "ObservedModelRuntime": {
+      "description": "Observed model_runtime identity and accelerator fit facts.",
+      "properties": {
+        "accelerator": {
+          "type": "string"
+        },
+        "variant": {
+          "type": "string"
+        },
+        "verified_weight_digest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "variant",
+        "verified_weight_digest"
+      ],
+      "type": "object"
+    },
+    "ObservedRuntimeComponent": {
+      "description": "Observed state of one deployed product on an environment.",
+      "properties": {
+        "executor_kind": {
+          "type": "string"
+        },
+        "health": {
+          "type": "string"
+        },
+        "last_init_job": {
+          "$ref": "#/$defs/ObservedInitJob"
+        },
+        "model_runtime": {
+          "$ref": "#/$defs/ObservedModelRuntime"
+        },
+        "product": {
+          "type": "string"
+        },
+        "units": {
+          "items": {
+            "$ref": "#/$defs/ObservedRuntimeUnit"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "product",
+        "executor_kind"
+      ],
+      "type": "object"
+    },
+    "ObservedRuntimeUnit": {
+      "description": "One running or declared Docker unit.",
+      "properties": {
+        "health": {
+          "type": "string"
+        },
+        "image_digest": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "restart_policy": {
+          "type": "string"
+        },
+        "running": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "image_digest",
+        "restart_policy",
+        "running"
       ],
       "type": "object"
     },
@@ -1812,6 +2418,26 @@
       ],
       "type": "object"
     },
+    "PageQuery": {
+      "description": "Query parameters for cursor-paged catalog lists.",
+      "properties": {
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "PlanApprovalTrustRoots": {
       "additionalProperties": false,
       "properties": {
@@ -1836,11 +2462,23 @@
     "PlanApprovalTrustedSigner": {
       "additionalProperties": false,
       "properties": {
+        "environments": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "identity": {
           "type": "string"
         },
         "key_id": {
           "type": "string"
+        },
+        "providers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "public_key": {
           "type": "string"
@@ -1850,6 +2488,25 @@
         "key_id",
         "identity",
         "public_key"
+      ],
+      "type": "object"
+    },
+    "PlanApprovalView": {
+      "description": "Whether a plan was approved by policy or still needs a human, and why.",
+      "properties": {
+        "policy_provider": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "source": {
+          "description": "`policy`, `human`, `development`, or `required`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source"
       ],
       "type": "object"
     },
@@ -2014,6 +2671,48 @@
       ],
       "type": "object"
     },
+    "ReleaseListEntry": {
+      "description": "Identifying fields and current digest/version for one published release.",
+      "properties": {
+        "digest": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "product",
+        "version",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "ReleasePage": {
+      "description": "One page of [`ReleaseListEntry`] values.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/ReleaseListEntry"
+          },
+          "type": "array"
+        },
+        "next_cursor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object"
+    },
     "ReleaseStatement": {
       "additionalProperties": false,
       "properties": {
@@ -2094,6 +2793,44 @@
         "version",
         "operation",
         "reason"
+      ],
+      "type": "object"
+    },
+    "RetryFailedTargetRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "environment": {
+          "type": "string"
+        },
+        "expected_generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "environment",
+        "expected_generation",
+        "product"
       ],
       "type": "object"
     },
@@ -2193,6 +2930,10 @@
       "properties": {
         "channel": {
           "type": "string"
+        },
+        "delivery_hold": {
+          "$ref": "#/$defs/DeliveryHold",
+          "description": "Present while the subscribed channel is held."
         },
         "deployed": {
           "type": [
@@ -2458,6 +3199,15 @@
     {
       "auth": "read",
       "method": "GET",
+      "path": "/v1/events",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/ChangeEventPage"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
       "path": "/v1/environments",
       "request": null,
       "response": {
@@ -2465,6 +3215,39 @@
           "$ref": "#/$defs/EnvironmentListEntry"
         },
         "type": "array"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/releases",
+      "request": {
+        "$ref": "#/$defs/PageQuery"
+      },
+      "response": {
+        "$ref": "#/$defs/ReleasePage"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/channels",
+      "request": {
+        "$ref": "#/$defs/PageQuery"
+      },
+      "response": {
+        "$ref": "#/$defs/ChannelPage"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/migrations",
+      "request": {
+        "$ref": "#/$defs/PageQuery"
+      },
+      "response": {
+        "$ref": "#/$defs/MigrationPage"
       }
     },
     {
@@ -2486,6 +3269,24 @@
           "$ref": "#/$defs/StatusRow"
         },
         "type": "array"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/environments/{environment}/approval-policy",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/EffectiveApprovalPolicy"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/environments/{environment}/runtime",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/EnvironmentRuntimeReport"
       }
     },
     {
@@ -2527,6 +3328,79 @@
       "path": "/v1/environments/{environment}/rollback",
       "request": {
         "$ref": "#/$defs/RollbackRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/environments/{environment}/hold",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/DeliveryHoldView"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/environments/{environment}/hold",
+      "request": {
+        "$ref": "#/$defs/DeliveryHoldRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/environments/{environment}/hold/release",
+      "request": {
+        "$ref": "#/$defs/DeliveryHoldRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/environments/{environment}/failed-targets/{product}/retry",
+      "request": {
+        "$ref": "#/$defs/RetryFailedTargetRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/products/{product}/channels/{channel}/hold",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/DeliveryHoldView"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/products/{product}/channels/{channel}/hold",
+      "request": {
+        "$ref": "#/$defs/ChannelHoldRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/products/{product}/channels/{channel}/hold/release",
+      "request": {
+        "$ref": "#/$defs/ChannelHoldRequest"
       },
       "response": {
         "$ref": "#/$defs/ManagementLifecycleResult"
@@ -2585,6 +3459,28 @@
       },
       "response": {
         "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/model-evaluation/trust",
+      "request": {
+        "$ref": "#/$defs/EvaluationTrustRoots"
+      },
+      "response": {
+        "type": "null"
+      }
+    },
+    {
+      "auth": "publish",
+      "method": "POST",
+      "path": "/v1/model-evaluation/evidence",
+      "request": {
+        "$ref": "#/$defs/ModelEvaluationEvidence"
+      },
+      "response": {
+        "type": "null"
       }
     },
     {
