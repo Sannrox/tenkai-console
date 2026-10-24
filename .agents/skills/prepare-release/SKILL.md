@@ -23,7 +23,7 @@ GitHub state unless the maintainer explicitly authorizes that action.
    - relative-URL behavior at `/ui/` and `/<prefix>/ui/`, and no requests
      outside the origin;
    - authentication, approval, and security-relevant UI behavior;
-   - the pin Tenkai must update (URL and SHA-256 behind the `ui` feature).
+   - Tenkai's `ui/console.pin` (tag and SHA-256 of the zip the `ui` feature embeds).
      Complete when every applicable item is resolved or a named blocker.
 4. Use `verify-change` for the full local gates. Confirm current GitHub CI and
    security checks when access is available. Do not run live-provider tests

@@ -128,7 +128,9 @@ mark the Issue unless documented maintainer policy requires it.
 
    ```bash
    pnpm install --frozen-lockfile
-   pnpm typecheck && pnpm lint && pnpm test && pnpm build
+   pnpm api:check
+   pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build
+   pnpm perf:bundle
    VERSION=ci sh scripts/package.sh
    ```
 
@@ -146,7 +148,7 @@ mark the Issue unless documented maintainer policy requires it.
    `git merge-base --is-ancestor origin/main HEAD`. If the check fails, refresh
    the branch onto `main` and rerun the affected checks. Otherwise refresh only
    for a failing gate, an explicit request, or a sibling lane that landed on a
-   shared surface (the API client and schemas in `src/api.ts`, build and base-URL
+   shared surface (the API client and schemas in `src/api/`, build and base-URL
    configuration, packaging and release workflow, `package.json` and the
    lockfile). Do not rebase merely because `main`
    advanced.

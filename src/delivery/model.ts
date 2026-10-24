@@ -46,7 +46,7 @@ const tone = (state: string): Tone =>
   ] as Tone | undefined) ?? "muted";
 
 /** One matrix cell: deployed version, its tone, and a short status line. */
-export const cell = (
+const cell = (
   subscription: EnvironmentSubscriptionView,
   plan: EnvironmentPlanSummary | null | undefined,
 ): Cell => {

@@ -29,10 +29,13 @@ Run the narrowest useful checks first, then expand according to change risk.
 
    ```bash
    pnpm install --frozen-lockfile
+   pnpm api:check
    pnpm typecheck
    pnpm lint
+   pnpm format:check
    pnpm test
    pnpm build
+   pnpm perf:bundle
    VERSION=ci sh scripts/package.sh
    ```
 

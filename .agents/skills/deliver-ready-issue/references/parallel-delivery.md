@@ -32,7 +32,7 @@ stalled lane. It is not an orchestration-only role.
    when remaining capacity is zero.
 
 3. Reject candidate pairs that touch the same collision surface: the API
-   client and schemas (`src/api.ts`), build and base-URL configuration,
+   client and schemas (`src/api/`), build and base-URL configuration,
    packaging and release workflow, or `package.json` and the lockfile. Run
    such Issues in sequence.
 4. Resolve one authority ceiling for the run. Claiming needs Publish or Land,
@@ -124,7 +124,7 @@ Lane brief
    `git merge-base --is-ancestor origin/main HEAD` pass. Publishing may happen
    concurrently; landing never.
 2. Land one lane at a time under Land authority:
-   `gh pr merge <pr> --squash --delete-branch --match-head-commit <verified-sha>`.
+   `gh pr merge <pr> --auto --squash --delete-branch --match-head-commit <verified-sha>`.
    A failed or timed-out merge response may still have merged; reconcile the
    remote state before retrying.
 3. After each landing, run `git fetch --prune origin` and recompute the
