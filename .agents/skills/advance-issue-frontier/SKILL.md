@@ -94,7 +94,7 @@ downstream-unblocking depth and then issue number. Call this a deterministic
 presentation order, not project priority.
 
 Parallel candidates must not depend on each other or collide on a shared
-surface: the API client and schemas (`src/api.ts`), build and base-URL
+surface: the API client and schemas (`src/api/`), build and base-URL
 configuration, packaging and release workflow, or `package.json` and the
 lockfile. Read each candidate's affected boundary and scope;
 when two candidates name the same surface, present them as sequential, not

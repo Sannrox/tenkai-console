@@ -54,9 +54,7 @@ afterEach(() => {
 describe("OIDC sign-in", () => {
   it("labels the button with the organisation name, else the issuer host", () => {
     expect(providerLabel(settings)).toBe("idp.example.test");
-    expect(providerLabel({ ...settings, display_name: "Example Org" } as OidcClientDiscovery)).toBe(
-      "Example Org",
-    );
+    expect(providerLabel({ ...settings, display_name: "Example Org" })).toBe("Example Org");
   });
 
   it("starts Authorization Code with S256 PKCE and the exact redirect URI", async () => {

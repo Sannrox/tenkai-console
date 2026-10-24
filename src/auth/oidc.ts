@@ -17,10 +17,8 @@ type Pending = { state: string; verifier: string };
 export const redirectUri = (consoleRoot: URL): string => new URL("auth/callback", consoleRoot).href;
 
 /** Button label: organisation name when the server provides one, else the issuer host. */
-export const providerLabel = (settings: OidcClientDiscovery): string => {
-  const named = (settings as { display_name?: unknown }).display_name;
-  return typeof named === "string" && named ? named : new URL(settings.issuer).host;
-};
+export const providerLabel = (settings: OidcClientDiscovery): string =>
+  settings.display_name || new URL(settings.issuer).host;
 
 // Tenkai only accepts plain-HTTP issuers on loopback, for development providers.
 const transport = (issuer: URL) =>

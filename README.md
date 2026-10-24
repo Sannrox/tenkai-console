@@ -9,10 +9,9 @@ The design is recorded in Tenkai
 ## How it ships
 
 Each tag `vX.Y.Z` publishes `tenkai-console-vX.Y.Z.zip`, `SHA256SUMS`, and a
-GitHub artifact attestation. Tenkai is to pin one release by URL and SHA-256
-and compile it into `tenkai-server` behind a `ui` feature that serves it at
-`/ui/` on the API's origin; that server side is tracked in
-[Sannrox/tenkai#463](https://github.com/Sannrox/tenkai/issues/463).
+GitHub artifact attestation. Tenkai pins one release in `ui/console.pin` by
+tag and SHA-256 and serves it at `/ui/` on the API's origin behind a `ui`
+feature.
 
 The build uses only relative URLs and finds the API two levels above its own
 entry module, so the same zip works at `/ui/` and at `/<prefix>/ui/` behind a
