@@ -7,6 +7,26 @@ import { Button, Centered, Title } from "../ui/kit";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
+/** Subtitle stays generic so the button is the only organisation name. */
+export const SIGN_IN_SUBTITLE = "Delivery";
+
+export const TOKEN_LABEL = "Platform token";
+
+/** Decision 5F: one button to the organisation's sign-in. */
+export const signInButtonLabel = (settings: OidcClientDiscovery): string =>
+  `Sign in to ${providerLabel(settings)}`;
+
+/** 401 vs 403 on a pasted platform token. Other statuses stay the server text. */
+export const tokenRefusal = (status: number): string | undefined => {
+  if (status === 401) {
+    return "Token not recognized.";
+  }
+  if (status === 403) {
+    return "This token is recognized and has no access.";
+  }
+  return undefined;
+};
+
 /** Decision 5F: one button to the organisation's sign-in, token as fallback. */
 export const SignIn = ({ settings }: { settings: OidcClientDiscovery | null }) => {
   const ended = useSession((state) => state.ended);
@@ -30,25 +50,19 @@ export const SignIn = ({ settings }: { settings: OidcClientDiscovery | null }) =
 
   return (
     <Centered>
-      <Title subtitle={`Delivery for ${window.location.host}`} />
+      <Title subtitle={SIGN_IN_SUBTITLE} />
       {ended === "expired" && (
         <p className="mb-3 text-xs text-warning">Session expired. Sign in again.</p>
       )}
       {settings && (
-        <>
-          <Button
-            variant="primary"
-            className="w-full py-2"
-            disabled={busy}
-            onClick={() => void signInWithProvider()}
-          >
-            Sign in with {providerLabel(settings)}
-          </Button>
-          <p className="mt-3.5 mb-0 text-xs text-muted">
-            You'll sign in on {providerLabel(settings)}'s login page and return here. What you can
-            see and change depends on your team.
-          </p>
-        </>
+        <Button
+          variant="primary"
+          className="w-full py-2"
+          disabled={busy}
+          onClick={() => void signInWithProvider()}
+        >
+          {signInButtonLabel(settings)}
+        </Button>
       )}
       {error && (
         <p role="alert" className="mt-3 mb-0 text-xs text-danger">
@@ -59,7 +73,7 @@ export const SignIn = ({ settings }: { settings: OidcClientDiscovery | null }) =
         <TokenForm />
       ) : (
         <div className="mt-4 border-t border-line pt-3 text-xs text-muted">
-          No access yet? Ask the platform team. ·{" "}
+          {TOKEN_LABEL} ·{" "}
           <button
             type="button"
             className="cursor-pointer text-muted underline"
@@ -73,7 +87,7 @@ export const SignIn = ({ settings }: { settings: OidcClientDiscovery | null }) =
   );
 };
 
-/** Bearer token held in memory for this tab; checked against a read before use. */
+/** Platform token held in memory for this tab; checked against a read before use. */
 const TokenForm = () => {
   const signIn = useSession((state) => state.signIn);
   const [token, setToken] = useState("");
@@ -94,21 +108,20 @@ const TokenForm = () => {
       });
     } catch (cause) {
       setError(
-        cause instanceof ApiError && (cause.status === 401 || cause.status === 403)
-          ? "This token is not accepted by the server."
-          : message(cause),
+        cause instanceof ApiError ? (tokenRefusal(cause.status) ?? message(cause)) : message(cause),
       );
     }
   };
 
   return (
     <form className="mt-4 border-t border-line pt-3" onSubmit={(event) => void submit(event)}>
+      <p className="mt-0 mb-2 text-xs text-muted">{TOKEN_LABEL}</p>
       <div className="flex gap-2">
         <input
           type="password"
           autoComplete="off"
-          aria-label="Bearer token"
-          placeholder="Paste bearer token"
+          aria-label={TOKEN_LABEL}
+          placeholder="Paste token"
           value={token}
           onChange={(event) => setToken(event.target.value)}
           className="min-w-0 flex-1 rounded-md border border-field bg-white/4 px-2.5 py-1.5 text-xs text-fg placeholder:text-muted"
