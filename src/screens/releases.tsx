@@ -6,13 +6,15 @@ import { useDelivery } from "../delivery/use-delivery";
 import { isReleaseSpec, parsePublish, promoteBody, recallBody } from "../management/catalog";
 import { refusesCredential, useManagementCall } from "../management/use-management";
 import { Card, ConfirmButton, Notice } from "../ui/kit";
+import { Migrations } from "./migrations";
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 
 /**
  * The software catalog. Channels (decision 4D): the head each channel points
  * to and who follows it, read from environment inspects; below it, publish,
- * promote, and recall through the catalog lifecycle routes.
+ * promote, recall, and package migrations. Four tabs stay; a migration is
+ * part of a release.
  */
 export const Releases = () => {
   const token = useSession((state) => state.session?.accessToken);
@@ -70,6 +72,12 @@ export const Releases = () => {
         </table>
       </Card>
       {token && <Catalog token={token} channels={table.channels} />}
+      {token && (
+        <Migrations
+          token={token}
+          environments={delivery.reports.map((report) => report.name).toSorted()}
+        />
+      )}
     </>
   );
 };
