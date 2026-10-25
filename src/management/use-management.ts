@@ -49,8 +49,8 @@ export const newRequestId = (): string =>
 /**
  * One management call, with its own request identity, per confirmed click; the client never retries or defers
  * mutations (main.tsx). A credential refusal hides that capability's controls
- * for the session, and every settled call refreshes the environment reads so
- * the screen shows the server's state.
+ * for the session, and every settled call refreshes the environment and
+ * runtime reads so the screen shows the server's state.
  */
 export const useManagementCall = <T>(
   token: string,
@@ -78,6 +78,7 @@ export const useManagementCall = <T>(
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ["environments"] }),
         queryClient.invalidateQueries({ queryKey: ["environment"] }),
+        queryClient.invalidateQueries({ queryKey: ["runtime"] }),
       ]),
   });
   const outcome: Outcome | undefined = mutation.data

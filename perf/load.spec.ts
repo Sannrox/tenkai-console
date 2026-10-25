@@ -88,6 +88,10 @@ const serve = () =>
           Array.from({ length: ENVIRONMENTS }, (_, index) => listEntry(index)),
         );
       }
+      const runtime = path.match(/^\/v1\/environments\/env-(\d{4})\/runtime$/);
+      if (runtime) {
+        return json(200, { environment: name(Number(runtime[1])), components: [] });
+      }
       const environment = path.match(/^\/v1\/environments\/env-(\d{4})$/);
       if (environment) {
         return json(200, inspect(Number(environment[1])));
