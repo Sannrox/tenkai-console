@@ -7,9 +7,17 @@ import type {
 } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
 import { channelTable, environmentRows } from "../delivery/configuration";
+import { holdLine, isHeldFailedTarget, productHasActivePlan } from "../delivery/model";
 import { useDelivery } from "../delivery/use-delivery";
 import { useManagementCall } from "../management/use-management";
-import { expectedGeneration, subscribeBody } from "../plan/requests";
+import {
+  expectedGeneration,
+  holdBody,
+  releaseChannelHoldBody,
+  releaseHoldBody,
+  retryFailedTargetBody,
+  subscribeBody,
+} from "../plan/requests";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
@@ -50,6 +58,7 @@ export const Environments = () => {
               <th className={th}>Deployed</th>
               <th className={th}>Facts</th>
               <th className={th}>Lease</th>
+              <th className={th}>Hold</th>
               <th className={th}>Latest plan</th>
             </tr>
           </thead>
@@ -68,6 +77,9 @@ export const Environments = () => {
                 </td>
                 <td className={`${td} text-muted`}>{row.facts || "none"}</td>
                 <td className={td}>{row.lease}</td>
+                <td className={`${td} ${row.hold ? "text-warning" : "text-muted"}`}>
+                  {row.hold ?? "none"}
+                </td>
                 <td className={td}>{row.plan}</td>
               </tr>
             ))}
@@ -99,7 +111,9 @@ const Detail = ({
   const generation = expectedGeneration(report.lease);
   const retire = useManagementCall(token, scope, "management", message);
   const subscribe = useManagementCall(token, scope, "management", message);
+  const hold = useManagementCall(token, scope, "management", message);
   const [reason, setReason] = useState("");
+  const [holdReason, setHoldReason] = useState("");
   const [product, setProduct] = useState("");
   const [channel, setChannel] = useState("");
   const spec = `${product.trim()}=${channel.trim()}`;
@@ -126,6 +140,7 @@ const Detail = ({
                 <th className={th}>Channel</th>
                 <th className={th}>Deployed</th>
                 <th className={th}>Head</th>
+                <th className={th}>Hold</th>
               </tr>
             </thead>
             <tbody>
@@ -139,6 +154,20 @@ const Detail = ({
                     {subscription.deployed ?? "none"}
                   </td>
                   <td className={`${td} font-mono`}>{subscription.head}</td>
+                  <td className={td}>
+                    <SubscriptionHold
+                      report={report}
+                      product={subscription.product}
+                      channel={subscription.channel}
+                      hold={subscription.delivery_hold}
+                      failed={
+                        isHeldFailedTarget(subscription) &&
+                        !productHasActivePlan(report.latest_plan, subscription.product)
+                      }
+                      error={subscription.error}
+                      token={token}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -202,7 +231,54 @@ const Detail = ({
             <dd className="m-0">
               {report.lease.held ? `held, generation ${report.lease.generation ?? 0}` : "free"}
             </dd>
+            <dt className="text-muted">delivery hold</dt>
+            <dd className={`m-0 ${report.delivery_hold ? "text-warning" : "text-muted"}`}>
+              {report.delivery_hold ? holdLine(report.delivery_hold) : "none"}
+            </dd>
           </dl>
+          {hold.allowed && (
+            <div className="flex flex-wrap gap-2 border-t border-line px-3.5 py-3">
+              {report.delivery_hold ? (
+                <ConfirmButton
+                  label="Release hold"
+                  confirm={`Release hold on ${report.name}`}
+                  disabled={hold.isPending}
+                  onConfirm={() =>
+                    hold.mutate({
+                      path: `${path}/hold/release`,
+                      body: releaseHoldBody(report.name, generation),
+                    })
+                  }
+                />
+              ) : (
+                <>
+                  <input
+                    aria-label="Hold reason"
+                    placeholder="Reason to hold"
+                    value={holdReason}
+                    onChange={(event) => setHoldReason(event.target.value)}
+                    className={field}
+                  />
+                  <ConfirmButton
+                    label="Hold"
+                    confirm={`Hold ${report.name}`}
+                    disabled={!holdReason.trim() || hold.isPending}
+                    onConfirm={() =>
+                      hold.mutate({
+                        path: `${path}/hold`,
+                        body: holdBody(report.name, generation, holdReason.trim()),
+                      })
+                    }
+                  />
+                </>
+              )}
+            </div>
+          )}
+          {hold.outcome && (
+            <div className="px-3.5 pb-3">
+              <Notice tone={hold.outcome.tone}>{hold.outcome.text}</Notice>
+            </div>
+          )}
           {retire.allowed && (
             <div className="flex gap-2 border-t border-line px-3.5 py-3">
               <input
@@ -237,5 +313,88 @@ const Detail = ({
         </Card>
       </div>
     </>
+  );
+};
+
+const SubscriptionHold = ({
+  report,
+  product,
+  channel,
+  hold,
+  failed,
+  error,
+  token,
+}: {
+  report: EnvironmentInspectReport;
+  product: string;
+  channel: string;
+  hold: { actor: string; held_at: number; reason: string } | undefined;
+  failed: boolean;
+  error: string | null | undefined;
+  token: string;
+}) => {
+  const envScope = `environment:${report.name}` as const;
+  const release = useManagementCall(token, "fleet", "management", message);
+  const retry = useManagementCall(token, envScope, "management", message);
+  const generation = expectedGeneration(report.lease);
+  const [retryReason, setRetryReason] = useState("");
+  if (!hold && !failed) {
+    return <span className="text-muted">none</span>;
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      {hold && (
+        <>
+          <span className="text-warning">{holdLine(hold)}</span>
+          {release.allowed && (
+            <ConfirmButton
+              label="Release hold"
+              confirm={`Release hold on ${product}/${channel}`}
+              disabled={release.isPending}
+              onConfirm={() =>
+                release.mutate({
+                  path: `v1/products/${encodeURIComponent(product)}/channels/${encodeURIComponent(channel)}/hold/release`,
+                  body: releaseChannelHoldBody(),
+                })
+              }
+            />
+          )}
+          {release.outcome && <Notice tone={release.outcome.tone}>{release.outcome.text}</Notice>}
+        </>
+      )}
+      {failed && (
+        <>
+          <span className="text-danger">{error ?? "retry held"}</span>
+          {retry.allowed && (
+            <>
+              <input
+                aria-label={`Retry reason for ${product}`}
+                placeholder="Reason to retry"
+                value={retryReason}
+                onChange={(event) => setRetryReason(event.target.value)}
+                className={field}
+              />
+              <ConfirmButton
+                label="Retry"
+                confirm={`Retry ${product} on ${report.name}`}
+                disabled={!retryReason.trim() || retry.isPending}
+                onConfirm={() =>
+                  retry.mutate({
+                    path: `v1/environments/${encodeURIComponent(report.name)}/failed-targets/${encodeURIComponent(product)}/retry`,
+                    body: retryFailedTargetBody(
+                      report.name,
+                      generation,
+                      product,
+                      retryReason.trim(),
+                    ),
+                  })
+                }
+              />
+            </>
+          )}
+          {retry.outcome && <Notice tone={retry.outcome.tone}>{retry.outcome.text}</Notice>}
+        </>
+      )}
+    </div>
   );
 };

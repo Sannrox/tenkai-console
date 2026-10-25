@@ -29,7 +29,9 @@ export const Home = () => {
         </span>
         {token && <Reconcile token={token} />}
       </div>
-      {!delivery.loading && !delivery.error && <Delivery reports={delivery.reports} />}
+      {!delivery.loading && !delivery.error && (
+        <Delivery reports={delivery.reports} token={token} />
+      )}
     </>
   );
 };
