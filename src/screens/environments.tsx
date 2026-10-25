@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import type {
   EnvironmentInspectReport,
@@ -9,6 +9,7 @@ import { useSession } from "../auth/session";
 import { channelTable, environmentRows } from "../delivery/configuration";
 import { maintenanceDetail } from "../delivery/maintenance";
 import { holdLine, isHeldFailedTarget, productHasActivePlan } from "../delivery/model";
+import { DOWNGRADE_NOTICE, previousRelease, rollbackConfirm } from "../delivery/rollback";
 import { useDelivery } from "../delivery/use-delivery";
 import { useManagementCall } from "../management/use-management";
 import {
@@ -17,6 +18,7 @@ import {
   releaseChannelHoldBody,
   releaseHoldBody,
   retryFailedTargetBody,
+  rollbackBody,
   subscribeBody,
 } from "../plan/requests";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
@@ -26,17 +28,19 @@ const td = "border-b border-line px-3.5 py-2 align-top";
 
 /**
  * Decision 4D: environments as a top tab, one table, the selected row's detail
- * below. The detail subscribes a product channel and retires the environment.
+ * below. The detail subscribes a product channel, rolls back, and retires.
  */
-export const Environments = () => {
+export const Environments = ({ focus }: { focus?: string }) => {
   const token = useSession((state) => state.session?.accessToken);
+  const navigate = useNavigate({ from: "/environments" });
   const delivery = useDelivery(token);
   const rows = environmentRows(delivery.reports);
-  const [selected, setSelected] = useState<string>();
-  // A retired or vanished selection falls back to the first environment.
-  const shown = rows.some((row) => row.name === selected) ? selected : rows[0]?.name;
+  const shown = rows.some((row) => row.name === focus) ? focus : rows[0]?.name;
   const report = delivery.reports.find((candidate) => candidate.name === shown);
   const { products, channels } = channelTable(delivery.reports);
+  const select = (name: string) => {
+    void navigate({ search: { environment: name }, replace: true });
+  };
 
   return (
     <>
@@ -68,7 +72,7 @@ export const Environments = () => {
               <tr
                 key={row.name}
                 aria-selected={row.name === report?.name}
-                onClick={() => setSelected(row.name)}
+                onClick={() => select(row.name)}
                 className={`cursor-pointer [&:last-child>td]:border-b-0 ${row.name === report?.name ? "bg-selected" : ""}`}
               >
                 <td className={`${td} font-semibold`}>{row.name}</td>
@@ -111,12 +115,20 @@ const Detail = ({
   const path = `v1/environments/${encodeURIComponent(report.name)}`;
   const generation = expectedGeneration(report.lease);
   const retire = useManagementCall(token, scope, "management", message);
+  const rollback = useManagementCall(token, scope, "management", message);
   const subscribe = useManagementCall(token, scope, "management", message);
   const hold = useManagementCall(token, scope, "management", message);
   const [reason, setReason] = useState("");
+  const [rollbackReason, setRollbackReason] = useState("");
   const [holdReason, setHoldReason] = useState("");
   const [product, setProduct] = useState("");
   const [channel, setChannel] = useState("");
+  const deployed = report.subscriptions.filter((subscription) => subscription.deployed);
+  const [rollbackProduct, setRollbackProduct] = useState(deployed[0]?.product ?? "");
+  const selectedProduct = deployed.some((subscription) => subscription.product === rollbackProduct)
+    ? rollbackProduct
+    : (deployed[0]?.product ?? "");
+  const previous = previousRelease(report, selectedProduct);
   const spec = `${product.trim()}=${channel.trim()}`;
 
   return (
@@ -141,6 +153,7 @@ const Detail = ({
                 <th className={th}>Channel</th>
                 <th className={th}>Deployed</th>
                 <th className={th}>Head</th>
+                <th className={th}>Previous</th>
                 <th className={th}>Hold</th>
               </tr>
             </thead>
@@ -155,6 +168,9 @@ const Detail = ({
                     {subscription.deployed ?? "none"}
                   </td>
                   <td className={`${td} font-mono`}>{subscription.head}</td>
+                  <td className={`${td} font-mono text-muted`}>
+                    {previousRelease(report, subscription.product) ?? "none"}
+                  </td>
                   <td className={td}>
                     <SubscriptionHold
                       report={report}
@@ -284,6 +300,64 @@ const Detail = ({
           {hold.outcome && (
             <div className="px-3.5 pb-3">
               <Notice tone={hold.outcome.tone}>{hold.outcome.text}</Notice>
+            </div>
+          )}
+          {rollback.allowed && deployed.length > 0 && (
+            <div className="border-t border-line px-3.5 py-3">
+              <div className="flex flex-wrap gap-2">
+                {deployed.length > 1 && (
+                  <select
+                    aria-label="Product to roll back"
+                    value={selectedProduct}
+                    onChange={(event) => setRollbackProduct(event.target.value)}
+                    className={field}
+                  >
+                    {deployed.map((subscription) => (
+                      <option key={subscription.product} value={subscription.product}>
+                        {subscription.product}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <input
+                  aria-label="Rollback reason"
+                  placeholder="Reason"
+                  value={rollbackReason}
+                  onChange={(event) => setRollbackReason(event.target.value)}
+                  className={field}
+                />
+                <ConfirmButton
+                  label="Roll back"
+                  confirm={rollbackConfirm(selectedProduct, previous)}
+                  disabled={!selectedProduct || !rollbackReason.trim() || rollback.isPending}
+                  onConfirm={() =>
+                    rollback.mutate({
+                      path: `${path}/rollback`,
+                      body: rollbackBody(
+                        report.name,
+                        generation,
+                        selectedProduct,
+                        rollbackReason.trim(),
+                      ),
+                    })
+                  }
+                />
+              </div>
+              <p className="mt-2 mb-0 text-xs text-muted">{DOWNGRADE_NOTICE}</p>
+            </div>
+          )}
+          {rollback.outcome && (
+            <div className="flex flex-wrap items-center gap-2 px-3.5 pb-3">
+              <Notice tone={rollback.outcome.tone}>{rollback.outcome.text}</Notice>
+              {rollback.outcome.tone === "ok" && (
+                <Link
+                  to="/environments/$environment/plan"
+                  params={{ environment: report.name }}
+                  className="text-xs font-medium text-muted"
+                >
+                  Open plan
+                </Link>
+              )}
             </div>
           )}
           {retire.allowed && (

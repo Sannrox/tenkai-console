@@ -76,7 +76,14 @@ const planRoute = createRoute({
 const environmentsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/environments",
-  component: Environments,
+  validateSearch: (search: Record<string, unknown>): { environment?: string } => {
+    const environment = typeof search.environment === "string" ? search.environment : undefined;
+    return environment === undefined ? {} : { environment };
+  },
+  component: function EnvironmentsPage() {
+    const { environment } = environmentsRoute.useSearch();
+    return environment === undefined ? <Environments /> : <Environments focus={environment} />;
+  },
 });
 
 const releasesRoute = createRoute({

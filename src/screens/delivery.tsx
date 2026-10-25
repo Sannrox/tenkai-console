@@ -144,6 +144,13 @@ const AttentionNext = ({
   if (item.next === "Retry" && token && report && item.product) {
     return <RetryFailed item={item} report={report} token={token} />;
   }
+  if (item.next === "Roll back") {
+    return (
+      <Link to="/environments" search={{ environment: item.environment }} className={linkClass}>
+        {item.next}
+      </Link>
+    );
+  }
   return (
     <Link
       to="/environments/$environment/plan"
