@@ -49,8 +49,8 @@ export const newRequestId = (): string =>
 /**
  * One management call, with its own request identity, per confirmed click; the client never retries or defers
  * mutations (main.tsx). A credential refusal hides that capability's controls
- * for the session, and every settled call refreshes the environment and
- * runtime reads so the screen shows the server's state.
+ * for the session, and every settled call refreshes the environment,
+ * runtime, and migration reads so the screen shows the server's state.
  */
 export const useManagementCall = <T>(
   token: string,
@@ -62,16 +62,16 @@ export const useManagementCall = <T>(
   const allowed = useSession((state) => !isRefused(state.refused, scope, capability));
   const refuse = useSession((state) => state.refuse);
   const mutation = useMutation({
-    mutationFn: (call: { path: string; body?: unknown }) =>
+    mutationFn: (call: { path: string; body?: unknown; scope?: Scope }) =>
       request<T>(call.path, {
         token,
         method: "POST",
         body: call.body,
         requestId: newRequestId(),
       }),
-    onError: (error) => {
+    onError: (error, call) => {
       if (refusesCredential(error)) {
-        refuse(token, scope, capability);
+        refuse(token, call.scope ?? scope, capability);
       }
     },
     onSettled: () =>
@@ -79,6 +79,8 @@ export const useManagementCall = <T>(
         queryClient.invalidateQueries({ queryKey: ["environments"] }),
         queryClient.invalidateQueries({ queryKey: ["environment"] }),
         queryClient.invalidateQueries({ queryKey: ["runtime"] }),
+        queryClient.invalidateQueries({ queryKey: ["migrations"] }),
+        queryClient.invalidateQueries({ queryKey: ["migration"] }),
       ]),
   });
   const outcome: Outcome | undefined = mutation.data
