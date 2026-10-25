@@ -50,12 +50,14 @@ export const rollbackBody = (
   environment: string,
   generation: number,
   product: string,
+  reason: string,
 ): RollbackRequest => ({
   version: VERSION,
   operation: "rollback",
   environment,
   product,
   expected_generation: generation,
+  recovery_reason: reason,
 });
 
 export const holdBody = (

@@ -15,7 +15,6 @@ import {
   expectedGeneration,
   parseEvidence,
   planBody,
-  rollbackBody,
   signCommand,
 } from "../plan/requests";
 import { Button, Card } from "../ui/kit";
@@ -230,17 +229,13 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
                         {subscription.error ? `: ${subscription.error}` : ""}
                       </span>
                     </div>
-                    <Button
-                      disabled={run.isPending}
-                      onClick={() =>
-                        run.mutate({
-                          path: `v1/environments/${env}/rollback`,
-                          body: rollbackBody(environment, generation, subscription.product),
-                        })
-                      }
+                    <Link
+                      to="/environments"
+                      search={{ environment }}
+                      className="text-xs font-medium text-muted"
                     >
-                      Roll back
-                    </Button>
+                      Open environment
+                    </Link>
                   </div>
                 ))}
               </Card>

@@ -8,6 +8,7 @@ import {
   releaseChannelHoldBody,
   releaseHoldBody,
   retryFailedTargetBody,
+  rollbackBody,
   signCommand,
   subscribeBody,
 } from "./requests";
@@ -83,6 +84,14 @@ describe("lifecycle requests", () => {
       expected_generation: 41,
       product: "api",
       reason: "retry after probe",
+    });
+    expect(rollbackBody("prod-eu", 41, "tenkai", "bad canary on 0.6.1")).toEqual({
+      version: 1,
+      operation: "rollback",
+      environment: "prod-eu",
+      expected_generation: 41,
+      product: "tenkai",
+      recovery_reason: "bad canary on 0.6.1",
     });
   });
 
