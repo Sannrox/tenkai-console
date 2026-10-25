@@ -2,8 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { ApiError, request } from "../api/http";
-import type { EnvironmentInspectReport, ManagementLifecycleResult } from "../api/tenkai.gen";
+import type {
+  EffectiveApprovalPolicy,
+  EnvironmentInspectReport,
+  ManagementLifecycleResult,
+} from "../api/tenkai.gen";
 import { planSummary } from "../delivery/model";
+import { approvalCopy, shownDigest } from "../plan/approval";
 import {
   applyBody,
   approveBody,
@@ -20,7 +25,7 @@ const STRIP = ["computed", "running", "succeeded"] as const;
 /** Decision 3B: one plan per environment, its steps, state, and the one next action. */
 export const PlanPage = ({ environment, token }: { environment: string; token: string }) => {
   const queryClient = useQueryClient();
-  const [digest, setDigest] = useState<string>();
+  const [localDigest, setLocalDigest] = useState<{ planId: string; digest: string }>();
   const [result, setResult] = useState<{ ok: boolean; text: string }>();
   const report = useQuery({
     queryKey: ["environment", environment, token],
@@ -30,13 +35,22 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
       }),
     retry: false,
   });
+  const policy = useQuery({
+    queryKey: ["approval-policy", environment, token],
+    queryFn: () =>
+      request<EffectiveApprovalPolicy>(
+        `v1/environments/${encodeURIComponent(environment)}/approval-policy`,
+        { token },
+      ),
+    retry: false,
+  });
 
   const run = useMutation({
     mutationFn: (call: { path: string; body: unknown }) =>
       request<ManagementLifecycleResult>(call.path, { token, method: "POST", body: call.body }),
     onSuccess: (response) => {
-      if (response.operation === "plan" && response.digest) {
-        setDigest(response.digest);
+      if (response.operation === "plan" && response.digest && response.resource) {
+        setLocalDigest({ planId: response.resource, digest: response.digest });
       }
       setResult({ ok: true, text: response.message });
       void queryClient.invalidateQueries({ queryKey: ["environment", environment] });
@@ -48,7 +62,8 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
 
   const data = report.data;
   const plan = data?.latest_plan ?? null;
-  const shownDigest = digest ?? plan?.digest;
+  const digestShown = shownDigest(plan, localDigest);
+  const approval = approvalCopy(plan, policy.data, localDigest);
   const generation = data ? expectedGeneration(data.lease) : 0;
   const env = encodeURIComponent(environment);
   const awaiting = plan?.state === "computed" || plan?.state === "blocked";
@@ -172,8 +187,14 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
                 <dt className="text-muted">held</dt>
                 <dd className="m-0">{plan?.status_detail || "nothing reported"}</dd>
                 <dt className="text-muted">digest</dt>
-                <dd className="m-0 font-mono break-all">
-                  {shownDigest ?? "shown after you plan here"}
+                <dd className="m-0 font-mono break-all">{approval.digest}</dd>
+                <dt className="text-muted">approved</dt>
+                <dd className="m-0">{approval.source}</dd>
+                <dt className="text-muted">human</dt>
+                <dd className="m-0">{approval.human}</dd>
+                <dt className="text-muted">stale</dt>
+                <dd className={`m-0 ${approval.stale !== "no" ? "text-warning" : ""}`}>
+                  {approval.stale}
                 </dd>
                 <dt className="text-muted">plan</dt>
                 <dd className="m-0 font-mono break-all">{plan?.id ?? "none"}</dd>
@@ -185,7 +206,7 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
             <Approval
               planId={plan.id}
               environment={environment}
-              digest={shownDigest}
+              digest={digestShown}
               generation={generation}
               run={run.mutate}
               pending={run.isPending}
