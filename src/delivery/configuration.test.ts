@@ -48,7 +48,14 @@ describe("environment rows", () => {
       facts: "arch=arm64 · region=eu",
       lease: "held · generation 41 · runtime-1",
       plan: "none",
+      hold: undefined,
     });
+  });
+
+  it("copies an environment delivery hold onto the row", () => {
+    const hold = { actor: "ops", held_at: 1_700_000_000_000, reason: "freeze" };
+    const [row] = environmentRows([{ ...reports[0]!, delivery_hold: hold }]);
+    expect(row?.hold).toBe("held by ops at 2023-11-14T22:13:20.000Z: freeze");
   });
 });
 

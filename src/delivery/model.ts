@@ -28,10 +28,23 @@ export type Column = {
 export type Attention = {
   tone: "warn" | "bad";
   product: string | undefined;
+  /** Set for a channel hold so release can target the channel route. */
+  channel: string | undefined;
   environment: string;
   detail: string;
   next: string;
 };
+
+/** Actor, Unix-ms time, and reason as inspect reports them. */
+export type Hold = { actor: string; held_at: number; reason: string };
+
+/** One line operators can match to `tenkaictl` hold output. */
+export const holdLine = (hold: Hold): string =>
+  `held by ${hold.actor} at ${new Date(hold.held_at).toISOString()}: ${hold.reason}`;
+
+/** Server error when automatic retry of a failed target is paused. */
+export const isHeldFailedTarget = (subscription: EnvironmentSubscriptionView): boolean =>
+  (subscription.error ?? "").includes("automatic retry held");
 
 const ACTIVE_PLAN = new Set(["computed", "running", "blocked"]);
 
@@ -39,6 +52,12 @@ const planStep = (plan: EnvironmentPlanSummary | null | undefined, product: stri
   plan && ACTIVE_PLAN.has(plan.state)
     ? plan.steps?.find((step) => step.product === product)
     : undefined;
+
+/** True when a computed, running, or blocked plan already covers `product`. */
+export const productHasActivePlan = (
+  plan: EnvironmentPlanSummary | null | undefined,
+  product: string,
+): boolean => Boolean(planStep(plan, product));
 
 const tone = (state: string): Tone =>
   (({ current: "ok", behind: "warn", config_stale: "warn", unhealthy: "bad", missing: "bad" })[
@@ -56,9 +75,27 @@ const cell = (
     tone: tone(subscription.state),
     channel: subscription.channel,
   };
+  if (
+    subscription.delivery_hold &&
+    subscription.state !== "unhealthy" &&
+    subscription.state !== "missing" &&
+    !isHeldFailedTarget(subscription)
+  ) {
+    return { ...base, tone: "warn", status: holdLine(subscription.delivery_hold) };
+  }
   if (step && plan) {
     const verb = { computed: "plan ready", running: "rolling out", blocked: "blocked" }[plan.state];
     return { ...base, status: `${verb} → ${step.to}` };
+  }
+  if (isHeldFailedTarget(subscription)) {
+    const status = subscription.error ?? "target failed; automatic retry held";
+    return {
+      ...base,
+      tone: "bad",
+      status: subscription.delivery_hold
+        ? `${status} · ${holdLine(subscription.delivery_hold)}`
+        : status,
+    };
   }
   const status: Record<string, string> = {
     current: "current",
@@ -68,7 +105,10 @@ const cell = (
     unhealthy: subscription.error ? `unhealthy · ${subscription.error}` : "unhealthy",
     unknown: "health unknown",
   };
-  return { ...base, status: status[subscription.state] ?? subscription.state };
+  const labeled = { ...base, status: status[subscription.state] ?? subscription.state };
+  return subscription.delivery_hold
+    ? { ...labeled, status: `${labeled.status} · ${holdLine(subscription.delivery_hold)}` }
+    : labeled;
 };
 
 export type Matrix = {
@@ -117,37 +157,71 @@ export const attention = (reports: EnvironmentInspectReport[]): Attention[] => {
   const items: Attention[] = [];
   for (const report of reports) {
     const plan = report.latest_plan;
+    const envHeld = Boolean(report.delivery_hold);
+    if (report.delivery_hold) {
+      items.push({
+        tone: "warn",
+        product: undefined,
+        channel: undefined,
+        environment: report.name,
+        detail: holdLine(report.delivery_hold),
+        next: "Release hold",
+      });
+    }
     if (plan?.state === "failed") {
       items.push({
         tone: "bad",
         product: undefined,
+        channel: undefined,
         environment: report.name,
         detail: plan.status_detail || `failed: ${planSummary(plan)}`,
         next: "Inspect failure",
       });
-    } else if (plan?.state === "blocked") {
+    } else if (!envHeld && plan?.state === "blocked") {
       items.push({
         tone: "warn",
         product: undefined,
+        channel: undefined,
         environment: report.name,
         detail: plan.status_detail || `blocked: ${planSummary(plan)}`,
         next: "Review plan",
       });
-    } else if (plan?.state === "computed") {
+    } else if (!envHeld && plan?.state === "computed") {
       items.push({
         tone: "warn",
         product: undefined,
+        channel: undefined,
         environment: report.name,
         detail: plan.status_detail || `ready: ${planSummary(plan)}`,
         next: "Review plan",
       });
     }
     for (const subscription of report.subscriptions) {
+      const at = {
+        product: subscription.product,
+        channel: subscription.channel,
+        environment: report.name,
+      };
+      if (isHeldFailedTarget(subscription) && !planStep(plan, subscription.product)) {
+        items.push({
+          ...at,
+          tone: "bad",
+          detail: subscription.error ?? "target failed; automatic retry held",
+          next: "Retry",
+        });
+      }
+      if (subscription.delivery_hold) {
+        items.push({
+          ...at,
+          tone: "warn",
+          detail: holdLine(subscription.delivery_hold),
+          next: "Release hold",
+        });
+      }
       if (planStep(plan, subscription.product)) {
         continue;
       }
-      const at = { product: subscription.product, environment: report.name };
-      if (subscription.state === "unhealthy") {
+      if (!isHeldFailedTarget(subscription) && subscription.state === "unhealthy") {
         items.push({
           ...at,
           tone: "bad",
@@ -161,7 +235,11 @@ export const attention = (reports: EnvironmentInspectReport[]): Attention[] => {
           detail: `subscribed to ${subscription.channel}, nothing deployed`,
           next: "Plan",
         });
-      } else if (subscription.state === "behind") {
+      }
+      if (envHeld || subscription.delivery_hold || isHeldFailedTarget(subscription)) {
+        continue;
+      }
+      if (subscription.state === "behind") {
         items.push({
           ...at,
           tone: "warn",

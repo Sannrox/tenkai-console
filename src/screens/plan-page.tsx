@@ -48,6 +48,7 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
 
   const data = report.data;
   const plan = data?.latest_plan ?? null;
+  const shownDigest = digest ?? plan?.digest;
   const generation = data ? expectedGeneration(data.lease) : 0;
   const env = encodeURIComponent(environment);
   const awaiting = plan?.state === "computed" || plan?.state === "blocked";
@@ -171,7 +172,9 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
                 <dt className="text-muted">held</dt>
                 <dd className="m-0">{plan?.status_detail || "nothing reported"}</dd>
                 <dt className="text-muted">digest</dt>
-                <dd className="m-0 font-mono break-all">{digest ?? "shown after you plan here"}</dd>
+                <dd className="m-0 font-mono break-all">
+                  {shownDigest ?? "shown after you plan here"}
+                </dd>
                 <dt className="text-muted">plan</dt>
                 <dd className="m-0 font-mono break-all">{plan?.id ?? "none"}</dd>
               </dl>
@@ -182,7 +185,7 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
             <Approval
               planId={plan.id}
               environment={environment}
-              digest={digest}
+              digest={shownDigest}
               generation={generation}
               run={run.mutate}
               pending={run.isPending}

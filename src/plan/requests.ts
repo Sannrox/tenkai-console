@@ -3,8 +3,11 @@ import { parse as parseToml } from "smol-toml";
 import type {
   ApplyRequest,
   ApproveRequest,
+  ChannelHoldRequest,
+  DeliveryHoldRequest,
   EnvironmentLeaseInspect,
   PlanRequest,
+  RetryFailedTargetRequest,
   RollbackRequest,
   SubscribeRequest,
 } from "../api/tenkai.gen";
@@ -53,6 +56,44 @@ export const rollbackBody = (
   environment,
   product,
   expected_generation: generation,
+});
+
+export const holdBody = (
+  environment: string,
+  generation: number,
+  reason: string,
+): DeliveryHoldRequest => ({
+  version: VERSION,
+  operation: "hold",
+  environment,
+  expected_generation: generation,
+  reason,
+});
+
+export const releaseHoldBody = (environment: string, generation: number): DeliveryHoldRequest => ({
+  version: VERSION,
+  operation: "release",
+  environment,
+  expected_generation: generation,
+});
+
+export const releaseChannelHoldBody = (): ChannelHoldRequest => ({
+  version: VERSION,
+  operation: "channel_release",
+});
+
+export const retryFailedTargetBody = (
+  environment: string,
+  generation: number,
+  product: string,
+  reason: string,
+): RetryFailedTargetRequest => ({
+  version: VERSION,
+  operation: "retry",
+  environment,
+  expected_generation: generation,
+  product,
+  reason,
 });
 
 const Envelope = type({
