@@ -83,6 +83,10 @@ const cell = (
   ) {
     return { ...base, tone: "warn", status: holdLine(subscription.delivery_hold) };
   }
+  if (step && plan) {
+    const verb = { computed: "plan ready", running: "rolling out", blocked: "blocked" }[plan.state];
+    return { ...base, status: `${verb} → ${step.to}` };
+  }
   if (isHeldFailedTarget(subscription)) {
     const status = subscription.error ?? "target failed; automatic retry held";
     return {
@@ -92,10 +96,6 @@ const cell = (
         ? `${status} · ${holdLine(subscription.delivery_hold)}`
         : status,
     };
-  }
-  if (step && plan) {
-    const verb = { computed: "plan ready", running: "rolling out", blocked: "blocked" }[plan.state];
-    return { ...base, status: `${verb} → ${step.to}` };
   }
   const status: Record<string, string> = {
     current: "current",

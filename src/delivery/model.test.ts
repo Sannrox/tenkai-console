@@ -108,6 +108,23 @@ describe("matrix", () => {
     });
   });
 
+  it("shows recovery-plan progress instead of a stale retry-held instruction", () => {
+    const m = matrix([
+      env(
+        "prod-eu",
+        [
+          {
+            ...sub("api", "unhealthy", "1.16.0", "1.16.0"),
+            error:
+              "target failed; automatic retry held; create and approve an explicit plan to retry",
+          },
+        ],
+        plan("running", "api", "1.16.0"),
+      ),
+    ]);
+    expect(m.cell("api", "prod-eu")?.status).toBe("rolling out → 1.16.0");
+  });
+
   it("labels a held failed target as retry held", () => {
     const m = matrix([
       env("prod-eu", [
