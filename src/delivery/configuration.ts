@@ -1,4 +1,5 @@
 import type { EnvironmentInspectReport } from "../api/tenkai.gen";
+import { planLabel } from "./maintenance";
 import { holdLine } from "./model";
 
 /**
@@ -38,7 +39,7 @@ export const environmentRows = (reports: EnvironmentInspectReport[]): Environmen
       lease: report.lease.held
         ? `held · generation ${report.lease.generation ?? 0}${report.lease.owner ? ` · ${report.lease.owner}` : ""}`
         : "free",
-      plan: report.latest_plan?.state ?? "none",
+      plan: planLabel(report),
       hold: report.delivery_hold ? holdLine(report.delivery_hold) : undefined,
     }));
 
