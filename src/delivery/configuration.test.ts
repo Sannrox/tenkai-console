@@ -57,6 +57,36 @@ describe("environment rows", () => {
     const [row] = environmentRows([{ ...reports[0]!, delivery_hold: hold }]);
     expect(row?.hold).toBe("held by ops at 2023-11-14T22:13:20.000Z: freeze");
   });
+
+  it("names the window a blocked plan waits for", () => {
+    const [row] = environmentRows([
+      {
+        ...reports[0]!,
+        latest_plan: {
+          id: "tenkai:plan:pln-22",
+          state: "blocked",
+          created_at: 0,
+          step_count: 1,
+          status_detail: "blocked outside the configured maintenance window",
+        },
+        maintenance: {
+          eligibility: "closed",
+          next_opens_at_ms: Date.parse("2026-10-24T20:00:00Z"),
+          windows: [
+            {
+              identity: "weeknights",
+              timezone: "Europe/Berlin",
+              weekdays: [6, 7],
+              start: "22:00",
+              duration_minutes: 480,
+              next_opens_at_ms: Date.parse("2026-10-24T20:00:00Z"),
+            },
+          ],
+        },
+      },
+    ]);
+    expect(row?.plan).toBe("waiting window weeknights");
+  });
 });
 
 describe("channel table", () => {

@@ -7,6 +7,7 @@ import type {
 } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
 import { channelTable, environmentRows } from "../delivery/configuration";
+import { maintenanceDetail } from "../delivery/maintenance";
 import { holdLine, isHeldFailedTarget, productHasActivePlan } from "../delivery/model";
 import { useDelivery } from "../delivery/use-delivery";
 import { useManagementCall } from "../management/use-management";
@@ -235,6 +236,12 @@ const Detail = ({
             <dd className={`m-0 ${report.delivery_hold ? "text-warning" : "text-muted"}`}>
               {report.delivery_hold ? holdLine(report.delivery_hold) : "none"}
             </dd>
+            {maintenanceDetail(report).map((row) => (
+              <div key={`${row.label}:${row.value}`} className="contents">
+                <dt className="text-muted">{row.label}</dt>
+                <dd className="m-0">{row.value}</dd>
+              </div>
+            ))}
           </dl>
           {hold.allowed && (
             <div className="flex flex-wrap gap-2 border-t border-line px-3.5 py-3">
