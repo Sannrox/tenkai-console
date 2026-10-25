@@ -4,7 +4,9 @@ import type {
   EnvironmentPlanSummary,
   EnvironmentSubscriptionView,
 } from "../api/tenkai.gen";
-import { attention, matrix, planSummary } from "./model";
+import { attention, holdLine, isHeldFailedTarget, matrix, planSummary } from "./model";
+
+const HOLD = { actor: "ops", held_at: 1_700_000_000_000, reason: "freeze" };
 
 const sub = (
   product: string,
@@ -105,6 +107,72 @@ describe("matrix", () => {
       status: "unhealthy · probe failed",
     });
   });
+
+  it("shows recovery-plan progress instead of a stale retry-held instruction", () => {
+    const m = matrix([
+      env(
+        "prod-eu",
+        [
+          {
+            ...sub("api", "unhealthy", "1.16.0", "1.16.0"),
+            error:
+              "target failed; automatic retry held; create and approve an explicit plan to retry",
+          },
+        ],
+        plan("running", "api", "1.16.0"),
+      ),
+    ]);
+    expect(m.cell("api", "prod-eu")?.status).toBe("rolling out → 1.16.0");
+  });
+
+  it("labels a held failed target as retry held", () => {
+    const m = matrix([
+      env("prod-eu", [
+        {
+          ...sub("api", "unhealthy", "1.16.0", "1.16.0"),
+          error:
+            "target failed; automatic retry held; create and approve an explicit plan to retry",
+        },
+      ]),
+    ]);
+    expect(m.cell("api", "prod-eu")).toMatchObject({
+      version: "1.16.0",
+      tone: "bad",
+      status: "target failed; automatic retry held; create and approve an explicit plan to retry",
+    });
+  });
+
+  it("labels a channel hold instead of the version drift it pauses", () => {
+    const m = matrix([
+      env("prod-eu", [
+        {
+          ...sub("api", "behind", "1.14.2", "1.16.0"),
+          delivery_hold: HOLD,
+        },
+      ]),
+    ]);
+    expect(m.cell("api", "prod-eu")).toMatchObject({
+      version: "1.14.2",
+      tone: "warn",
+      status: holdLine(HOLD),
+    });
+  });
+
+  it("keeps a failed deployment's tone when a channel hold is also present", () => {
+    const m = matrix([
+      env("prod-us", [
+        {
+          ...sub("web", "unhealthy", "3.3.1", "3.3.1"),
+          error: "probe failed",
+          delivery_hold: HOLD,
+        },
+      ]),
+    ]);
+    expect(m.cell("web", "prod-us")).toMatchObject({
+      tone: "bad",
+      status: `unhealthy · probe failed · ${holdLine(HOLD)}`,
+    });
+  });
 });
 
 describe("attention", () => {
@@ -146,5 +214,88 @@ describe("attention", () => {
 
   it("is empty when everything is current", () => {
     expect(attention([env("prod", [sub("api", "current", "1.0.0", "1.0.0")])])).toEqual([]);
+  });
+
+  it("does not offer retry when a recovery plan already covers the held failed target", () => {
+    const failedHeld = {
+      ...sub("api", "unhealthy", "1.16.0", "1.16.0"),
+      error: "target failed; automatic retry held; create and approve an explicit plan to retry",
+    };
+    expect(
+      attention([env("prod-eu", [failedHeld], plan("computed", "api", "1.16.0"))]).map(
+        (item) => item.next,
+      ),
+    ).toEqual(["Review plan"]);
+  });
+
+  it("does not ask to plan or roll back a target already covered by an active plan", () => {
+    expect(
+      attention([
+        env("prod-eu", [sub("api", "missing", null, "1.0.0")], plan("running", "api", "1.0.0")),
+      ]),
+    ).toEqual([]);
+    expect(
+      attention([
+        env(
+          "prod-eu",
+          [{ ...sub("web", "unhealthy", "3.3.1", "3.3.1"), error: "probe failed" }],
+          plan("running", "web", "3.3.1"),
+        ),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("surfaces delivery holds and held failed targets with actor, time, and reason", () => {
+    expect(holdLine(HOLD)).toBe("held by ops at 2023-11-14T22:13:20.000Z: freeze");
+    const channelHeld = {
+      ...sub("web", "current", "3.1.4", "3.1.4"),
+      delivery_hold: HOLD,
+    };
+    const failedHeld = {
+      ...sub("api", "unhealthy", "1.16.0", "1.16.0"),
+      error: "target failed; automatic retry held; create and approve an explicit plan to retry",
+    };
+    expect(isHeldFailedTarget(failedHeld)).toBe(true);
+    const items = attention([
+      { ...env("prod-eu", [channelHeld, failedHeld]), delivery_hold: HOLD },
+      env("prod-us", [sub("api", "behind", "1.14.2", "1.16.0")]),
+    ]);
+    expect(items.map((item) => [item.tone, item.environment, item.product, item.next])).toEqual([
+      ["bad", "prod-eu", "api", "Retry"],
+      ["warn", "prod-eu", undefined, "Release hold"],
+      ["warn", "prod-eu", "web", "Release hold"],
+      ["warn", "prod-us", "api", "Plan"],
+    ]);
+    expect(items[1]?.detail).toBe(holdLine(HOLD));
+    expect(items.find((item) => item.product === "web")?.channel).toBe("stable");
+    const both = attention([
+      env("prod-eu", [
+        {
+          ...sub("api", "unhealthy", "1.16.0", "1.16.0"),
+          error:
+            "target failed; automatic retry held; create and approve an explicit plan to retry",
+          delivery_hold: HOLD,
+        },
+      ]),
+    ]);
+    expect(both.map((item) => item.next)).toEqual(["Retry", "Release hold"]);
+  });
+
+  it("keeps unhealthy and missing alerts while a hold pauses delivery", () => {
+    const items = attention([
+      {
+        ...env("prod-eu", [
+          { ...sub("web", "unhealthy", "3.3.1", "3.3.1"), error: "probe failed" },
+          sub("worker", "missing", null, "0.9.1"),
+          sub("api", "behind", "1.14.2", "1.16.0"),
+        ]),
+        delivery_hold: HOLD,
+      },
+    ]);
+    expect(items.map((item) => [item.tone, item.product, item.next])).toEqual([
+      ["bad", "web", "Roll back"],
+      ["bad", "worker", "Plan"],
+      ["warn", undefined, "Release hold"],
+    ]);
   });
 });

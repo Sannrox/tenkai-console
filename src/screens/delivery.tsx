@@ -1,7 +1,15 @@
 import { Link } from "@tanstack/react-router";
-import type { EnvironmentInspectReport } from "../api/tenkai.gen";
-import { type Tone, attention, matrix } from "../delivery/model";
-import { Card } from "../ui/kit";
+import { useState } from "react";
+import type { EnvironmentInspectReport, ManagementLifecycleResult } from "../api/tenkai.gen";
+import { type Attention, type Tone, attention, matrix } from "../delivery/model";
+import { useManagementCall } from "../management/use-management";
+import {
+  expectedGeneration,
+  releaseChannelHoldBody,
+  releaseHoldBody,
+  retryFailedTargetBody,
+} from "../plan/requests";
+import { Card, ConfirmButton, Notice } from "../ui/kit";
 
 const TEXT: Record<Tone, string> = {
   ok: "text-ok",
@@ -11,8 +19,16 @@ const TEXT: Record<Tone, string> = {
 };
 const DOT = { warn: "bg-warning", bad: "bg-danger" } as const;
 
+const message = (result: ManagementLifecycleResult) => result.message;
+
 /** Decision 2B: what needs you first, then every delivery. */
-export const Delivery = ({ reports }: { reports: EnvironmentInspectReport[] }) => {
+export const Delivery = ({
+  reports,
+  token,
+}: {
+  reports: EnvironmentInspectReport[];
+  token: string | undefined;
+}) => {
   const items = attention(reports);
   const grid = matrix(reports);
 
@@ -28,7 +44,7 @@ export const Delivery = ({ reports }: { reports: EnvironmentInspectReport[] }) =
         <Card>
           {items.map((item) => (
             <div
-              key={`${item.environment}/${item.product ?? "plan"}`}
+              key={`${item.environment}/${item.product ?? "-"}/${item.channel ?? "-"}/${item.next}`}
               className="grid grid-cols-[10px_1fr_auto] items-center gap-3 border-t border-line px-3.5 py-2.5 first:border-t-0"
             >
               <span className={`size-[7px] rounded-full ${DOT[item.tone]}`} />
@@ -36,17 +52,13 @@ export const Delivery = ({ reports }: { reports: EnvironmentInspectReport[] }) =
                 <div className="text-[13px] font-semibold">
                   {item.product
                     ? `${item.product} · ${item.environment}`
-                    : `${item.environment} plan`}
+                    : item.next === "Release hold"
+                      ? `${item.environment} hold`
+                      : `${item.environment} plan`}
                 </div>
                 <div className="text-xs text-muted">{item.detail}</div>
               </div>
-              <Link
-                to="/environments/$environment/plan"
-                params={{ environment: item.environment }}
-                className="inline-flex items-center rounded-md border border-field px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap text-fg no-underline"
-              >
-                {item.next}
-              </Link>
+              <AttentionNext item={item} reports={reports} token={token} />
             </div>
           ))}
         </Card>
@@ -110,5 +122,120 @@ export const Delivery = ({ reports }: { reports: EnvironmentInspectReport[] }) =
         </table>
       </Card>
     </>
+  );
+};
+
+const linkClass =
+  "inline-flex items-center rounded-md border border-field px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap text-fg no-underline";
+
+const AttentionNext = ({
+  item,
+  reports,
+  token,
+}: {
+  item: Attention;
+  reports: EnvironmentInspectReport[];
+  token: string | undefined;
+}) => {
+  const report = reports.find((candidate) => candidate.name === item.environment);
+  if (item.next === "Release hold" && token && report) {
+    return <ReleaseHold item={item} report={report} token={token} />;
+  }
+  if (item.next === "Retry" && token && report && item.product) {
+    return <RetryFailed item={item} report={report} token={token} />;
+  }
+  return (
+    <Link
+      to="/environments/$environment/plan"
+      params={{ environment: item.environment }}
+      className={linkClass}
+    >
+      {item.next}
+    </Link>
+  );
+};
+
+const ReleaseHold = ({
+  item,
+  report,
+  token,
+}: {
+  item: Attention;
+  report: EnvironmentInspectReport;
+  token: string;
+}) => {
+  const scope = item.product && item.channel ? "fleet" : (`environment:${report.name}` as const);
+  const call = useManagementCall(token, scope, "management", message);
+  const generation = expectedGeneration(report.lease);
+  const path =
+    item.product && item.channel
+      ? `v1/products/${encodeURIComponent(item.product)}/channels/${encodeURIComponent(item.channel)}/hold/release`
+      : `v1/environments/${encodeURIComponent(report.name)}/hold/release`;
+  const body =
+    item.product && item.channel
+      ? releaseChannelHoldBody()
+      : releaseHoldBody(report.name, generation);
+  return (
+    <div className="flex flex-col items-end gap-1">
+      {call.allowed && (
+        <ConfirmButton
+          label={item.next}
+          confirm={`Release hold on ${item.product ? `${item.product}/${item.channel}` : report.name}`}
+          disabled={call.isPending}
+          onConfirm={() => call.mutate({ path, body })}
+        />
+      )}
+      {call.outcome && <Notice tone={call.outcome.tone}>{call.outcome.text}</Notice>}
+    </div>
+  );
+};
+
+const RetryFailed = ({
+  item,
+  report,
+  token,
+}: {
+  item: Attention;
+  report: EnvironmentInspectReport;
+  token: string;
+}) => {
+  const [reason, setReason] = useState("");
+  const scope = `environment:${report.name}` as const;
+  const call = useManagementCall(token, scope, "management", message);
+  const product = item.product;
+  if (!product) {
+    return null;
+  }
+  return (
+    <div className="flex flex-col items-end gap-1">
+      {call.allowed && (
+        <>
+          <input
+            aria-label={`Retry reason for ${product}`}
+            placeholder="Reason to retry"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            className="min-w-40 rounded-md border border-field bg-white/4 px-2.5 py-1.5 text-xs text-fg placeholder:text-muted"
+          />
+          <ConfirmButton
+            label={item.next}
+            confirm={`Retry ${product} on ${report.name}`}
+            disabled={!reason.trim() || call.isPending}
+            onConfirm={() =>
+              call.mutate({
+                path: `v1/environments/${encodeURIComponent(report.name)}/failed-targets/${encodeURIComponent(product)}/retry`,
+                body: retryFailedTargetBody(
+                  report.name,
+                  expectedGeneration(report.lease),
+                  product,
+                  reason.trim(),
+                ),
+              })
+            }
+          />
+        </>
+      )}
+      {call.outcome && <Notice tone={call.outcome.tone}>{call.outcome.text}</Notice>}
+    </div>
   );
 };

@@ -1,4 +1,5 @@
 import type { EnvironmentInspectReport } from "../api/tenkai.gen";
+import { holdLine } from "./model";
 
 /**
  * Read-only configuration views (decision 4D) derived from inspect reports:
@@ -16,6 +17,7 @@ export type EnvironmentRow = {
   facts: string;
   lease: string;
   plan: string;
+  hold: string | undefined;
 };
 
 export const environmentRows = (reports: EnvironmentInspectReport[]): EnvironmentRow[] =>
@@ -37,6 +39,7 @@ export const environmentRows = (reports: EnvironmentInspectReport[]): Environmen
         ? `held · generation ${report.lease.generation ?? 0}${report.lease.owner ? ` · ${report.lease.owner}` : ""}`
         : "free",
       plan: report.latest_plan?.state ?? "none",
+      hold: report.delivery_hold ? holdLine(report.delivery_hold) : undefined,
     }));
 
 export type ChannelTable = {

@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   applyBody,
   expectedGeneration,
+  holdBody,
   parseEvidence,
   planBody,
+  releaseChannelHoldBody,
+  releaseHoldBody,
+  retryFailedTargetBody,
   signCommand,
   subscribeBody,
 } from "./requests";
@@ -58,6 +62,28 @@ describe("lifecycle requests", () => {
     expect(body).toMatchObject({ operation: "apply", expected_generation: 3 });
     expect(body).not.toHaveProperty("skip_gates");
     expect(body).not.toHaveProperty("emergency_reason");
+    expect(holdBody("prod-eu", 41, "freeze")).toEqual({
+      version: 1,
+      operation: "hold",
+      environment: "prod-eu",
+      expected_generation: 41,
+      reason: "freeze",
+    });
+    expect(releaseHoldBody("prod-eu", 41)).toEqual({
+      version: 1,
+      operation: "release",
+      environment: "prod-eu",
+      expected_generation: 41,
+    });
+    expect(releaseChannelHoldBody()).toEqual({ version: 1, operation: "channel_release" });
+    expect(retryFailedTargetBody("prod-eu", 41, "api", "retry after probe")).toEqual({
+      version: 1,
+      operation: "retry",
+      environment: "prod-eu",
+      expected_generation: 41,
+      product: "api",
+      reason: "retry after probe",
+    });
   });
 
   it("refuses malformed or misdirected approval evidence before sending", () => {

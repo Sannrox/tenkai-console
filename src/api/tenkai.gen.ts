@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 7d5a5b98836d4937c9e9f2ac479b86c6b0f4a85e (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 48e56eb154462af5cbddcd510d1a731bd230dd12 (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -122,6 +122,10 @@ name: string
 } | {
 events?: WebhookEvent[]
 kind: "set_webhook"
+/**
+ * Operational events the endpoint also receives (#724).
+ */
+operational?: OperationalEvent[]
 secret_env: string
 url: string
 } | {
@@ -140,6 +144,15 @@ kind: "clear_approval_policy"
  * via the `definition` "WebhookEvent".
  */
 export type WebhookEvent = ("apply.succeeded" | "apply.failed" | "apply.rolled_back")
+/**
+ * Operational events of [`crate::operational_events`] (#724). They live in
+ * their own endpoint field, `operational`, so a version that does not know
+ * them ignores the field and keeps the endpoint's apply subscriptions.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "OperationalEvent".
+ */
+export type OperationalEvent = ("plan.held" | "plan.awaiting_approval" | "import.failed" | "backup.stale" | "clock.drift")
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "EnvironmentStatus".
@@ -180,6 +193,11 @@ state: "busy"
 export type EvaluationOutcome = ("passed" | "failed")
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ImportState".
+ */
+export type ImportState = (("running" | "succeeded" | "failed") | "previewed")
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "MigrationStatus".
  */
 export type MigrationStatus = ("admitted" | "running" | "succeeded" | "failed" | "rolled_back" | "recovery_required")
@@ -195,6 +213,7 @@ BackupFailure?: BackupFailure
 BackupHealth?: BackupHealth
 BackupManifest?: BackupManifest
 BackupStatus?: BackupStatus
+BindPreview?: BindPreview
 ChangeEvent?: ChangeEvent
 ChangeEventKind?: ChangeEventKind
 ChangeEventPage?: ChangeEventPage
@@ -204,6 +223,7 @@ ChannelPage?: ChannelPage
 CheckpointClass?: CheckpointClass
 CheckpointDecl?: CheckpointDecl
 CheckpointReceipt?: CheckpointReceipt
+ClockHealth?: ClockHealth
 CompatibilityEvidence?: CompatibilityEvidence
 CompatibilityEvidence2?: CompatibilityEvidence2
 CompatibilityFailure?: CompatibilityFailure
@@ -212,6 +232,8 @@ CompatibilityStatus?: CompatibilityStatus
 ComponentObservation?: ComponentObservation
 ComponentPin?: ComponentPin
 ConnectivityClass?: ConnectivityClass
+ContentInventory?: ContentInventory
+ContentItem?: ContentItem
 DeliveryHold?: DeliveryHold
 DeliveryHoldRequest?: DeliveryHoldRequest
 DeliveryHoldView?: DeliveryHoldView
@@ -240,6 +262,9 @@ EvidenceSigner?: EvidenceSigner
 FleetEnvironmentRow?: FleetEnvironmentRow
 FleetStatusReport?: FleetStatusReport
 HoldAuditEvent?: HoldAuditEvent
+ImportJob?: ImportJob
+ImportRequest?: ImportRequest
+ImportState?: ImportState
 ManagementLifecycleResult?: ManagementLifecycleResult
 MigrationApprovalEnvelope?: MigrationApprovalEnvelope
 MigrationApprovalStatement?: MigrationApprovalStatement
@@ -257,6 +282,7 @@ ObservedModelRuntime?: ObservedModelRuntime
 ObservedRuntimeComponent?: ObservedRuntimeComponent
 ObservedRuntimeUnit?: ObservedRuntimeUnit
 OidcClientDiscovery?: OidcClientDiscovery
+OperationalEvent?: OperationalEvent
 PackageMigrationApplyRequest?: PackageMigrationApplyRequest
 PackageMigrationMutateRequest?: PackageMigrationMutateRequest
 PackageMigrationPreviewRequest?: PackageMigrationPreviewRequest
@@ -273,6 +299,7 @@ Provenance?: Provenance
 PublishRequest?: PublishRequest
 RecallRequest?: RecallRequest
 RegisterEnvironmentRequest?: RegisterEnvironmentRequest
+ReleaseContent?: ReleaseContent
 ReleaseListEntry?: ReleaseListEntry
 ReleasePage?: ReleasePage
 ReleaseStatement?: ReleaseStatement
@@ -281,12 +308,15 @@ ReleaseTrustedSigner?: ReleaseTrustedSigner
 RetireEnvironmentRequest?: RetireEnvironmentRequest
 RetryFailedTargetRequest?: RetryFailedTargetRequest
 RollbackRequest?: RollbackRequest
+ScanEvidence?: ScanEvidence1
 ServiceStatus?: ServiceStatus
 SignatureEnvelope?: SignatureEnvelope
+StagedBundle?: StagedBundle
 StatusRow?: StatusRow
 SubscribeRequest?: SubscribeRequest
 TerminalOutcomeProjection?: TerminalOutcomeProjection
 TickReport?: TickReport
+WebhookDelivery?: WebhookDelivery
 WebhookEvent?: WebhookEvent
 }
 /**
@@ -447,6 +477,45 @@ schema: string
 sha256: string
 }
 /**
+ * What binding a bundle would do, without writing anything.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "BindPreview".
+ */
+export interface BindPreview {
+/**
+ * True when the environment already has this bundle bound (a replay).
+ */
+already_bound: boolean
+bundle_digest: string
+/**
+ * True when the bundle carries a key revocation list to install.
+ */
+carries_revocations: boolean
+plan_id: string
+release_ids: string[]
+scan?: ScanEvidence
+}
+/**
+ * The import scanner's outcome, when one is configured.
+ */
+export interface ScanEvidence {
+exit_code: number
+scanned_at_ms: number
+scanner: string
+stderr_sha256: string
+/**
+ * SHA-256 of the scanner's standard output and standard error, so the
+ * full report can be matched to the scanner's own logs.
+ */
+stdout_sha256: string
+/**
+ * The first line of output (standard output, else standard error), at
+ * most 200 bytes.
+ */
+summary: string
+}
+/**
  * One durable change. `cursor` is the opaque resume token (monotonic sequence).
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -534,6 +603,26 @@ plan_id?: string
 result: string
 }
 /**
+ * The last clock reading, as health reports it.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ClockHealth".
+ */
+export interface ClockHealth {
+measured_at_ms?: number
+refuse_ms: number
+/**
+ * Time-source time minus local time, from the last successful reading.
+ */
+skew_ms?: number
+/**
+ * `ok`, `warn`, `refuse`, or `unknown` (no successful reading yet, or the
+ * last measurement failed).
+ */
+state: string
+warn_ms: number
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "CompatibilityEvidence".
  */
@@ -587,6 +676,59 @@ export interface CompatibilityReport {
 failures: CompatibilityFailure[]
 release_digest: string
 version: number
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ContentInventory".
+ */
+export interface ContentInventory {
+/**
+ * Referenced content this host holds no bytes for, as `<release> <digest>`.
+ */
+missing: string[]
+/**
+ * Bytes under the OCI store; absent when no store is configured.
+ */
+oci_store_bytes?: number
+releases: ReleaseContent[]
+/**
+ * Bytes under the weight cache; absent when no cache is configured.
+ */
+weight_cache_bytes?: number
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ReleaseContent".
+ */
+export interface ReleaseContent {
+content: ContentItem[]
+id: string
+product: string
+/**
+ * `channel <product>/<channel>` heads and `deployed <environment>`.
+ */
+referenced_by: string[]
+version: string
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ContentItem".
+ */
+export interface ContentItem {
+digest: string
+/**
+ * `layer` or `weights`.
+ */
+kind: string
+size_bytes?: number
+/**
+ * Whether this host holds a file named for this digest: a layer under
+ * any registry path of the OCI store, a weight in the cache. Files are
+ * found by name and not re-hashed here; import, apply and fetch verify
+ * the bytes. An environment still pulls a layer through its own mirror
+ * path. Absent when the store that would hold it is not configured.
+ */
+stored?: boolean
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -1155,6 +1297,66 @@ environments_empty: number
 environments_unhealthy: number
 }
 /**
+ * `GET /v1/imports/{id}` and the job file.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ImportJob".
+ */
+export interface ImportJob {
+actor: string
+bundle: string
+dry_run: boolean
+environment: string
+finished_at_ms?: number
+id: string
+preview?: BindPreview1
+/**
+ * The exact refusal, for example a missing layer digest or an expired interval.
+ */
+refusal?: string
+schema: string
+started_at_ms: number
+state: ImportState
+upgrade: string
+}
+/**
+ * What binding a bundle would do, without writing anything.
+ */
+export interface BindPreview1 {
+/**
+ * True when the environment already has this bundle bound (a replay).
+ */
+already_bound: boolean
+bundle_digest: string
+/**
+ * True when the bundle carries a key revocation list to install.
+ */
+carries_revocations: boolean
+plan_id: string
+release_ids: string[]
+scan?: ScanEvidence
+}
+/**
+ * Body of `POST /v1/imports`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ImportRequest".
+ */
+export interface ImportRequest {
+/**
+ * File name inside the staging directory.
+ */
+bundle: string
+dry_run?: boolean
+environment: string
+operation: string
+/**
+ * The isolated upgrade the bundle binds to.
+ */
+upgrade: string
+version: number
+}
+/**
  * Versioned result shared by catalog lifecycle routes.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -1532,12 +1734,35 @@ recovery_reason?: (string | null)
 version: number
 }
 /**
+ * What the scanner said about one import.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ScanEvidence".
+ */
+export interface ScanEvidence1 {
+exit_code: number
+scanned_at_ms: number
+scanner: string
+stderr_sha256: string
+/**
+ * SHA-256 of the scanner's standard output and standard error, so the
+ * full report can be matched to the scanner's own logs.
+ */
+stdout_sha256: string
+/**
+ * The first line of output (standard output, else standard error), at
+ * most 200 bytes.
+ */
+summary: string
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "ServiceStatus".
  */
 export interface ServiceStatus {
 backup?: BackupHealth1
 capabilities: string[]
+clock?: ClockHealth1
 /**
  * API contract ids this server serves, for client compatibility checks.
  */
@@ -1556,6 +1781,47 @@ max_age_seconds: number
  * or `unreadable` (the status file cannot be read).
  */
 state: string
+}
+/**
+ * The last clock reading, as health reports it.
+ */
+export interface ClockHealth1 {
+measured_at_ms?: number
+refuse_ms: number
+/**
+ * Time-source time minus local time, from the last successful reading.
+ */
+skew_ms?: number
+/**
+ * `ok`, `warn`, `refuse`, or `unknown` (no successful reading yet, or the
+ * last measurement failed).
+ */
+state: string
+warn_ms: number
+}
+/**
+ * One archive in the staging directory.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "StagedBundle".
+ */
+export interface StagedBundle {
+/**
+ * True when a `<stem>.chunks/` store sits beside the archive.
+ */
+chunked: boolean
+/**
+ * Present when the file parses as a bundle; signatures are not checked here.
+ */
+environment?: string
+expires_at_ms?: number
+file: string
+plan_id?: string
+size_bytes: number
+/**
+ * Why the file is not a readable bundle.
+ */
+unreadable?: string
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -1596,6 +1862,28 @@ version: number
  */
 export interface TickReport {
 environments: EnvironmentResult[]
+}
+/**
+ * One webhook delivery as `GET .../webhooks/deliveries` reports it.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "WebhookDelivery".
+ */
+export interface WebhookDelivery {
+attempts: number
+delivered_at?: number
+event: string
+id: string
+/**
+ * The last failure, as the worker recorded it.
+ */
+last_error?: string
+next_attempt_at: number
+/**
+ * `pending`, `retrying` or `delivered`.
+ */
+state: string
+url: string
 }
 
 export const TENKAI_CONTRACT = "tenkai.http.v1";
