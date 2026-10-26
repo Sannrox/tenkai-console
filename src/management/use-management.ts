@@ -83,7 +83,8 @@ export const useManagementCall = <T>(
         queryClient.invalidateQueries({ queryKey: ["migration"] }),
       ]),
   });
-  const outcome: Outcome | undefined = mutation.data
+  // By status, not data: some routes answer success with JSON `null`.
+  const outcome: Outcome | undefined = mutation.isSuccess
     ? { tone: "ok", text: describe(mutation.data) }
     : mutation.error
       ? failure(mutation.error, capability)
