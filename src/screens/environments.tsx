@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { request } from "../api/http";
 import type {
   EnvironmentInspectReport,
@@ -10,7 +10,12 @@ import type {
 } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
 import { channelTable, environmentRows } from "../delivery/configuration";
-import { maintenanceDetail } from "../delivery/maintenance";
+import {
+  maintenanceDetail,
+  maintenanceRefreshAt,
+  maintenanceTimeline,
+  type MaintenanceTimeline,
+} from "../delivery/maintenance";
 import { holdLine, isHeldFailedTarget, productHasActivePlan } from "../delivery/model";
 import { DOWNGRADE_NOTICE, previousRelease, rollbackConfirm } from "../delivery/rollback";
 import { runtimeRows } from "../delivery/runtime";
@@ -119,6 +124,9 @@ const Detail = ({
   const scope = `environment:${report.name}` as const;
   const path = `v1/environments/${encodeURIComponent(report.name)}`;
   const generation = expectedGeneration(report.lease);
+  const now = useMinuteClock();
+  const timeline = maintenanceTimeline(report, now);
+  useRefreshAt(maintenanceRefreshAt(report), now, ["environment", report.name, token]);
   const retire = useManagementCall(token, scope, "management", message);
   const rollback = useManagementCall(token, scope, "management", message);
   const subscribe = useManagementCall(token, scope, "management", message);
@@ -242,6 +250,7 @@ const Detail = ({
           )}
         </Card>
         <Card>
+          {timeline && <TimelineStrip timeline={timeline} />}
           <dl className="m-0 grid grid-cols-[120px_1fr] gap-x-3 gap-y-1 px-3.5 py-3 text-xs">
             {Object.entries(report.facts).map(([key, value]) => (
               <div key={key} className="contents">
@@ -257,10 +266,12 @@ const Detail = ({
             <dd className={`m-0 ${report.delivery_hold ? "text-warning" : "text-muted"}`}>
               {report.delivery_hold ? holdLine(report.delivery_hold) : "none"}
             </dd>
-            {maintenanceDetail(report).map((row) => (
+            {(timeline?.rows ?? maintenanceDetail(report)).map((row) => (
               <div key={`${row.label}:${row.value}`} className="contents">
                 <dt className="text-muted">{row.label}</dt>
-                <dd className="m-0">{row.value}</dd>
+                <dd className={`m-0 ${row.label === "waiting" ? "text-warning" : ""}`}>
+                  {row.value}
+                </dd>
               </div>
             ))}
           </dl>
@@ -547,3 +558,66 @@ const SubscriptionHold = ({
     </div>
   );
 };
+
+/** Seven days of maintenance windows in local time, four slots a day. */
+function TimelineStrip({ timeline }: { timeline: MaintenanceTimeline }) {
+  return (
+    <div className="border-b border-line px-3.5 py-3 text-xs">
+      <span className="text-muted">Next 7 days, local time</span>
+      <ul
+        className="m-0 mt-1.5 grid list-none grid-cols-[repeat(28,1fr)] gap-px p-0"
+        aria-label="Maintenance windows, next 7 days"
+      >
+        {timeline.slots.map((slot, index) => (
+          <li
+            // oxlint-disable-next-line no-array-index-key -- slots are positional
+            key={index}
+            aria-label={slot.label}
+            title={slot.label}
+            className={`block h-3 ${slot.open ? "bg-ok" : "bg-line"} ${slot.now ? "outline outline-1 outline-fg" : ""}`}
+          />
+        ))}
+      </ul>
+      <div className="mt-1 grid grid-cols-7 text-muted" aria-hidden="true">
+        <span>{timeline.days[0]}</span>
+        <span />
+        <span>{timeline.days[1]}</span>
+        <span />
+        <span>{timeline.days[2]}</span>
+      </div>
+    </div>
+  );
+}
+
+/** The current time, refreshed every minute, for time-relative views. */
+function useMinuteClock(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
+
+/**
+ * Refetch `queryKey` once `at` passes, at once when it already has, and
+ * again every minute (`now` is the minute clock) while it stays overdue, so
+ * a failed refresh is retried.
+ */
+function useRefreshAt(at: number | undefined, now: number, queryKey: readonly unknown[]): void {
+  const client = useQueryClient();
+  const key = JSON.stringify(queryKey);
+  const overdueTick = at !== undefined && at <= now ? now : 0;
+  useEffect(() => {
+    if (at === undefined) {
+      return undefined;
+    }
+    // Overdue: retry a second after each minute tick; else just past `at`.
+    const delay = overdueTick > 0 ? 1_000 : Math.max(0, at - Date.now()) + 1_000;
+    const timer = setTimeout(
+      () => void client.invalidateQueries({ queryKey: JSON.parse(key) as unknown[] }),
+      delay,
+    );
+    return () => clearTimeout(timer);
+  }, [at, overdueTick, key, client]);
+}

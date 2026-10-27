@@ -123,6 +123,294 @@ const closesLine = (
 const constraintLine = (constraint: EnvironmentConstraint): string =>
   `${constraint.kind} ${constraint.name} = ${constraint.value}`;
 
+/** Offset of `timeZone` from UTC at `ms`, in milliseconds. */
+const zoneOffset = (ms: number, timeZone: string): number => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(new Date(ms));
+  const part = (type: string) => Number(parts.find((entry) => entry.type === type)?.value);
+  const local = Date.UTC(
+    part("year"),
+    part("month") - 1,
+    part("day"),
+    part("hour"),
+    part("minute"),
+    part("second"),
+  );
+  return local - (ms - (ms % 1000));
+};
+
+/** Calendar date and ISO weekday (1 = Mon) of `ms` in `timeZone`. */
+const zoneDate = (
+  ms: number,
+  timeZone?: string,
+): { y: number; m: number; d: number; weekday: number } => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+  }).formatToParts(new Date(ms));
+  const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
+  const weekday = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(part("weekday")) + 1;
+  return { y: Number(part("year")), m: Number(part("month")), d: Number(part("day")), weekday };
+};
+
+const PROBES = Array.from({ length: 13 }, (_, index) => (index - 6) * 6 * 3_600_000);
+
+/**
+ * Every instant whose wall time in `timeZone` is y-m-d hh:mm: one normally,
+ * none in a spring-forward gap, two in an autumn overlap.
+ */
+const localInstants = (
+  y: number,
+  m: number,
+  d: number,
+  hh: number,
+  mm: number,
+  timeZone: string,
+): number[] => {
+  const guess = Date.UTC(y, m - 1, d, hh, mm);
+  // Offsets in force within a day and a half either side; a clock change
+  // near the wall time shows as two of them, whatever the zone's offset.
+  const candidates = PROBES.map((probe) => guess - zoneOffset(guess + probe, timeZone)).filter(
+    (instant, index, all) => all.indexOf(instant) === index,
+  );
+  return candidates
+    .filter((instant) => instant + zoneOffset(instant, timeZone) === guess)
+    .toSorted((left, right) => left - right);
+};
+
+/** The instant of local wall time y-m-d hh:mm in `timeZone`, for slot
+ * boundaries: the earlier of two, or the first moment after a gap. */
+const zoneInstant = (
+  y: number,
+  m: number,
+  d: number,
+  hh: number,
+  mm: number,
+  timeZone: string,
+): number => {
+  const [first] = localInstants(y, m, d, hh, mm, timeZone);
+  if (first !== undefined) {
+    return first;
+  }
+  // In a gap: the offset before it carries the wall time to the first
+  // moment after the gap.
+  const guess = Date.UTC(y, m - 1, d, hh, mm);
+  return guess - zoneOffset(guess - 36 * 3_600_000, timeZone);
+};
+
+const DAY_MS = 24 * 60 * 60_000;
+
+/** `[start, end)` of every opening of `window` overlapping `[from, to)`. */
+export const windowOpenings = (
+  window: EnvironmentMaintenanceWindow,
+  from: number,
+  to: number,
+): Array<[number, number]> => {
+  const [hh = 0, mm = 0] = window.start.split(":").map(Number);
+  const openings: Array<[number, number]> = [];
+  // Local calendar dates in the window's zone, from before `from` (a window
+  // that opened the day before can still be open) until past `to`; a date is
+  // never skipped by a clock change.
+  const first = zoneDate(from - DAY_MS - window.duration_minutes * 60_000, window.timezone);
+  for (let offset = 0; ; offset += 1) {
+    const date = new Date(Date.UTC(first.y, first.m - 1, first.d + offset));
+    const [y, m, d] = [date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()];
+    const starts = localInstants(y, m, d, hh, mm, window.timezone);
+    if (Math.min(...starts, zoneInstant(y, m, d, hh, mm, window.timezone)) >= to) {
+      break;
+    }
+    // As the server schedules: a start that does not exist, or exists twice,
+    // on a clock-change date is no opening.
+    const [start] = starts;
+    if (starts.length !== 1 || start === undefined) {
+      continue;
+    }
+    // ISO weekday of the calendar date itself (1 = Mon).
+    const weekday = ((date.getUTCDay() + 6) % 7) + 1;
+    if (!window.weekdays.includes(weekday)) {
+      continue;
+    }
+    const end = start + window.duration_minutes * 60_000;
+    if (end > from && start < to && !openings.some(([seen]) => seen === start)) {
+      openings.push([start, end]);
+    }
+  }
+  return openings.toSorted((left, right) => left[0] - right[0]);
+};
+
+/** One 6-hour slot; `label` reads it out, for assistive technology. */
+export type TimelineSlot = { open: boolean; now: boolean; label: string };
+
+/** Seven days of maintenance windows in the viewer's zone. */
+/**
+ * When a report goes stale: its earliest announced opening or close,
+ * including each window's own next opening, after which it has changed. A boundary already past stays due until a
+ * refreshed report replaces it. `undefined` when none is announced.
+ */
+export const maintenanceRefreshAt = (report: EnvironmentInspectReport): number | undefined =>
+  [
+    report.maintenance?.next_opens_at_ms,
+    report.maintenance?.open_until_ms,
+    ...(report.maintenance?.windows ?? []).map((window) => window.next_opens_at_ms),
+  ]
+    .filter((at): at is number => at !== undefined)
+    .toSorted((left, right) => left - right)[0];
+
+export type MaintenanceTimeline = {
+  /** Four 6-hour slots per day from the viewer's midnight today. */
+  slots: TimelineSlot[];
+  /** Weekday labels at days 0, 2 and 4. */
+  days: string[];
+  rows: DetailRow[];
+};
+
+const span = (ms: number): string => {
+  const minutes = Math.max(0, Math.round(ms / 60_000));
+  const hours = Math.floor(minutes / 60);
+  return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+};
+
+const clock = (ms: number, timeZone?: string): string =>
+  new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone,
+  }).format(new Date(ms));
+
+/** "today", "tomorrow", or the weekday of `ms`, by calendar date. */
+const dayWord = (ms: number, now: number, timeZone?: string): string => {
+  const dayNumber = (instant: number) => {
+    const { y, m, d } = zoneDate(instant, timeZone);
+    return Date.UTC(y, m - 1, d) / DAY_MS;
+  };
+  const offset = dayNumber(ms) - dayNumber(now);
+  if (offset === 0) {
+    return "today";
+  }
+  if (offset === 1) {
+    return "tomorrow";
+  }
+  return formatViewerInstant(ms, timeZone).split(" ")[0] ?? "";
+};
+
+/**
+ * The environment-detail maintenance view (#27): a 7-day strip of when its
+ * windows are open, the next opening, the plan waiting for it, and the
+ * constraints on one line. `null` strip when no schedule restricts it.
+ */
+export const maintenanceTimeline = (
+  report: EnvironmentInspectReport,
+  now: number,
+  timeZone?: string,
+): MaintenanceTimeline | null => {
+  const maintenance = report.maintenance;
+  const constraints = (report.constraints ?? []).map(constraintLine).join(" · ");
+  const tail: DetailRow[] = [];
+  if (constraints) {
+    tail.push({ label: "constraints", value: constraints });
+  }
+  // An invalid schedule cannot be evaluated here either (its zone may not
+  // exist): the plain rows carry the server's diagnostic.
+  if (
+    !maintenance ||
+    maintenance.eligibility === "unrestricted" ||
+    maintenance.eligibility === "invalid" ||
+    maintenance.windows.length === 0
+  ) {
+    return null;
+  }
+  const zone = timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Slot boundaries are local wall times, so a day stays four local slots
+  // across a daylight-saving change.
+  const today = zoneDate(now, timeZone);
+  const boundary = (index: number): number => {
+    const day = new Date(Date.UTC(today.y, today.m - 1, today.d + Math.floor(index / 4)));
+    return zoneInstant(
+      day.getUTCFullYear(),
+      day.getUTCMonth() + 1,
+      day.getUTCDate(),
+      (index % 4) * 6,
+      0,
+      zone,
+    );
+  };
+  const midnight = boundary(0);
+  const end = boundary(28);
+  const openings = maintenance.windows
+    .flatMap((window) =>
+      windowOpenings(window, midnight, end).map(([open, close]) => ({ window, open, close })),
+    )
+    .toSorted((left, right) => left.open - right.open);
+  const slots = Array.from({ length: 28 }, (_, index) => {
+    const from = boundary(index);
+    const to = boundary(index + 1);
+    const open = openings.some((opening) => opening.open < to && opening.close > from);
+    const current = now >= from && now < to;
+    const label = `${formatViewerInstant(from, timeZone)} to ${clock(to, timeZone)}, ${open ? "open" : "closed"}${current ? ", now" : ""}`;
+    return { open, now: current, label };
+  });
+  const days = [0, 8, 16].map(
+    (index) => formatViewerInstant(boundary(index + 2), timeZone).split(" ")[0] ?? "",
+  );
+  const rows: DetailRow[] = [];
+  const current = openings.find(({ open, close }) => open <= now && close > now);
+  // The server's next opening is authoritative and not bounded by the strip.
+  // The server's per-window next openings reach past the strip; computed
+  // openings cover an announcement that has since passed. The earliest
+  // future one of either is next.
+  const announced = maintenance.windows.flatMap((window) =>
+    window.next_opens_at_ms !== undefined && window.next_opens_at_ms > now
+      ? [
+          {
+            window,
+            open: window.next_opens_at_ms,
+            close: window.next_opens_at_ms + window.duration_minutes * 60_000,
+          },
+        ]
+      : [],
+  );
+  const next = [...announced, ...openings.filter(({ open }) => open > now)].toSorted(
+    (left, right) => left.open - right.open,
+  )[0];
+  if (current) {
+    rows.push({
+      label: "open now",
+      value: `${current.window.identity}, until ${clock(current.close, timeZone)}`,
+    });
+  }
+  if (next) {
+    rows.push({
+      label: "next open",
+      value: `${next.window.identity}, ${dayWord(next.open, now, timeZone)} ${clock(next.open, timeZone)} to ${clock(next.close, timeZone)}`,
+    });
+  }
+  const waiting = waitingOnWindow(report);
+  const plan = report.latest_plan;
+  if (waiting && plan && maintenance.next_opens_at_ms !== undefined) {
+    // Past the announced opening the report is stale until it refreshes.
+    const left = maintenance.next_opens_at_ms - now;
+    rows.push({
+      label: "waiting",
+      value: `${shortPlanId(plan.id)}, ${left > 0 ? `opens in ${span(left)}` : "window opening"}`,
+    });
+  } else {
+    // Any other latest plan keeps its identifier and state.
+    rows.push({ label: "plan", value: planDetail(report) });
+  }
+  return { slots, days, rows: [...rows, ...tail] };
+};
 /** Environment-detail fields: eligibility, next open/close, schedule, constraints, plan. */
 export const maintenanceDetail = (
   report: EnvironmentInspectReport,
