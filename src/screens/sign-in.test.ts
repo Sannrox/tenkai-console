@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { OidcClientDiscovery } from "../api/tenkai.gen";
-import { SIGN_IN_SUBTITLE, TOKEN_LABEL, signInButtonLabel, tokenRefusal } from "./sign-in";
+import { TEAM_NOTE, TOKEN_LABEL, signInButtonLabel, signInHeading, tokenRefusal } from "./sign-in";
 
 const settings: OidcClientDiscovery = {
   issuer: "https://idp.example.test/realms/ops",
@@ -10,12 +10,19 @@ const settings: OidcClientDiscovery = {
 };
 
 describe("Sign-in copy", () => {
-  it("puts the organisation name only on the button", () => {
-    expect(SIGN_IN_SUBTITLE).toBe("Delivery");
-    expect(signInButtonLabel(settings)).toBe("Sign in to idp.example.test");
-    expect(signInButtonLabel({ ...settings, display_name: "Northwind" })).toBe(
-      "Sign in to Northwind",
-    );
+  it("makes the organisation the title and names it on the button (#30, pick A)", () => {
+    expect(signInHeading(settings)).toEqual({
+      title: "idp.example.test",
+      subtitle: "Tenkai delivery console",
+    });
+    const northwind = { ...settings, display_name: "Northwind" };
+    expect(signInHeading(northwind).title).toBe("Northwind");
+    expect(signInButtonLabel(northwind)).toBe("Sign in with Northwind SSO");
+    expect(TEAM_NOTE).toMatch(/depends on your team/);
+  });
+
+  it("titles Tenkai when no organisation sign-in is configured", () => {
+    expect(signInHeading(null)).toEqual({ title: "Tenkai", subtitle: "Delivery console" });
   });
 
   it("labels the fallback as a platform token", () => {
