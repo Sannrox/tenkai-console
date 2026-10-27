@@ -562,19 +562,21 @@ function TimelineStrip({ timeline }: { timeline: MaintenanceTimeline }) {
   return (
     <div className="border-b border-line px-3.5 py-3 text-xs">
       <span className="text-muted">Next 7 days, local time</span>
-      <div
-        className="mt-1.5 grid grid-cols-[repeat(28,1fr)] gap-px"
-        aria-label="maintenance windows"
+      <ul
+        className="m-0 mt-1.5 grid list-none grid-cols-[repeat(28,1fr)] gap-px p-0"
+        aria-label="Maintenance windows, next 7 days"
       >
         {timeline.slots.map((slot, index) => (
-          <i
+          <li
             // oxlint-disable-next-line no-array-index-key -- slots are positional
             key={index}
+            aria-label={slot.label}
+            title={slot.label}
             className={`block h-3 ${slot.open ? "bg-ok" : "bg-line"} ${slot.now ? "outline outline-1 outline-fg" : ""}`}
           />
         ))}
-      </div>
-      <div className="mt-1 grid grid-cols-7 text-muted">
+      </ul>
+      <div className="mt-1 grid grid-cols-7 text-muted" aria-hidden="true">
         <span>{timeline.days[0]}</span>
         <span />
         <span>{timeline.days[1]}</span>

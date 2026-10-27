@@ -175,6 +175,8 @@ describe("maintenance timeline (#27)", () => {
       Array.from({ length: 28 }, (_, index) => index % 4 === 0),
     );
     expect(slots.findIndex((slot) => slot.now)).toBe(3);
+    expect(slots[3]?.label).toBe("Thu 18:00 to 00:00, closed, now");
+    expect(slots[4]?.label).toBe("Fri 00:00 to 06:00, open");
     expect(timeline?.days).toEqual(["Thu", "Sat", "Mon"]);
     expect(timeline?.rows).toEqual([
       { label: "next open", value: "nightly, tomorrow 02:00 to 04:00" },
@@ -275,5 +277,21 @@ describe("maintenance timeline across spring forward (#27)", () => {
     };
     const rows = maintenanceTimeline(env(closed([weekly])), now, ZONE)?.rows ?? [];
     expect(rows[0]).toEqual({ label: "next open", value: "weekly, Thu 02:00 to 03:00" });
+  });
+});
+
+describe("maintenance timeline keeps the latest plan (#27)", () => {
+  it("shows a plan that is not waiting for a window", () => {
+    const now = Date.parse("2026-10-22T18:48:00Z");
+    const nightly: EnvironmentMaintenanceWindow = {
+      identity: "nightly",
+      timezone: ZONE,
+      weekdays: [1, 2, 3, 4, 5, 6, 7],
+      start: "02:00",
+      duration_minutes: 120,
+    };
+    const failed = { id: "tenkai:plan:prod:7a02bb00", state: "failed" } as EnvironmentPlanSummary;
+    const rows = maintenanceTimeline(env(closed([nightly]), failed), now, ZONE)?.rows ?? [];
+    expect(rows).toContainEqual({ label: "plan", value: "7a02bb00 failed" });
   });
 });

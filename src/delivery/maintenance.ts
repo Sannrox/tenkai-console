@@ -213,7 +213,8 @@ export const windowOpenings = (
   return openings.toSorted((left, right) => left[0] - right[0]);
 };
 
-export type TimelineSlot = { open: boolean; now: boolean };
+/** One 6-hour slot; `label` reads it out, for assistive technology. */
+export type TimelineSlot = { open: boolean; now: boolean; label: string };
 
 /** Seven days of maintenance windows in the viewer's zone. */
 export type MaintenanceTimeline = {
@@ -305,10 +306,10 @@ export const maintenanceTimeline = (
   const slots = Array.from({ length: 28 }, (_, index) => {
     const from = boundary(index);
     const to = boundary(index + 1);
-    return {
-      open: openings.some(({ open, close }) => open < to && close > from),
-      now: now >= from && now < to,
-    };
+    const open = openings.some((opening) => opening.open < to && opening.close > from);
+    const current = now >= from && now < to;
+    const label = `${formatViewerInstant(from, timeZone)} to ${clock(to, timeZone)}, ${open ? "open" : "closed"}${current ? ", now" : ""}`;
+    return { open, now: current, label };
   });
   const days = [0, 8, 16].map(
     (index) => formatViewerInstant(boundary(index + 2), timeZone).split(" ")[0] ?? "",
@@ -344,6 +345,9 @@ export const maintenanceTimeline = (
       label: "waiting",
       value: `${shortPlanId(plan.id)}, opens in ${span(maintenance.next_opens_at_ms - now)}`,
     });
+  } else {
+    // Any other latest plan keeps its identifier and state.
+    rows.push({ label: "plan", value: planDetail(report) });
   }
   return { slots, days, rows: [...rows, ...tail] };
 };
