@@ -3,18 +3,29 @@ import { ApiError, consoleRoot, request } from "../api/http";
 import type { OidcClientDiscovery } from "../api/tenkai.gen";
 import { beginSignIn, providerLabel } from "../auth/oidc";
 import { useSession } from "../auth/session";
-import { Button, Centered, Title } from "../ui/kit";
+import { Button, Centered } from "../ui/kit";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/** Subtitle stays generic so the button is the only organisation name. */
-export const SIGN_IN_SUBTITLE = "Delivery";
-
 export const TOKEN_LABEL = "Platform token";
+
+/** Shown under the button: access follows the signed-in team. */
+export const TEAM_NOTE = "What you can see and change depends on your team.";
+
+/**
+ * Sign-in heading (#30, pick A): the organisation is the title, Tenkai the
+ * subtitle; with no organisation sign-in configured, Tenkai is the title.
+ */
+export const signInHeading = (
+  settings: OidcClientDiscovery | null,
+): { title: string; subtitle: string } =>
+  settings
+    ? { title: providerLabel(settings), subtitle: "Tenkai delivery console" }
+    : { title: "Tenkai", subtitle: "Delivery console" };
 
 /** Decision 5F: one button to the organisation's sign-in. */
 export const signInButtonLabel = (settings: OidcClientDiscovery): string =>
-  `Sign in to ${providerLabel(settings)}`;
+  `Sign in with ${providerLabel(settings)} SSO`;
 
 /** 401 vs 403 on a pasted platform token. Other statuses stay the server text. */
 export const tokenRefusal = (status: number): string | undefined => {
@@ -48,9 +59,11 @@ export const SignIn = ({ settings }: { settings: OidcClientDiscovery | null }) =
     }
   };
 
+  const heading = signInHeading(settings);
   return (
     <Centered>
-      <Title subtitle={SIGN_IN_SUBTITLE} />
+      <h1 className="m-0 text-[15px] font-semibold">{heading.title}</h1>
+      <p className="mt-0 mb-4 text-xs text-muted">{heading.subtitle}</p>
       {ended === "expired" && (
         <p className="mb-3 text-xs text-warning">Session expired. Sign in again.</p>
       )}
@@ -64,6 +77,7 @@ export const SignIn = ({ settings }: { settings: OidcClientDiscovery | null }) =
           {signInButtonLabel(settings)}
         </Button>
       )}
+      {settings && <p className="mt-2 mb-0 text-xs text-muted">{TEAM_NOTE}</p>}
       {error && (
         <p role="alert" className="mt-3 mb-0 text-xs text-danger">
           {error}
@@ -72,8 +86,7 @@ export const SignIn = ({ settings }: { settings: OidcClientDiscovery | null }) =
       {useToken ? (
         <TokenForm />
       ) : (
-        <div className="mt-4 border-t border-line pt-3 text-xs text-muted">
-          {TOKEN_LABEL} ·{" "}
+        <div className="mt-3 border-t border-line pt-2 text-xs">
           <button
             type="button"
             className="cursor-pointer text-muted underline"
