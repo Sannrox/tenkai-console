@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { request } from "../api/http";
 import type {
   EnvironmentInspectReport,
@@ -17,7 +17,12 @@ import {
   type MaintenanceTimeline,
 } from "../delivery/maintenance";
 import { holdLine, isHeldFailedTarget, productHasActivePlan } from "../delivery/model";
-import { DOWNGRADE_NOTICE, previousRelease, rollbackConfirm } from "../delivery/rollback";
+import {
+  DOWNGRADE_NOTICE,
+  previousRelease,
+  rollbackConfirmed,
+  rollbackSummary,
+} from "../delivery/rollback";
 import { runtimeRows } from "../delivery/runtime";
 import { useDelivery } from "../delivery/use-delivery";
 import { useManagementCall } from "../management/use-management";
@@ -132,7 +137,6 @@ const Detail = ({
   const subscribe = useManagementCall(token, scope, "management", message);
   const hold = useManagementCall(token, scope, "management", message);
   const [reason, setReason] = useState("");
-  const [rollbackReason, setRollbackReason] = useState("");
   const [holdReason, setHoldReason] = useState("");
   const [product, setProduct] = useState("");
   const [channel, setChannel] = useState("");
@@ -319,47 +323,32 @@ const Detail = ({
             </div>
           )}
           {rollback.allowed && deployed.length > 0 && (
-            <div className="border-t border-line px-3.5 py-3">
-              <div className="flex flex-wrap gap-2">
-                {deployed.length > 1 && (
-                  <select
-                    aria-label="Product to roll back"
-                    value={selectedProduct}
-                    onChange={(event) => setRollbackProduct(event.target.value)}
-                    className={field}
-                  >
-                    {deployed.map((subscription) => (
-                      <option key={subscription.product} value={subscription.product}>
-                        {subscription.product}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <input
-                  aria-label="Rollback reason"
-                  placeholder="Reason"
-                  value={rollbackReason}
-                  onChange={(event) => setRollbackReason(event.target.value)}
+            <div className="flex flex-wrap gap-2 border-t border-line px-3.5 py-3">
+              {deployed.length > 1 && (
+                <select
+                  aria-label="Product to roll back"
+                  value={selectedProduct}
+                  onChange={(event) => setRollbackProduct(event.target.value)}
                   className={field}
-                />
-                <ConfirmButton
-                  label="Roll back"
-                  confirm={rollbackConfirm(selectedProduct, previous)}
-                  disabled={!selectedProduct || !rollbackReason.trim() || rollback.isPending}
-                  onConfirm={() =>
-                    rollback.mutate({
-                      path: `${path}/rollback`,
-                      body: rollbackBody(
-                        report.name,
-                        generation,
-                        selectedProduct,
-                        rollbackReason.trim(),
-                      ),
-                    })
-                  }
-                />
-              </div>
-              <p className="mt-2 mb-0 text-xs text-muted">{DOWNGRADE_NOTICE}</p>
+                >
+                  {deployed.map((subscription) => (
+                    <option key={subscription.product} value={subscription.product}>
+                      {subscription.product}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <RollbackDialog
+                environment={report.name}
+                summary={rollbackSummary(report, selectedProduct, previous)}
+                disabled={!selectedProduct || rollback.isPending}
+                onConfirm={(why) =>
+                  rollback.mutate({
+                    path: `${path}/rollback`,
+                    body: rollbackBody(report.name, generation, selectedProduct, why),
+                  })
+                }
+              />
             </div>
           )}
           {rollback.outcome && (
@@ -620,4 +609,91 @@ function useRefreshAt(at: number | undefined, now: number, queryKey: readonly un
     );
     return () => clearTimeout(timer);
   }, [at, overdueTick, key, client]);
+/**
+ * Roll back behind a modal (#28, pick B): it states what will happen, takes
+ * a reason, and sends only once the environment name is typed exactly.
+ */
+function RollbackDialog({
+  environment,
+  summary,
+  disabled,
+  onConfirm,
+}: {
+  environment: string;
+  summary: Array<{ label: string; value: string }>;
+  disabled: boolean;
+  onConfirm: (reason: string) => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [reason, setReason] = useState("");
+  const [typed, setTyped] = useState("");
+  const close = () => {
+    dialog.current?.close();
+    setReason("");
+    setTyped("");
+  };
+  return (
+    <>
+      <Button disabled={disabled} onClick={() => dialog.current?.showModal()}>
+        Roll back
+      </Button>
+      <dialog
+        ref={dialog}
+        aria-labelledby={`rollback-${environment}`}
+        onClose={() => {
+          setReason("");
+          setTyped("");
+        }}
+        className="m-auto w-full max-w-[380px] rounded-card border border-line bg-card p-3 text-xs text-fg backdrop:bg-black/70"
+      >
+        <p id={`rollback-${environment}`} className="m-0 mb-2 text-sm font-semibold">
+          Roll back {environment}?
+        </p>
+        <dl className="m-0 mb-2 grid grid-cols-[90px_1fr] gap-x-3 gap-y-1">
+          {summary.map((row) => (
+            <div key={row.label} className="contents">
+              <dt className="text-muted">{row.label}</dt>
+              <dd className={`m-0 ${row.label === "approval" ? "text-warning" : ""}`}>
+                {row.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+        <p className="m-0 mb-2 text-muted">{DOWNGRADE_NOTICE}</p>
+        <label className="mb-2 block">
+          <span className="text-muted">Reason</span>
+          <input
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            className={`${field} mt-1 w-full`}
+          />
+        </label>
+        <label className="mb-3 block">
+          <span className="text-muted">Type {environment} to confirm</span>
+          <input
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+            className={`${field} mt-1 w-full`}
+          />
+        </label>
+        <div className="flex gap-2">
+          <Button
+            variant="primary"
+            disabled={disabled || !rollbackConfirmed(environment, typed, reason)}
+            onClick={() => {
+              onConfirm(reason.trim());
+              close();
+            }}
+          >
+            Roll back
+          </Button>
+          <Button variant="ghost" onClick={close}>
+            Cancel
+          </Button>
+        </div>
+      </dialog>
+    </>
+  );
 }

@@ -29,8 +29,22 @@ export const previousRelease = (
   return step?.from ?? undefined;
 };
 
-/** Confirmation names the previous release when inspect still reports it. */
-export const rollbackConfirm = (product: string, previous: string | undefined): string =>
-  previous
-    ? `Confirm roll back ${product} to ${previous}`
-    : `Confirm roll back ${product} to the previous release`;
+/** What the rollback dialog states before anything is sent (#28, pick B). */
+export const rollbackSummary = (
+  report: EnvironmentInspectReport,
+  product: string,
+  previous: string | undefined,
+): Array<{ label: string; value: string }> => {
+  const deployed =
+    report.subscriptions.find((subscription) => subscription.product === product)?.deployed ??
+    "unknown";
+  return [
+    { label: "product", value: product },
+    { label: "from → to", value: `${deployed} → ${previous ?? "previous release"}` },
+    { label: "approval", value: "required: a human-signed downgrade approval" },
+  ];
+};
+
+/** The dialog's Roll back is enabled only with a reason and the environment name typed exactly. */
+export const rollbackConfirmed = (environment: string, typed: string, reason: string): boolean =>
+  typed === environment && reason.trim().length > 0;

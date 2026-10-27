@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EnvironmentInspectReport, EnvironmentPlanSummary } from "../api/tenkai.gen";
-import { DOWNGRADE_NOTICE, previousRelease, rollbackConfirm } from "./rollback";
+import { DOWNGRADE_NOTICE, previousRelease, rollbackConfirmed, rollbackSummary } from "./rollback";
 
 const env = (latest_plan: EnvironmentPlanSummary | null = null): EnvironmentInspectReport => ({
   name: "prod",
@@ -68,12 +68,24 @@ describe("previousRelease", () => {
   });
 });
 
-describe("rollbackConfirm", () => {
-  it("names the previous release in the confirmation", () => {
-    expect(rollbackConfirm("tenkai", "0.6.0")).toBe("Confirm roll back tenkai to 0.6.0");
-    expect(rollbackConfirm("tenkai", undefined)).toBe(
-      "Confirm roll back tenkai to the previous release",
-    );
+describe("rollback dialog (#28)", () => {
+  it("states product, from and to, and the approval before anything is sent", () => {
+    expect(rollbackSummary(env(upgrade("0.6.0")), "tenkai", "0.6.0")).toEqual([
+      { label: "product", value: "tenkai" },
+      { label: "from → to", value: "0.6.1 → 0.6.0" },
+      { label: "approval", value: "required: a human-signed downgrade approval" },
+    ]);
+    expect(rollbackSummary(env(), "tenkai", undefined)[1]).toEqual({
+      label: "from → to",
+      value: "0.6.1 → previous release",
+    });
+  });
+
+  it("confirms only with a reason and the environment name typed exactly", () => {
+    expect(rollbackConfirmed("prod", "prod", "checkout errors")).toBe(true);
+    expect(rollbackConfirmed("prod", "prod", "  ")).toBe(false);
+    expect(rollbackConfirmed("prod", "Prod", "checkout errors")).toBe(false);
+    expect(rollbackConfirmed("prod", "prod ", "checkout errors")).toBe(false);
   });
 
   it("explains the downgrade approval before submit", () => {
