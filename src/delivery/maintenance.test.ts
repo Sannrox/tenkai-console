@@ -246,3 +246,34 @@ describe("maintenance timeline edge cases (#27)", () => {
     expect(slots.findIndex((slot) => slot.open)).toBe(19);
   });
 });
+
+describe("maintenance timeline across spring forward (#27)", () => {
+  it("keeps the local date a clock change would skip, and labels it by calendar date", () => {
+    // UTC viewer on Thursday 2026-03-26; Berlin springs forward on Sunday 2026-03-29.
+    const now = Date.parse("2026-03-26T12:00:00Z");
+    const sunday: EnvironmentMaintenanceWindow = {
+      identity: "sunday",
+      timezone: ZONE,
+      weekdays: [7],
+      start: "01:00",
+      duration_minutes: 120,
+    };
+    const openings = windowOpenings(sunday, now, now + 7 * 24 * 60 * 60 * 1000);
+    expect(openings[0]?.[0]).toBe(Date.parse("2026-03-29T00:00:00Z"));
+  });
+
+  it("names the server's next opening even beyond the strip", () => {
+    const now = Date.parse("2026-10-22T18:48:00Z");
+    const next = Date.parse("2026-10-29T01:00:00Z");
+    const weekly: EnvironmentMaintenanceWindow = {
+      identity: "weekly",
+      timezone: ZONE,
+      weekdays: [4],
+      start: "02:00",
+      duration_minutes: 60,
+      next_opens_at_ms: next,
+    };
+    const rows = maintenanceTimeline(env(closed([weekly])), now, ZONE)?.rows ?? [];
+    expect(rows[0]).toEqual({ label: "next open", value: "weekly, Thu 02:00 to 03:00" });
+  });
+});

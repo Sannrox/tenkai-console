@@ -189,17 +189,22 @@ export const windowOpenings = (
 ): Array<[number, number]> => {
   const [hh = 0, mm = 0] = window.start.split(":").map(Number);
   const openings: Array<[number, number]> = [];
-  // A window that opened the day before can still be open at `from`.
-  for (
-    let day = from - DAY_MS - window.duration_minutes * 60_000;
-    day < to + DAY_MS;
-    day += DAY_MS
-  ) {
-    const { y, m, d, weekday } = zoneDate(day, window.timezone);
+  // Local calendar dates in the window's zone, from before `from` (a window
+  // that opened the day before can still be open) until past `to`; a date is
+  // never skipped by a clock change.
+  const first = zoneDate(from - DAY_MS - window.duration_minutes * 60_000, window.timezone);
+  for (let offset = 0; ; offset += 1) {
+    const date = new Date(Date.UTC(first.y, first.m - 1, first.d + offset));
+    const [y, m, d] = [date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()];
+    const start = zoneInstant(y, m, d, hh, mm, window.timezone);
+    if (start >= to) {
+      break;
+    }
+    // ISO weekday of the calendar date itself (1 = Mon).
+    const weekday = ((date.getUTCDay() + 6) % 7) + 1;
     if (!window.weekdays.includes(weekday)) {
       continue;
     }
-    const start = zoneInstant(y, m, d, hh, mm, window.timezone);
     const end = start + window.duration_minutes * 60_000;
     if (end > from && start < to && !openings.some(([seen]) => seen === start)) {
       openings.push([start, end]);
@@ -233,9 +238,13 @@ const clock = (ms: number, timeZone?: string): string =>
     timeZone,
   }).format(new Date(ms));
 
-/** "today", "tomorrow", or the weekday of `ms` relative to `midnight`. */
-const dayWord = (ms: number, midnight: number, timeZone?: string): string => {
-  const offset = Math.floor((ms - midnight) / DAY_MS);
+/** "today", "tomorrow", or the weekday of `ms`, by calendar date. */
+const dayWord = (ms: number, now: number, timeZone?: string): string => {
+  const dayNumber = (instant: number) => {
+    const { y, m, d } = zoneDate(instant, timeZone);
+    return Date.UTC(y, m - 1, d) / DAY_MS;
+  };
+  const offset = dayNumber(ms) - dayNumber(now);
   if (offset === 0) {
     return "today";
   }
@@ -306,7 +315,16 @@ export const maintenanceTimeline = (
   );
   const rows: DetailRow[] = [];
   const current = openings.find(({ open, close }) => open <= now && close > now);
-  const next = openings.find(({ open }) => open > now);
+  // The server's next opening is authoritative and not bounded by the strip.
+  const announced = waitingWindow(maintenance);
+  const next =
+    announced && maintenance.next_opens_at_ms !== undefined && maintenance.next_opens_at_ms > now
+      ? {
+          window: announced,
+          open: maintenance.next_opens_at_ms,
+          close: maintenance.next_opens_at_ms + announced.duration_minutes * 60_000,
+        }
+      : openings.find(({ open }) => open > now);
   if (current) {
     rows.push({
       label: "open now",
@@ -316,7 +334,7 @@ export const maintenanceTimeline = (
   if (next) {
     rows.push({
       label: "next open",
-      value: `${next.window.identity}, ${dayWord(next.open, midnight, timeZone)} ${clock(next.open, timeZone)} to ${clock(next.close, timeZone)}`,
+      value: `${next.window.identity}, ${dayWord(next.open, now, timeZone)} ${clock(next.open, timeZone)} to ${clock(next.close, timeZone)}`,
     });
   }
   const waiting = waitingOnWindow(report);
