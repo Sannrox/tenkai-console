@@ -219,14 +219,6 @@ export type MaintenanceTimeline = {
   rows: DetailRow[];
 };
 
-const SLOT_MS = 6 * 60 * 60_000;
-
-const viewerMidnight = (now: number, timeZone?: string): number => {
-  const { y, m, d } = zoneDate(now, timeZone);
-  const zone = timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return zoneInstant(y, m, d, 0, 0, zone);
-};
-
 const span = (ms: number): string => {
   const minutes = Math.max(0, Math.round(ms / 60_000));
   const hours = Math.floor(minutes / 60);
@@ -269,37 +261,50 @@ export const maintenanceTimeline = (
   if (constraints) {
     tail.push({ label: "constraints", value: constraints });
   }
+  // An invalid schedule cannot be evaluated here either (its zone may not
+  // exist): the plain rows carry the server's diagnostic.
   if (
     !maintenance ||
     maintenance.eligibility === "unrestricted" ||
+    maintenance.eligibility === "invalid" ||
     maintenance.windows.length === 0
   ) {
     return null;
   }
-  const midnight = viewerMidnight(now, timeZone);
-  const end = midnight + 7 * DAY_MS;
-  const openings = maintenance.windows.flatMap((window) =>
-    windowOpenings(window, midnight, end).map(([open, close]) => ({ window, open, close })),
-  );
+  const zone = timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Slot boundaries are local wall times, so a day stays four local slots
+  // across a daylight-saving change.
+  const today = zoneDate(now, timeZone);
+  const boundary = (index: number): number => {
+    const day = new Date(Date.UTC(today.y, today.m - 1, today.d + Math.floor(index / 4)));
+    return zoneInstant(
+      day.getUTCFullYear(),
+      day.getUTCMonth() + 1,
+      day.getUTCDate(),
+      (index % 4) * 6,
+      0,
+      zone,
+    );
+  };
+  const midnight = boundary(0);
+  const end = boundary(28);
+  const openings = maintenance.windows
+    .flatMap((window) =>
+      windowOpenings(window, midnight, end).map(([open, close]) => ({ window, open, close })),
+    )
+    .toSorted((left, right) => left.open - right.open);
   const slots = Array.from({ length: 28 }, (_, index) => {
-    const from = midnight + index * SLOT_MS;
-    const to = from + SLOT_MS;
+    const from = boundary(index);
+    const to = boundary(index + 1);
     return {
       open: openings.some(({ open, close }) => open < to && close > from),
       now: now >= from && now < to,
     };
   });
-  const days = [0, 2, 4].map(
-    (offset) =>
-      formatViewerInstant(midnight + offset * DAY_MS + SLOT_MS * 2, timeZone).split(" ")[0] ?? "",
+  const days = [0, 8, 16].map(
+    (index) => formatViewerInstant(boundary(index + 2), timeZone).split(" ")[0] ?? "",
   );
   const rows: DetailRow[] = [];
-  if (maintenance.eligibility === "invalid") {
-    rows.push({
-      label: "window",
-      value: maintenance.detail ? `invalid · ${maintenance.detail}` : "invalid",
-    });
-  }
   const current = openings.find(({ open, close }) => open <= now && close > now);
   const next = openings.find(({ open }) => open > now);
   if (current) {

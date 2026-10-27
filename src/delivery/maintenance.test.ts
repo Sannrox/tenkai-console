@@ -202,3 +202,47 @@ describe("maintenance timeline (#27)", () => {
     ]);
   });
 });
+
+describe("maintenance timeline edge cases (#27)", () => {
+  const NOW = Date.parse("2026-10-22T18:48:00Z");
+  const at = (
+    identity: string,
+    start: string,
+    weekdays: number[],
+  ): EnvironmentMaintenanceWindow => ({
+    identity,
+    timezone: ZONE,
+    weekdays,
+    start,
+    duration_minutes: 60,
+  });
+
+  it("names the earliest opening across windows, whatever their order", () => {
+    const later = at("weekly", "03:00", [5]);
+    const sooner = at("evening", "22:00", [4]);
+    const timeline = maintenanceTimeline(env(closed([later, sooner])), NOW, ZONE);
+    expect(timeline?.rows[0]).toEqual({
+      label: "next open",
+      value: "evening, today 22:00 to 23:00",
+    });
+  });
+
+  it("leaves an invalid schedule to the plain rows without evaluating its zone", () => {
+    const broken = { ...at("broken", "02:00", [1]), timezone: "Nowhere/Invalid" };
+    expect(
+      maintenanceTimeline(
+        env({ eligibility: "invalid", detail: "unknown zone", windows: [broken] }),
+        NOW,
+        ZONE,
+      ),
+    ).toBeNull();
+  });
+
+  it("keeps four local slots a day across the autumn clock change", () => {
+    // Monday 2026-10-26 23:30 local falls after the change on Sunday.
+    const late = at("late", "23:30", [1]);
+    const slots = maintenanceTimeline(env(closed([late])), NOW, ZONE)?.slots ?? [];
+    // Thursday is day 0, so Monday is day 4 and its last slot is index 19.
+    expect(slots.findIndex((slot) => slot.open)).toBe(19);
+  });
+});
