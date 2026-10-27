@@ -315,7 +315,9 @@ describe("maintenance timeline freshness (#27)", () => {
     };
     const rows = maintenanceTimeline(env(open), now, ZONE)?.rows ?? [];
     expect(rows).toContainEqual({ label: "next open", value: "weekly, Thu 20:00 to 22:00" });
-    expect(maintenanceRefreshAt(env(open), now)).toBe(Date.parse("2026-10-22T20:00:00Z"));
+    expect(maintenanceRefreshAt(env(open))).toBe(Date.parse("2026-10-22T20:00:00Z"));
+    // A boundary already past stays due until a refreshed report arrives.
+    expect(maintenanceRefreshAt(env({ ...open, open_until_ms: now - 1 }))).toBe(now - 1);
   });
 
   it("does not count down past an announced opening", () => {

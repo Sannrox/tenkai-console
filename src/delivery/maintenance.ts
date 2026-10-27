@@ -218,15 +218,13 @@ export type TimelineSlot = { open: boolean; now: boolean; label: string };
 
 /** Seven days of maintenance windows in the viewer's zone. */
 /**
- * When a report shown at `now` goes stale: the next announced opening or
- * close, after which eligibility has changed. `undefined` when none is due.
+ * When a report goes stale: its earliest announced opening or close, after
+ * which eligibility has changed. A boundary already past stays due until a
+ * refreshed report replaces it. `undefined` when none is announced.
  */
-export const maintenanceRefreshAt = (
-  report: EnvironmentInspectReport,
-  now: number,
-): number | undefined =>
+export const maintenanceRefreshAt = (report: EnvironmentInspectReport): number | undefined =>
   [report.maintenance?.next_opens_at_ms, report.maintenance?.open_until_ms]
-    .filter((at): at is number => at !== undefined && at > now)
+    .filter((at): at is number => at !== undefined)
     .toSorted((left, right) => left - right)[0];
 
 export type MaintenanceTimeline = {

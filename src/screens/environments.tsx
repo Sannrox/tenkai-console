@@ -126,7 +126,7 @@ const Detail = ({
   const generation = expectedGeneration(report.lease);
   const now = useMinuteClock();
   const timeline = maintenanceTimeline(report, now);
-  useRefreshAt(maintenanceRefreshAt(report, now), ["environment", report.name, token]);
+  useRefreshAt(maintenanceRefreshAt(report), ["environment", report.name, token]);
   const retire = useManagementCall(token, scope, "management", message);
   const rollback = useManagementCall(token, scope, "management", message);
   const subscribe = useManagementCall(token, scope, "management", message);
@@ -599,7 +599,7 @@ function useMinuteClock(): number {
   return now;
 }
 
-/** Refetch `queryKey` once `at` passes, when the shown data goes stale. */
+/** Refetch `queryKey` once `at` passes (at once when it already has). */
 function useRefreshAt(at: number | undefined, queryKey: readonly unknown[]): void {
   const client = useQueryClient();
   const key = JSON.stringify(queryKey);
