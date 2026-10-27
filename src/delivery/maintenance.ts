@@ -123,6 +123,207 @@ const closesLine = (
 const constraintLine = (constraint: EnvironmentConstraint): string =>
   `${constraint.kind} ${constraint.name} = ${constraint.value}`;
 
+/** Offset of `timeZone` from UTC at `ms`, in milliseconds. */
+const zoneOffset = (ms: number, timeZone: string): number => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(new Date(ms));
+  const part = (type: string) => Number(parts.find((entry) => entry.type === type)?.value);
+  const local = Date.UTC(
+    part("year"),
+    part("month") - 1,
+    part("day"),
+    part("hour"),
+    part("minute"),
+    part("second"),
+  );
+  return local - (ms - (ms % 1000));
+};
+
+/** Calendar date and ISO weekday (1 = Mon) of `ms` in `timeZone`. */
+const zoneDate = (
+  ms: number,
+  timeZone?: string,
+): { y: number; m: number; d: number; weekday: number } => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+  }).formatToParts(new Date(ms));
+  const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
+  const weekday = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(part("weekday")) + 1;
+  return { y: Number(part("year")), m: Number(part("month")), d: Number(part("day")), weekday };
+};
+
+/** The instant of local wall time y-m-d hh:mm in `timeZone`. */
+const zoneInstant = (
+  y: number,
+  m: number,
+  d: number,
+  hh: number,
+  mm: number,
+  timeZone: string,
+): number => {
+  const guess = Date.UTC(y, m - 1, d, hh, mm);
+  const first = guess - zoneOffset(guess, timeZone);
+  // A second pass settles instants near an offset change.
+  return guess - zoneOffset(first, timeZone);
+};
+
+const DAY_MS = 24 * 60 * 60_000;
+
+/** `[start, end)` of every opening of `window` overlapping `[from, to)`. */
+export const windowOpenings = (
+  window: EnvironmentMaintenanceWindow,
+  from: number,
+  to: number,
+): Array<[number, number]> => {
+  const [hh = 0, mm = 0] = window.start.split(":").map(Number);
+  const openings: Array<[number, number]> = [];
+  // A window that opened the day before can still be open at `from`.
+  for (
+    let day = from - DAY_MS - window.duration_minutes * 60_000;
+    day < to + DAY_MS;
+    day += DAY_MS
+  ) {
+    const { y, m, d, weekday } = zoneDate(day, window.timezone);
+    if (!window.weekdays.includes(weekday)) {
+      continue;
+    }
+    const start = zoneInstant(y, m, d, hh, mm, window.timezone);
+    const end = start + window.duration_minutes * 60_000;
+    if (end > from && start < to && !openings.some(([seen]) => seen === start)) {
+      openings.push([start, end]);
+    }
+  }
+  return openings.toSorted((left, right) => left[0] - right[0]);
+};
+
+export type TimelineSlot = { open: boolean; now: boolean };
+
+/** Seven days of maintenance windows in the viewer's zone. */
+export type MaintenanceTimeline = {
+  /** Four 6-hour slots per day from the viewer's midnight today. */
+  slots: TimelineSlot[];
+  /** Weekday labels at days 0, 2 and 4. */
+  days: string[];
+  rows: DetailRow[];
+};
+
+const SLOT_MS = 6 * 60 * 60_000;
+
+const viewerMidnight = (now: number, timeZone?: string): number => {
+  const { y, m, d } = zoneDate(now, timeZone);
+  const zone = timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return zoneInstant(y, m, d, 0, 0, zone);
+};
+
+const span = (ms: number): string => {
+  const minutes = Math.max(0, Math.round(ms / 60_000));
+  const hours = Math.floor(minutes / 60);
+  return hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+};
+
+const clock = (ms: number, timeZone?: string): string =>
+  new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone,
+  }).format(new Date(ms));
+
+/** "today", "tomorrow", or the weekday of `ms` relative to `midnight`. */
+const dayWord = (ms: number, midnight: number, timeZone?: string): string => {
+  const offset = Math.floor((ms - midnight) / DAY_MS);
+  if (offset === 0) {
+    return "today";
+  }
+  if (offset === 1) {
+    return "tomorrow";
+  }
+  return formatViewerInstant(ms, timeZone).split(" ")[0] ?? "";
+};
+
+/**
+ * The environment-detail maintenance view (#27): a 7-day strip of when its
+ * windows are open, the next opening, the plan waiting for it, and the
+ * constraints on one line. `null` strip when no schedule restricts it.
+ */
+export const maintenanceTimeline = (
+  report: EnvironmentInspectReport,
+  now: number,
+  timeZone?: string,
+): MaintenanceTimeline | null => {
+  const maintenance = report.maintenance;
+  const constraints = (report.constraints ?? []).map(constraintLine).join(" · ");
+  const tail: DetailRow[] = [];
+  if (constraints) {
+    tail.push({ label: "constraints", value: constraints });
+  }
+  if (
+    !maintenance ||
+    maintenance.eligibility === "unrestricted" ||
+    maintenance.windows.length === 0
+  ) {
+    return null;
+  }
+  const midnight = viewerMidnight(now, timeZone);
+  const end = midnight + 7 * DAY_MS;
+  const openings = maintenance.windows.flatMap((window) =>
+    windowOpenings(window, midnight, end).map(([open, close]) => ({ window, open, close })),
+  );
+  const slots = Array.from({ length: 28 }, (_, index) => {
+    const from = midnight + index * SLOT_MS;
+    const to = from + SLOT_MS;
+    return {
+      open: openings.some(({ open, close }) => open < to && close > from),
+      now: now >= from && now < to,
+    };
+  });
+  const days = [0, 2, 4].map(
+    (offset) =>
+      formatViewerInstant(midnight + offset * DAY_MS + SLOT_MS * 2, timeZone).split(" ")[0] ?? "",
+  );
+  const rows: DetailRow[] = [];
+  if (maintenance.eligibility === "invalid") {
+    rows.push({
+      label: "window",
+      value: maintenance.detail ? `invalid · ${maintenance.detail}` : "invalid",
+    });
+  }
+  const current = openings.find(({ open, close }) => open <= now && close > now);
+  const next = openings.find(({ open }) => open > now);
+  if (current) {
+    rows.push({
+      label: "open now",
+      value: `${current.window.identity}, until ${clock(current.close, timeZone)}`,
+    });
+  }
+  if (next) {
+    rows.push({
+      label: "next open",
+      value: `${next.window.identity}, ${dayWord(next.open, midnight, timeZone)} ${clock(next.open, timeZone)} to ${clock(next.close, timeZone)}`,
+    });
+  }
+  const waiting = waitingOnWindow(report);
+  const plan = report.latest_plan;
+  if (waiting && plan && maintenance.next_opens_at_ms !== undefined) {
+    rows.push({
+      label: "waiting",
+      value: `${shortPlanId(plan.id)}, opens in ${span(maintenance.next_opens_at_ms - now)}`,
+    });
+  }
+  return { slots, days, rows: [...rows, ...tail] };
+};
 /** Environment-detail fields: eligibility, next open/close, schedule, constraints, plan. */
 export const maintenanceDetail = (
   report: EnvironmentInspectReport,

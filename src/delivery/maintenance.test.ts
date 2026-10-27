@@ -5,7 +5,14 @@ import type {
   EnvironmentMaintenanceWindow,
   EnvironmentPlanSummary,
 } from "../api/tenkai.gen";
-import { formatSchedule, formatViewerInstant, maintenanceDetail, planLabel } from "./maintenance";
+import {
+  formatSchedule,
+  formatViewerInstant,
+  maintenanceDetail,
+  maintenanceTimeline,
+  planLabel,
+  windowOpenings,
+} from "./maintenance";
 
 const ZONE = "Europe/Berlin";
 /** Saturday 2026-10-17 22:00 in Europe/Berlin (CEST). */
@@ -135,5 +142,63 @@ describe("maintenance detail", () => {
       label: "window",
       value: "open · next close Sun 06:00",
     });
+  });
+});
+
+describe("maintenance timeline (#27)", () => {
+  /** Thursday 2026-10-22 20:48 in Europe/Berlin; nightly opens at 02:00. */
+  const NOW = Date.parse("2026-10-22T18:48:00Z");
+  const nightly: EnvironmentMaintenanceWindow = {
+    identity: "nightly",
+    timezone: ZONE,
+    weekdays: [1, 2, 3, 4, 5, 6, 7],
+    start: "02:00",
+    duration_minutes: 120,
+    next_opens_at_ms: Date.parse("2026-10-23T00:00:00Z"),
+  };
+  const blocked: EnvironmentPlanSummary = {
+    id: "tenkai:plan:prod:8f21aa00",
+    state: "blocked",
+    status_detail: "waiting for maintenance window",
+  } as EnvironmentPlanSummary;
+
+  it("marks the open slots of the next seven days, the next opening, and the waiting plan", () => {
+    const report = env(closed([nightly]), blocked, [
+      { kind: "max_parallel_targets", name: "targets", value: "2" },
+    ] as EnvironmentInspectReport["constraints"]);
+    const timeline = maintenanceTimeline(report, NOW, ZONE);
+    expect(timeline).not.toBeNull();
+    const slots = timeline?.slots ?? [];
+    expect(slots).toHaveLength(28);
+    // 02:00 to 04:00 falls in the 00:00 to 06:00 slot of each day.
+    expect(slots.map((slot) => slot.open)).toEqual(
+      Array.from({ length: 28 }, (_, index) => index % 4 === 0),
+    );
+    expect(slots.findIndex((slot) => slot.now)).toBe(3);
+    expect(timeline?.days).toEqual(["Thu", "Sat", "Mon"]);
+    expect(timeline?.rows).toEqual([
+      { label: "next open", value: "nightly, tomorrow 02:00 to 04:00" },
+      { label: "waiting", value: "8f21aa00, opens in 5h 12m" },
+      { label: "constraints", value: "max_parallel_targets targets = 2" },
+    ]);
+  });
+
+  it("keeps the plain rows when no schedule restricts the environment", () => {
+    expect(
+      maintenanceTimeline(env({ eligibility: "unrestricted", windows: [] }), NOW, ZONE),
+    ).toBeNull();
+  });
+
+  it("finds openings across a daylight-saving change", () => {
+    // Europe/Berlin leaves summer time on 2026-10-25 at 03:00.
+    const sunday = { ...nightly, weekdays: [7], start: "01:00", duration_minutes: 480 };
+    const openings = windowOpenings(
+      sunday,
+      Date.parse("2026-10-24T00:00:00Z"),
+      Date.parse("2026-10-26T00:00:00Z"),
+    );
+    expect(openings).toEqual([
+      [Date.parse("2026-10-24T23:00:00Z"), Date.parse("2026-10-25T07:00:00Z")],
+    ]);
   });
 });
