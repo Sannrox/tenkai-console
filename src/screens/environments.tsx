@@ -609,6 +609,8 @@ function useRefreshAt(at: number | undefined, now: number, queryKey: readonly un
     );
     return () => clearTimeout(timer);
   }, [at, overdueTick, key, client]);
+}
+
 /**
  * Roll back behind a modal (#28, pick B): it states what will happen, takes
  * a reason, and sends only once the environment name is typed exactly.
