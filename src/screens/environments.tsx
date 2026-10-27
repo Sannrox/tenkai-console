@@ -126,7 +126,7 @@ const Detail = ({
   const generation = expectedGeneration(report.lease);
   const now = useMinuteClock();
   const timeline = maintenanceTimeline(report, now);
-  useRefreshAt(maintenanceRefreshAt(report), ["environment", report.name, token]);
+  useRefreshAt(maintenanceRefreshAt(report), now, ["environment", report.name, token]);
   const retire = useManagementCall(token, scope, "management", message);
   const rollback = useManagementCall(token, scope, "management", message);
   const subscribe = useManagementCall(token, scope, "management", message);
@@ -599,18 +599,25 @@ function useMinuteClock(): number {
   return now;
 }
 
-/** Refetch `queryKey` once `at` passes (at once when it already has). */
-function useRefreshAt(at: number | undefined, queryKey: readonly unknown[]): void {
+/**
+ * Refetch `queryKey` once `at` passes, at once when it already has, and
+ * again every minute (`now` is the minute clock) while it stays overdue, so
+ * a failed refresh is retried.
+ */
+function useRefreshAt(at: number | undefined, now: number, queryKey: readonly unknown[]): void {
   const client = useQueryClient();
   const key = JSON.stringify(queryKey);
+  const overdueTick = at !== undefined && at <= now ? now : 0;
   useEffect(() => {
     if (at === undefined) {
       return undefined;
     }
+    // Overdue: retry a second after each minute tick; else just past `at`.
+    const delay = overdueTick > 0 ? 1_000 : Math.max(0, at - Date.now()) + 1_000;
     const timer = setTimeout(
       () => void client.invalidateQueries({ queryKey: JSON.parse(key) as unknown[] }),
-      Math.max(0, at - Date.now()) + 1_000,
+      delay,
     );
     return () => clearTimeout(timer);
-  }, [at, key, client]);
+  }, [at, overdueTick, key, client]);
 }
