@@ -217,6 +217,18 @@ export const windowOpenings = (
 export type TimelineSlot = { open: boolean; now: boolean; label: string };
 
 /** Seven days of maintenance windows in the viewer's zone. */
+/**
+ * When a report shown at `now` goes stale: the next announced opening or
+ * close, after which eligibility has changed. `undefined` when none is due.
+ */
+export const maintenanceRefreshAt = (
+  report: EnvironmentInspectReport,
+  now: number,
+): number | undefined =>
+  [report.maintenance?.next_opens_at_ms, report.maintenance?.open_until_ms]
+    .filter((at): at is number => at !== undefined && at > now)
+    .toSorted((left, right) => left - right)[0];
+
 export type MaintenanceTimeline = {
   /** Four 6-hour slots per day from the viewer's midnight today. */
   slots: TimelineSlot[];
@@ -317,15 +329,22 @@ export const maintenanceTimeline = (
   const rows: DetailRow[] = [];
   const current = openings.find(({ open, close }) => open <= now && close > now);
   // The server's next opening is authoritative and not bounded by the strip.
-  const announced = waitingWindow(maintenance);
-  const next =
-    announced && maintenance.next_opens_at_ms !== undefined && maintenance.next_opens_at_ms > now
-      ? {
-          window: announced,
-          open: maintenance.next_opens_at_ms,
-          close: maintenance.next_opens_at_ms + announced.duration_minutes * 60_000,
-        }
-      : openings.find(({ open }) => open > now);
+  // The server's per-window next openings are authoritative and not
+  // bounded by the strip; the earliest future one is next.
+  const announced = maintenance.windows
+    .flatMap((window) =>
+      window.next_opens_at_ms !== undefined && window.next_opens_at_ms > now
+        ? [
+            {
+              window,
+              open: window.next_opens_at_ms,
+              close: window.next_opens_at_ms + window.duration_minutes * 60_000,
+            },
+          ]
+        : [],
+    )
+    .toSorted((left, right) => left.open - right.open)[0];
+  const next = announced ?? openings.find(({ open }) => open > now);
   if (current) {
     rows.push({
       label: "open now",
@@ -341,9 +360,11 @@ export const maintenanceTimeline = (
   const waiting = waitingOnWindow(report);
   const plan = report.latest_plan;
   if (waiting && plan && maintenance.next_opens_at_ms !== undefined) {
+    // Past the announced opening the report is stale until it refreshes.
+    const left = maintenance.next_opens_at_ms - now;
     rows.push({
       label: "waiting",
-      value: `${shortPlanId(plan.id)}, opens in ${span(maintenance.next_opens_at_ms - now)}`,
+      value: `${shortPlanId(plan.id)}, ${left > 0 ? `opens in ${span(left)}` : "window opening"}`,
     });
   } else {
     // Any other latest plan keeps its identifier and state.

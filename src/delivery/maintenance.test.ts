@@ -9,6 +9,7 @@ import {
   formatSchedule,
   formatViewerInstant,
   maintenanceDetail,
+  maintenanceRefreshAt,
   maintenanceTimeline,
   planLabel,
   windowOpenings,
@@ -293,5 +294,45 @@ describe("maintenance timeline keeps the latest plan (#27)", () => {
     const failed = { id: "tenkai:plan:prod:7a02bb00", state: "failed" } as EnvironmentPlanSummary;
     const rows = maintenanceTimeline(env(closed([nightly]), failed), now, ZONE)?.rows ?? [];
     expect(rows).toContainEqual({ label: "plan", value: "7a02bb00 failed" });
+  });
+});
+
+describe("maintenance timeline freshness (#27)", () => {
+  const now = Date.parse("2026-10-22T18:48:00Z");
+  it("names a per-window next opening while the environment is open", () => {
+    const weekly: EnvironmentMaintenanceWindow = {
+      identity: "weekly",
+      timezone: ZONE,
+      weekdays: [4],
+      start: "20:00",
+      duration_minutes: 120,
+      next_opens_at_ms: Date.parse("2026-10-29T19:00:00Z"),
+    };
+    const open: EnvironmentMaintenanceInspect = {
+      eligibility: "open",
+      open_until_ms: Date.parse("2026-10-22T20:00:00Z"),
+      windows: [weekly],
+    };
+    const rows = maintenanceTimeline(env(open), now, ZONE)?.rows ?? [];
+    expect(rows).toContainEqual({ label: "next open", value: "weekly, Thu 20:00 to 22:00" });
+    expect(maintenanceRefreshAt(env(open), now)).toBe(Date.parse("2026-10-22T20:00:00Z"));
+  });
+
+  it("does not count down past an announced opening", () => {
+    const nightly: EnvironmentMaintenanceWindow = {
+      identity: "nightly",
+      timezone: ZONE,
+      weekdays: [1, 2, 3, 4, 5, 6, 7],
+      start: "20:00",
+      duration_minutes: 120,
+      next_opens_at_ms: now - 60_000,
+    };
+    const blocked = {
+      id: "tenkai:plan:prod:8f21aa00",
+      state: "blocked",
+      status_detail: "waiting for maintenance window",
+    } as EnvironmentPlanSummary;
+    const rows = maintenanceTimeline(env(closed([nightly]), blocked), now, ZONE)?.rows ?? [];
+    expect(rows).toContainEqual({ label: "waiting", value: "8f21aa00, window opening" });
   });
 });

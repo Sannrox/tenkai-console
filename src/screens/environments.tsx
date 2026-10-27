@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { request } from "../api/http";
@@ -12,6 +12,7 @@ import { useSession } from "../auth/session";
 import { channelTable, environmentRows } from "../delivery/configuration";
 import {
   maintenanceDetail,
+  maintenanceRefreshAt,
   maintenanceTimeline,
   type MaintenanceTimeline,
 } from "../delivery/maintenance";
@@ -125,6 +126,7 @@ const Detail = ({
   const generation = expectedGeneration(report.lease);
   const now = useMinuteClock();
   const timeline = maintenanceTimeline(report, now);
+  useRefreshAt(maintenanceRefreshAt(report, now), ["environment", report.name, token]);
   const retire = useManagementCall(token, scope, "management", message);
   const rollback = useManagementCall(token, scope, "management", message);
   const subscribe = useManagementCall(token, scope, "management", message);
@@ -595,4 +597,20 @@ function useMinuteClock(): number {
     return () => clearInterval(timer);
   }, []);
   return now;
+}
+
+/** Refetch `queryKey` once `at` passes, when the shown data goes stale. */
+function useRefreshAt(at: number | undefined, queryKey: readonly unknown[]): void {
+  const client = useQueryClient();
+  const key = JSON.stringify(queryKey);
+  useEffect(() => {
+    if (at === undefined) {
+      return undefined;
+    }
+    const timer = setTimeout(
+      () => void client.invalidateQueries({ queryKey: JSON.parse(key) as unknown[] }),
+      Math.max(0, at - Date.now()) + 1_000,
+    );
+    return () => clearTimeout(timer);
+  }, [at, key, client]);
 }
