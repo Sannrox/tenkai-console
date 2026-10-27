@@ -254,12 +254,16 @@ export type TimelineSlot = { open: boolean; now: boolean; label: string };
 
 /** Seven days of maintenance windows in the viewer's zone. */
 /**
- * When a report goes stale: its earliest announced opening or close, after
- * which eligibility has changed. A boundary already past stays due until a
+ * When a report goes stale: its earliest announced opening or close,
+ * including each window's own next opening, after which it has changed. A boundary already past stays due until a
  * refreshed report replaces it. `undefined` when none is announced.
  */
 export const maintenanceRefreshAt = (report: EnvironmentInspectReport): number | undefined =>
-  [report.maintenance?.next_opens_at_ms, report.maintenance?.open_until_ms]
+  [
+    report.maintenance?.next_opens_at_ms,
+    report.maintenance?.open_until_ms,
+    ...(report.maintenance?.windows ?? []).map((window) => window.next_opens_at_ms),
+  ]
     .filter((at): at is number => at !== undefined)
     .toSorted((left, right) => left - right)[0];
 
@@ -363,22 +367,23 @@ export const maintenanceTimeline = (
   const rows: DetailRow[] = [];
   const current = openings.find(({ open, close }) => open <= now && close > now);
   // The server's next opening is authoritative and not bounded by the strip.
-  // The server's per-window next openings are authoritative and not
-  // bounded by the strip; the earliest future one is next.
-  const announced = maintenance.windows
-    .flatMap((window) =>
-      window.next_opens_at_ms !== undefined && window.next_opens_at_ms > now
-        ? [
-            {
-              window,
-              open: window.next_opens_at_ms,
-              close: window.next_opens_at_ms + window.duration_minutes * 60_000,
-            },
-          ]
-        : [],
-    )
-    .toSorted((left, right) => left.open - right.open)[0];
-  const next = announced ?? openings.find(({ open }) => open > now);
+  // The server's per-window next openings reach past the strip; computed
+  // openings cover an announcement that has since passed. The earliest
+  // future one of either is next.
+  const announced = maintenance.windows.flatMap((window) =>
+    window.next_opens_at_ms !== undefined && window.next_opens_at_ms > now
+      ? [
+          {
+            window,
+            open: window.next_opens_at_ms,
+            close: window.next_opens_at_ms + window.duration_minutes * 60_000,
+          },
+        ]
+      : [],
+  );
+  const next = [...announced, ...openings.filter(({ open }) => open > now)].toSorted(
+    (left, right) => left.open - right.open,
+  )[0];
   if (current) {
     rows.push({
       label: "open now",

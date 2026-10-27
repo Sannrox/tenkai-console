@@ -390,3 +390,30 @@ describe("clock changes far from UTC (#27)", () => {
     expect(slots.slice(0, 4).some((slot) => slot.open)).toBe(false);
   });
 });
+
+describe("next opening after a passed announcement (#27)", () => {
+  it("prefers a computed opening over a later announcement", () => {
+    // Tuesday 2026-10-20 12:30 Berlin; a daily 12:00 window's announcement has passed.
+    const now = Date.parse("2026-10-20T10:30:00Z");
+    const weekly: EnvironmentMaintenanceWindow = {
+      identity: "weekly",
+      timezone: ZONE,
+      weekdays: [2],
+      start: "08:00",
+      duration_minutes: 600,
+      next_opens_at_ms: Date.parse("2026-10-27T07:00:00Z"),
+    };
+    const daily: EnvironmentMaintenanceWindow = {
+      identity: "daily",
+      timezone: ZONE,
+      weekdays: [1, 2, 3, 4, 5, 6, 7],
+      start: "12:00",
+      duration_minutes: 60,
+      next_opens_at_ms: Date.parse("2026-10-20T10:00:00Z"),
+    };
+    const open: EnvironmentMaintenanceInspect = { eligibility: "open", windows: [weekly, daily] };
+    const rows = maintenanceTimeline(env(open), now, ZONE)?.rows ?? [];
+    expect(rows).toContainEqual({ label: "next open", value: "daily, tomorrow 12:00 to 13:00" });
+    expect(maintenanceRefreshAt(env(open))).toBe(Date.parse("2026-10-20T10:00:00Z"));
+  });
+});
