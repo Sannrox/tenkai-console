@@ -164,6 +164,8 @@ const zoneDate = (
   return { y: Number(part("year")), m: Number(part("month")), d: Number(part("day")), weekday };
 };
 
+const PROBES = Array.from({ length: 13 }, (_, index) => (index - 6) * 6 * 3_600_000);
+
 /**
  * Every instant whose wall time in `timeZone` is y-m-d hh:mm: one normally,
  * none in a spring-forward gap, two in an autumn overlap.
@@ -177,9 +179,11 @@ const localInstants = (
   timeZone: string,
 ): number[] => {
   const guess = Date.UTC(y, m - 1, d, hh, mm);
-  const candidates = [guess - 12 * 3_600_000, guess + 12 * 3_600_000]
-    .map((probe) => guess - zoneOffset(probe, timeZone))
-    .filter((instant, index, all) => all.indexOf(instant) === index);
+  // Offsets in force within a day and a half either side; a clock change
+  // near the wall time shows as two of them, whatever the zone's offset.
+  const candidates = PROBES.map((probe) => guess - zoneOffset(guess + probe, timeZone)).filter(
+    (instant, index, all) => all.indexOf(instant) === index,
+  );
   return candidates
     .filter((instant) => instant + zoneOffset(instant, timeZone) === guess)
     .toSorted((left, right) => left - right);
@@ -199,8 +203,10 @@ const zoneInstant = (
   if (first !== undefined) {
     return first;
   }
+  // In a gap: the offset before it carries the wall time to the first
+  // moment after the gap.
   const guess = Date.UTC(y, m - 1, d, hh, mm);
-  return guess - zoneOffset(guess + 12 * 3_600_000, timeZone);
+  return guess - zoneOffset(guess - 36 * 3_600_000, timeZone);
 };
 
 const DAY_MS = 24 * 60 * 60_000;

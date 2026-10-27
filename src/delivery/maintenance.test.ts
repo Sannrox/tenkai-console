@@ -360,3 +360,33 @@ describe("maintenance openings at clock changes, as the server schedules them (#
     expect(windowOpenings(sunday("02:30"), from, from + 2 * 24 * 3_600_000)).toEqual([]);
   });
 });
+
+describe("clock changes far from UTC (#27)", () => {
+  it("finds an overlap in a UTC+13 zone", () => {
+    // 2026-04-05 02:30 happens twice in Pacific/Auckland.
+    const schedule: EnvironmentMaintenanceWindow = {
+      identity: "sunday",
+      timezone: "Pacific/Auckland",
+      weekdays: [7],
+      start: "02:30",
+      duration_minutes: 60,
+    };
+    const from = Date.parse("2026-04-03T00:00:00Z");
+    expect(windowOpenings(schedule, from, from + 3 * 24 * 3_600_000)).toEqual([]);
+  });
+  it("starts a viewer's day after a midnight gap, not before it", () => {
+    // Midnight 2026-09-06 does not exist in America/Santiago; the day starts at 01:00.
+    const now = Date.parse("2026-09-06T12:00:00Z");
+    const schedule: EnvironmentMaintenanceWindow = {
+      identity: "early",
+      timezone: "America/Santiago",
+      weekdays: [6],
+      start: "23:30",
+      duration_minutes: 20,
+    };
+    const slots =
+      maintenanceTimeline(env(closed([schedule])), now, "America/Santiago")?.slots ?? [];
+    expect(slots[0]?.label.startsWith("Sun 01:00")).toBe(true);
+    expect(slots.slice(0, 4).some((slot) => slot.open)).toBe(false);
+  });
+});
