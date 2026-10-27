@@ -171,9 +171,11 @@ describe("maintenance timeline (#27)", () => {
     expect(timeline).not.toBeNull();
     const slots = timeline?.slots ?? [];
     expect(slots).toHaveLength(28);
-    // 02:00 to 04:00 falls in the 00:00 to 06:00 slot of each day.
+    // 02:00 to 04:00 falls in the 00:00 to 06:00 slot of each day, except
+    // Sunday 2026-10-25, when 02:00 happens twice: the server schedules no
+    // opening for an ambiguous start, and neither does the strip.
     expect(slots.map((slot) => slot.open)).toEqual(
-      Array.from({ length: 28 }, (_, index) => index % 4 === 0),
+      Array.from({ length: 28 }, (_, index) => index % 4 === 0 && index !== 12),
     );
     expect(slots.findIndex((slot) => slot.now)).toBe(3);
     expect(slots[3]?.label).toBe("Thu 18:00 to 00:00, closed, now");
@@ -336,5 +338,25 @@ describe("maintenance timeline freshness (#27)", () => {
     } as EnvironmentPlanSummary;
     const rows = maintenanceTimeline(env(closed([nightly]), blocked), now, ZONE)?.rows ?? [];
     expect(rows).toContainEqual({ label: "waiting", value: "8f21aa00, window opening" });
+  });
+});
+
+describe("maintenance openings at clock changes, as the server schedules them (#27)", () => {
+  const sunday = (start: string): EnvironmentMaintenanceWindow => ({
+    identity: "sunday",
+    timezone: ZONE,
+    weekdays: [7],
+    start,
+    duration_minutes: 60,
+  });
+  it("gives no opening for a start that does not exist", () => {
+    // 2026-03-29 02:30 does not exist in Europe/Berlin.
+    const from = Date.parse("2026-03-28T00:00:00Z");
+    expect(windowOpenings(sunday("02:30"), from, from + 2 * 24 * 3_600_000)).toEqual([]);
+  });
+  it("gives no opening for a start that exists twice", () => {
+    // 2026-10-25 02:30 happens twice in Europe/Berlin.
+    const from = Date.parse("2026-10-24T00:00:00Z");
+    expect(windowOpenings(sunday("02:30"), from, from + 2 * 24 * 3_600_000)).toEqual([]);
   });
 });

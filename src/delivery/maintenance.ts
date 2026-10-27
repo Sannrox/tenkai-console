@@ -164,7 +164,29 @@ const zoneDate = (
   return { y: Number(part("year")), m: Number(part("month")), d: Number(part("day")), weekday };
 };
 
-/** The instant of local wall time y-m-d hh:mm in `timeZone`. */
+/**
+ * Every instant whose wall time in `timeZone` is y-m-d hh:mm: one normally,
+ * none in a spring-forward gap, two in an autumn overlap.
+ */
+const localInstants = (
+  y: number,
+  m: number,
+  d: number,
+  hh: number,
+  mm: number,
+  timeZone: string,
+): number[] => {
+  const guess = Date.UTC(y, m - 1, d, hh, mm);
+  const candidates = [guess - 12 * 3_600_000, guess + 12 * 3_600_000]
+    .map((probe) => guess - zoneOffset(probe, timeZone))
+    .filter((instant, index, all) => all.indexOf(instant) === index);
+  return candidates
+    .filter((instant) => instant + zoneOffset(instant, timeZone) === guess)
+    .toSorted((left, right) => left - right);
+};
+
+/** The instant of local wall time y-m-d hh:mm in `timeZone`, for slot
+ * boundaries: the earlier of two, or the first moment after a gap. */
 const zoneInstant = (
   y: number,
   m: number,
@@ -173,10 +195,12 @@ const zoneInstant = (
   mm: number,
   timeZone: string,
 ): number => {
+  const [first] = localInstants(y, m, d, hh, mm, timeZone);
+  if (first !== undefined) {
+    return first;
+  }
   const guess = Date.UTC(y, m - 1, d, hh, mm);
-  const first = guess - zoneOffset(guess, timeZone);
-  // A second pass settles instants near an offset change.
-  return guess - zoneOffset(first, timeZone);
+  return guess - zoneOffset(guess + 12 * 3_600_000, timeZone);
 };
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -196,9 +220,15 @@ export const windowOpenings = (
   for (let offset = 0; ; offset += 1) {
     const date = new Date(Date.UTC(first.y, first.m - 1, first.d + offset));
     const [y, m, d] = [date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate()];
-    const start = zoneInstant(y, m, d, hh, mm, window.timezone);
-    if (start >= to) {
+    const starts = localInstants(y, m, d, hh, mm, window.timezone);
+    if (Math.min(...starts, zoneInstant(y, m, d, hh, mm, window.timezone)) >= to) {
       break;
+    }
+    // As the server schedules: a start that does not exist, or exists twice,
+    // on a clock-change date is no opening.
+    const [start] = starts;
+    if (starts.length !== 1 || start === undefined) {
+      continue;
     }
     // ISO weekday of the calendar date itself (1 = Mon).
     const weekday = ((date.getUTCDay() + 6) % 7) + 1;
