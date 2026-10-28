@@ -26,9 +26,10 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 /**
- * The 2026-10-28 pick B (#39): hub transport facts, then one row per
- * environment with its runner count and static bearer tokens. A top-level
- * tab of its own (#34); `server-status.tsx` stays the unreachable-hub panel.
+ * The 2026-10-28 pick B (#39): hub transport facts (TLS mode, whether runner
+ * mTLS is required, the runner CA with its fingerprint), then one row per
+ * environment with its runners by auth, bearer in warning. A top-level tab
+ * of its own (#34); `server-status.tsx` stays the unreachable-hub panel.
  */
 export const Server = () => {
   const token = useSession((state) => state.session?.accessToken);
@@ -65,6 +66,7 @@ export const Server = () => {
           environments.data.map((entry) => entry.name),
         )
       : [];
+  const unknownAuth = rows.some((row) => row.unknown > 0);
 
   return (
     <>
@@ -111,13 +113,15 @@ export const Server = () => {
             <tr>
               <th className={th}>Environment</th>
               <th className={th}>Runners</th>
-              <th className={th}>Static bearer tokens</th>
+              <th className={th}>mTLS</th>
+              <th className={th}>Bearer</th>
+              {unknownAuth && <th className={th}>Auth not reported</th>}
             </tr>
           </thead>
           <tbody>
             {pending !== undefined ? (
               <tr>
-                <td className={`${td} border-b-0 text-muted`} colSpan={3}>
+                <td className={`${td} border-b-0 text-muted`} colSpan={5}>
                   {pending}
                 </td>
               </tr>
@@ -128,9 +132,11 @@ export const Server = () => {
                   <td className={`${td} ${row.runners === 0 ? "text-muted" : ""}`}>
                     {row.runners}
                   </td>
+                  <td className={`${td} ${row.mtls === 0 ? "text-muted" : ""}`}>{row.mtls}</td>
                   <td className={`${td} ${row.bearer > 0 ? "text-warning" : "text-muted"}`}>
                     {row.bearer}
                   </td>
+                  {unknownAuth && <td className={`${td} text-muted`}>{row.unknown}</td>}
                 </tr>
               ))
             )}
@@ -142,7 +148,13 @@ export const Server = () => {
 };
 
 /** One line per certificate, coloured by its status. */
-const Certificates = ({ certificates }: { certificates: CertificateEntry[] }) =>
+const Certificates = ({
+  certificates,
+  fingerprints = false,
+}: {
+  certificates: CertificateEntry[];
+  fingerprints?: boolean;
+}) =>
   certificates.map((certificate) => (
     <div
       // Subject and expiry tell certificates of one source apart.
@@ -150,8 +162,15 @@ const Certificates = ({ certificates }: { certificates: CertificateEntry[] }) =>
       className={STATUS_TONE[certificate.status] ?? ""}
     >
       {describeCertificate(certificate)}
+      {fingerprints && certificate.sha256_fingerprint && (
+        <div className="font-mono text-[11px] text-muted select-all">
+          SHA-256 {certificate.sha256_fingerprint}
+        </div>
+      )}
     </div>
   ));
+
+const MTLS_TONE = { required: "", optional: "text-warning", unknown: "text-muted" } as const;
 
 const Facts = ({ transport }: { transport: HubTransport }) => (
   <table className="w-full border-collapse text-xs">
@@ -164,10 +183,10 @@ const Facts = ({ transport }: { transport: HubTransport }) => (
         </td>
       </tr>
       <tr>
-        <th className={th}>Runner client certificates</th>
+        <th className={th}>Runner mTLS</th>
         <td className={td}>
-          <div className={transport.clientCa.length > 0 ? "" : "text-muted"}>
-            {transport.clientCa.length > 0 ? "verified when presented" : "not accepted"}
+          <div className={MTLS_TONE[transport.mtls]}>
+            {transport.mtls === "unknown" ? "not reported" : transport.mtls}
           </div>
           <Certificates certificates={transport.clientCa} />
         </td>
@@ -176,7 +195,7 @@ const Facts = ({ transport }: { transport: HubTransport }) => (
         <th className={th}>Runner CA</th>
         <td className={td}>
           {transport.runnerCa.length > 0 ? (
-            <Certificates certificates={transport.runnerCa} />
+            <Certificates certificates={transport.runnerCa} fingerprints />
           ) : (
             <span className="text-muted">none</span>
           )}

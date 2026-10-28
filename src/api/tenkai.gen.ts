@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at ee771b0281af674edd5d55bcc4fafc49641c4f24 (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at a566f7d5733cfc10f2b19e974cf23f8f885d20dd (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -16,7 +16,7 @@ export type TrustSource = ("loaded" | "file")
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "ChangeEventKind".
  */
-export type ChangeEventKind = ("plan_created" | "plan_approved" | "plan_applied" | "target_failed" | "target_held" | "target_retried" | "hold_set" | "hold_released" | "release_published" | "release_promoted" | "release_recalled" | "compatibility_result_recorded")
+export type ChangeEventKind = ("plan_created" | "plan_approved" | "plan_applied" | "target_failed" | "target_held" | "target_retried" | "hold_set" | "hold_released" | "release_published" | "release_promoted" | "release_recalled" | "compatibility_result_recorded" | "trust_threshold_crossed")
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "CheckpointClass".
@@ -229,6 +229,14 @@ export type ImportState = (("running" | "succeeded" | "failed") | "previewed")
  */
 export type MigrationStatus = ("admitted" | "running" | "succeeded" | "failed" | "rolled_back" | "recovery_required")
 /**
+ * How a runner authenticates (#809), from what the server issued it, not
+ * from what a request presented.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RunnerAuth".
+ */
+export type RunnerAuth = ("client_certificate" | "bearer")
+/**
  * Status ordering: `ok` < `warning` < `critical` < `expired`.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -354,6 +362,7 @@ ReleaseTrustedSigner?: ReleaseTrustedSigner
 RetireEnvironmentRequest?: RetireEnvironmentRequest
 RetryFailedTargetRequest?: RetryFailedTargetRequest
 RollbackRequest?: RollbackRequest
+RunnerAuth?: RunnerAuth
 RuntimeCredentialRevoked?: RuntimeCredentialRevoked
 RuntimeEnrollmentIssued?: RuntimeEnrollmentIssued
 RuntimeEnrollmentRequest?: RuntimeEnrollmentRequest
@@ -593,6 +602,11 @@ file: string
  */
 not_after?: number
 purpose: string
+/**
+ * SHA-256 of the certificate's DER, as `openssl x509 -fingerprint
+ * -sha256` prints it: uppercase hex pairs joined by colons (#809).
+ */
+sha256_fingerprint?: string
 source: TrustSource
 /**
  * An unreadable certificate file is `critical`.
@@ -1992,6 +2006,11 @@ reason: string
  * via the `definition` "RuntimeRunner".
  */
 export interface RuntimeRunner {
+/**
+ * How a runner authenticates (#809), from what the server issued it, not
+ * from what a request presented.
+ */
+auth?: ("client_certificate" | "bearer")
 created_at?: number
 created_by?: string
 environment: string
@@ -2219,6 +2238,11 @@ environments: EnvironmentResult[]
 export interface TrustPosture {
 critical_days: number
 revocation_list?: InstalledRevocations
+/**
+ * Runtime routes refuse a connection without a verified client
+ * certificate, enrollment and renewal aside (#809).
+ */
+runtime_client_cert_required: boolean
 signing: SigningRoot[]
 /**
  * The worst certificate status; `ok` when nothing is about to lapse.
