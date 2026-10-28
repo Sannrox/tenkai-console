@@ -18,6 +18,7 @@ import { Centered, Title } from "./ui/kit";
 const PlanPage = lazyRouteComponent(() => import("./screens/plan-page"), "PlanPage");
 const Environments = lazyRouteComponent(() => import("./screens/environments"), "Environments");
 const Releases = lazyRouteComponent(() => import("./screens/releases"), "Releases");
+const Runners = lazyRouteComponent(() => import("./screens/runners"), "Runners");
 const Access = lazyRouteComponent(() => import("./screens/access"), "Access");
 const AuthCallback = lazyRouteComponent(() => import("./screens/auth-callback"), "AuthCallback");
 
@@ -92,6 +93,12 @@ const releasesRoute = createRoute({
   component: Releases,
 });
 
+const runnersRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/runners",
+  component: Runners,
+});
+
 const accessRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/access",
@@ -117,7 +124,14 @@ const callbackRoute = createRoute({
 
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
-    appRoute.addChildren([indexRoute, planRoute, environmentsRoute, releasesRoute, accessRoute]),
+    appRoute.addChildren([
+      indexRoute,
+      planRoute,
+      environmentsRoute,
+      releasesRoute,
+      runnersRoute,
+      accessRoute,
+    ]),
     callbackRoute,
   ]),
   basepath: consoleRoot.pathname,

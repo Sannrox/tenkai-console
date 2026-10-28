@@ -9,6 +9,7 @@ const TABS = [
   { label: "Delivery", to: "/" },
   { label: "Releases", to: "/releases" },
   { label: "Environments", to: "/environments" },
+  { label: "Runners", to: "/runners" },
   { label: "Access", to: "/access" },
 ] as const;
 
@@ -16,7 +17,12 @@ const TABS = [
 const activeTab = (path: string) =>
   TABS.find((tab) => tab.to !== "/" && path === tab.to)?.label ?? "Delivery";
 
-/** Decision 4D: four top-level tabs, no second menu, account menu on the right. */
+/**
+ * Top-level tabs, no second menu, account menu on the right. The 2026-10-28
+ * navigation decision (#34) supersedes decision 4D's four-tab limit: new
+ * screens (Runners, Imports, Trust, Operations) are tabs of their own, each
+ * added with its screen.
+ */
 export const TopBar = ({
   session,
   settings,
