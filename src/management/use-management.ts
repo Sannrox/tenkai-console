@@ -62,10 +62,16 @@ export const useManagementCall = <T>(
   const allowed = useSession((state) => !isRefused(state.refused, scope, capability));
   const refuse = useSession((state) => state.refuse);
   const mutation = useMutation({
-    mutationFn: (call: { path: string; body?: unknown; scope?: Scope }) =>
+    mutationFn: (call: {
+      path: string;
+      body?: unknown;
+      scope?: Scope;
+      /** POST unless the route says otherwise (configuration uses PUT and DELETE). */
+      method?: "POST" | "PUT" | "DELETE";
+    }) =>
       request<T>(call.path, {
         token,
-        method: "POST",
+        method: call.method ?? "POST",
         body: call.body,
         requestId: newRequestId(),
       }),

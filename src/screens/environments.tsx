@@ -36,6 +36,7 @@ import {
   subscribeBody,
 } from "../plan/requests";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
+import { AddEnvironment, ConfigSections } from "./environment-config";
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2 align-top";
@@ -59,7 +60,7 @@ export const Environments = ({ focus }: { focus?: string }) => {
 
   return (
     <>
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <h1 className="m-0 text-lg font-semibold">Environments</h1>
         <span className="text-xs text-muted">
           {delivery.error
@@ -68,6 +69,7 @@ export const Environments = ({ focus }: { focus?: string }) => {
               ? "Loading"
               : `${rows.length} active`}
         </span>
+        {token && <AddEnvironment token={token} />}
       </div>
       <Card className="overflow-x-auto">
         <table className="w-full border-collapse text-xs">
@@ -398,6 +400,7 @@ const Detail = ({
           )}
         </Card>
       </div>
+      <ConfigSections report={report} token={token} />
       <Runtime report={report} token={token} />
     </>
   );
