@@ -6,9 +6,11 @@ import type {
   EffectiveApprovalPolicy,
   EnvironmentInspectReport,
   ManagementLifecycleResult,
+  PlanApprovalsView,
 } from "../api/tenkai.gen";
 import { planSummary } from "../delivery/model";
 import { approvalCopy, shownDigest } from "../plan/approval";
+import { quorumMatrix, quorumStatus } from "../plan/quorum";
 import {
   applyBody,
   approveBody,
@@ -44,6 +46,21 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
     retry: false,
   });
 
+  const pendingPlan = report.data?.latest_plan;
+  const awaitingPlan = pendingPlan?.state === "computed" || pendingPlan?.state === "blocked";
+  const approvals = useQuery({
+    queryKey: ["plan-approvals", pendingPlan?.id, token],
+    queryFn: () =>
+      request<PlanApprovalsView>(
+        `v1/plans/${encodeURIComponent(pendingPlan?.id ?? "")}/approvals`,
+        {
+          token,
+        },
+      ),
+    enabled: awaitingPlan && pendingPlan !== undefined,
+    retry: false,
+  });
+
   const run = useMutation({
     mutationFn: (call: { path: string; body: unknown }) =>
       request<ManagementLifecycleResult>(call.path, { token, method: "POST", body: call.body }),
@@ -53,6 +70,7 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
       }
       setResult({ ok: true, text: response.message });
       void queryClient.invalidateQueries({ queryKey: ["environment", environment] });
+      void queryClient.invalidateQueries({ queryKey: ["plan-approvals"] });
       void queryClient.invalidateQueries({ queryKey: ["environments"] });
     },
     onError: (error) =>
@@ -202,7 +220,18 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
           </div>
 
           {awaiting && plan && (
+            <Quorum
+              view={approvals.data}
+              error={approvals.error?.message}
+              stale={approvals.error !== null && approvals.data !== undefined}
+            />
+          )}
+
+          {awaiting && plan && (
             <Approval
+              applyBlocked={
+                approvals.data ? quorumStatus(quorumMatrix(approvals.data)).applyBlocked : false
+              }
               planId={plan.id}
               environment={environment}
               digest={digestShown}
@@ -255,6 +284,7 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
 
 /** Approval hand-off: sign outside the browser, paste the envelope back. */
 const Approval = ({
+  applyBlocked,
   planId,
   environment,
   digest,
@@ -262,6 +292,8 @@ const Approval = ({
   run,
   pending,
 }: {
+  /** The server reports more approvals missing than one paste can add. */
+  applyBlocked: boolean;
   planId: string;
   environment: string;
   digest: string | undefined;
@@ -322,7 +354,7 @@ const Approval = ({
       <div className="mt-2 flex gap-2">
         <Button
           variant="primary"
-          disabled={pending || !envelope || !roots}
+          disabled={pending || !envelope || !roots || applyBlocked}
           onClick={() => submit("apply")}
         >
           Apply
@@ -336,6 +368,94 @@ const Approval = ({
           {problem}
         </p>
       )}
+    </>
+  );
+};
+
+const th = "border-b border-line px-3 py-1.5 text-left font-medium whitespace-nowrap text-muted";
+const td = "border-b border-line px-3 py-1.5 whitespace-nowrap";
+
+/**
+ * Pick B (#38): collected approvers by policy group, and how far the plan
+ * is from its quorum. Rows are the approvals Tenkai collected; it does not
+ * report who else may sign.
+ */
+const Quorum = ({
+  view,
+  error,
+  stale,
+}: {
+  view: PlanApprovalsView | undefined;
+  error: string | undefined;
+  stale: boolean;
+}) => {
+  if (!view) {
+    return (
+      <p aria-label="Approvals" className="mt-[18px] text-xs text-muted">
+        Approvals: {error ?? "Loading"}
+      </p>
+    );
+  }
+  const matrix = quorumMatrix(view);
+  const status = quorumStatus(matrix);
+  return (
+    <>
+      <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">
+        Approvals <span className="font-normal text-muted">{view.purpose}</span>
+      </h2>
+      {stale && (
+        <p role="alert" className="m-0 mb-2 text-xs text-danger">
+          Refresh failed: {error}. Showing the last approvals.
+        </p>
+      )}
+      <Card className="overflow-x-auto">
+        <table aria-label="Approvals by group" className="w-full border-collapse text-xs">
+          <thead>
+            <tr>
+              <th className={th}>Signer</th>
+              {matrix.groups.map((group, column) => (
+                <th key={group} className={th}>
+                  {group} {matrix.perGroup[column]}
+                </th>
+              ))}
+              <th className={th}>Valid until</th>
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.rows.length === 0 ? (
+              <tr>
+                <td className={`${td} border-b-0 text-muted`} colSpan={matrix.groups.length + 2}>
+                  No approvals collected
+                </td>
+              </tr>
+            ) : (
+              matrix.rows.map((row) => (
+                <tr key={row.keyId} className="[&:last-child>td]:border-b-0">
+                  <td className={td} title={row.keyId}>
+                    {row.signer}
+                  </td>
+                  {row.cells.map((cell, column) => (
+                    <td
+                      key={matrix.groups[column]}
+                      className={`${td} ${cell === "approved" ? "text-ok" : "text-muted"}`}
+                    >
+                      {cell}
+                    </td>
+                  ))}
+                  <td className={`${td} text-muted`}>{new Date(row.expiresAt).toISOString()}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </Card>
+      <p
+        aria-label="Quorum"
+        className={`mt-2 mb-0 text-xs ${view.missing === 0 ? "text-ok" : "text-warning"}`}
+      >
+        {status.line}
+        {view.exclude_requester ? " The apply requester's own approval does not count." : ""}
+      </p>
     </>
   );
 };
