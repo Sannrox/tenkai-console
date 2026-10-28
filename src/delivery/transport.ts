@@ -3,10 +3,10 @@ import type { CertificateEntry, RuntimeRunner, TrustPosture } from "../api/tenka
 /**
  * Transport and runner identity posture for the Server screen (#39), read
  * from the trust posture (GET `/v1/trust`, Sannrox/tenkai#676) and the runner
- * registry (GET `/v1/runners`, Sannrox/tenkai#673). Every fact is one the
- * server reports. Tenkai does not report whether runner client certificates
- * are required, the runner CA fingerprint, or how an enrolled runner
- * authenticates, so none of those is shown or guessed.
+ * registry (GET `/v1/runners`, Sannrox/tenkai#673), with the client
+ * certificate requirement, fingerprints and per-runner auth of
+ * Sannrox/tenkai#809. Every fact is one the server reports; a server older
+ * than #809 omits them, and they read as unknown rather than guessed.
  */
 
 export type HubTransport = {
@@ -16,6 +16,8 @@ export type HubTransport = {
    * from the same host.
    */
   tls: "native" | "proxy or local";
+  /** Whether runtime routes refuse a connection without a client certificate. */
+  mtls: "required" | "optional" | "unknown";
   /**
    * Every certificate of each kind, worst status first: a source may hold
    * several, such as a listener chain or an old and a new CA mid-rotation.
@@ -43,6 +45,12 @@ export const hubTransport = (posture: TrustPosture): HubTransport => {
   const listener = entries(posture, "listener");
   return {
     tls: listener.length > 0 ? "native" : "proxy or local",
+    // A server before Sannrox/tenkai#809 omits the field despite the contract type.
+    mtls: !("runtime_client_cert_required" in posture)
+      ? "unknown"
+      : posture.runtime_client_cert_required
+        ? "required"
+        : "optional",
     listener,
     clientCa: entries(posture, "tls_client_ca"),
     runnerCa: entries(posture, "runner_ca"),
@@ -67,8 +75,11 @@ export type EnvironmentAuthRow = {
   environment: string;
   /** Runners that can act: enrolled and active, or static. */
   runners: number;
-  /** Static runtime tokens from server configuration: bearer by definition. */
+  /** Runners the runner CA issued a client certificate. */
+  mtls: number;
   bearer: number;
+  /** Runners an older server reported no `auth` for. */
+  unknown: number;
 };
 
 /** One row per environment the server names or a runner belongs to, sorted. */
@@ -85,6 +96,8 @@ export const environmentAuth = (
       return {
         environment,
         runners: live.length,
-        bearer: live.filter((runner) => runner.state === "static").length,
+        mtls: live.filter((runner) => runner.auth === "client_certificate").length,
+        bearer: live.filter((runner) => runner.auth === "bearer").length,
+        unknown: live.filter((runner) => runner.auth === undefined).length,
       };
     });

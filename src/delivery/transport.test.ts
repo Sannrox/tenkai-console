@@ -17,6 +17,7 @@ const posture = (tls: CertificateEntry[]): TrustPosture => ({
   status: "ok",
   warning_days: 30,
   critical_days: 7,
+  runtime_client_cert_required: true,
   signing: [],
   tls,
 });
@@ -24,12 +25,13 @@ const posture = (tls: CertificateEntry[]): TrustPosture => ({
 const runner = (
   environment: string,
   state: string,
-  id = `${environment}-${state}`,
+  auth?: RuntimeRunner["auth"],
 ): RuntimeRunner => ({
-  id,
+  id: `${environment}-${state}-${auth ?? "unreported"}`,
   environment,
   state,
   instances: [],
+  ...(auth === undefined ? {} : { auth }),
 });
 
 describe("hub transport", () => {
@@ -57,10 +59,19 @@ describe("hub transport", () => {
     const transport = hubTransport(posture([certificate("outbound_ca_bundle")]));
     expect(transport).toStrictEqual({
       tls: "proxy or local",
+      mtls: "required",
       listener: [],
       clientCa: [],
       runnerCa: [],
     });
+  });
+
+  it("reads mTLS as optional when not required, and unknown from a server before tenkai#809", () => {
+    expect(hubTransport({ ...posture([]), runtime_client_cert_required: false }).mtls).toBe(
+      "optional",
+    );
+    const { runtime_client_cert_required: _omitted, ...older } = posture([]);
+    expect(hubTransport(older as TrustPosture).mtls).toBe("unknown");
   });
 
   it("describes a certificate by subject and expiry, or by the server's error", () => {
@@ -81,21 +92,22 @@ describe("hub transport", () => {
 });
 
 describe("environment runner auth", () => {
-  it("counts live runners and static bearer tokens per environment, revoked excluded", () => {
+  it("counts live runners by auth per environment, revoked excluded, unreported as unknown", () => {
     expect(
       environmentAuth(
         [
+          runner("prod", "active", "client_certificate"),
+          runner("prod", "static", "bearer"),
+          runner("prod", "revoked", "bearer"),
           runner("prod", "active"),
-          runner("prod", "static"),
-          runner("prod", "revoked"),
-          runner("lab", "active"),
+          runner("lab", "active", "bearer"),
         ],
         ["prod", "staging"],
       ),
     ).toStrictEqual([
-      { environment: "lab", runners: 1, bearer: 0 },
-      { environment: "prod", runners: 2, bearer: 1 },
-      { environment: "staging", runners: 0, bearer: 0 },
+      { environment: "lab", runners: 1, mtls: 0, bearer: 1, unknown: 0 },
+      { environment: "prod", runners: 3, mtls: 1, bearer: 1, unknown: 1 },
+      { environment: "staging", runners: 0, mtls: 0, bearer: 0, unknown: 0 },
     ]);
   });
 });

@@ -14,6 +14,7 @@ const TRUST: TrustPosture = {
   status: "ok",
   warning_days: 30,
   critical_days: 7,
+  runtime_client_cert_required: false,
   signing: [],
   tls: [
     {
@@ -29,6 +30,7 @@ const TRUST: TrustPosture = {
       source: "loaded",
       status: "warning",
       subject: "CN=runner-ca",
+      sha256_fingerprint: "C6:32",
     },
   ],
 };
@@ -112,8 +114,14 @@ describe("Server", () => {
       return {
         body: {
           runners: [
-            { id: "a", environment: "prod", state: "static", instances: [] },
-            { id: "b", environment: "prod", state: "active", instances: [] },
+            { id: "a", environment: "prod", state: "static", auth: "bearer", instances: [] },
+            {
+              id: "b",
+              environment: "prod",
+              state: "active",
+              auth: "client_certificate",
+              instances: [],
+            },
           ],
         },
       };
@@ -121,13 +129,15 @@ describe("Server", () => {
     await render();
     expect(cells()).toStrictEqual([
       ["TLS", "nativeCN=hub"],
-      ["Runner client certificates", "not accepted"],
-      ["Runner CA", "CN=runner-ca"],
-      ["lab", "0", "0"],
-      ["prod", "2", "1"],
+      ["Runner mTLS", "optional"],
+      ["Runner CA", "CN=runner-caSHA-256 C6:32"],
+      ["lab", "0", "0", "0"],
+      ["prod", "2", "1", "1"],
     ]);
     const bearer = [...container.querySelectorAll("tbody tr")].at(-1)?.lastElementChild;
     expect(bearer?.className).toContain("text-warning");
+    const mtls = [...container.querySelectorAll("tbody tr")][1]?.querySelector("td div");
+    expect(mtls?.className).toBe("text-warning");
   });
 
   it("shows a refused runner registry without hiding the hub facts", async () => {
@@ -141,7 +151,7 @@ describe("Server", () => {
     await render();
     expect(cells()).toStrictEqual([
       ["TLS", "proxy or local"],
-      ["Runner client certificates", "not accepted"],
+      ["Runner mTLS", "optional"],
       ["Runner CA", "none"],
       ["insufficient delivery capability"],
     ]);
@@ -184,7 +194,7 @@ describe("Server", () => {
       answer(new Response(JSON.stringify({ runners: [] })));
     });
     await settle();
-    expect(cells().slice(3)).toStrictEqual([["prod", "0", "0"]]);
+    expect(cells().slice(3)).toStrictEqual([["prod", "0", "0", "0"]]);
   });
 
   it("refetches every list on Refresh", async () => {
@@ -270,6 +280,23 @@ describe("Server", () => {
       /^Refresh failed: trust posture unavailable\. Showing data from \d{4}-\d\d-\d\dT.+Z\.$/,
     );
     expect(cells()[0]).toStrictEqual(["TLS", "nativeCN=hub"]);
-    expect(cells().at(-1)).toStrictEqual(["prod", "0", "0"]);
+    expect(cells().at(-1)).toStrictEqual(["prod", "0", "0", "0"]);
+  });
+
+  it("shows what a server before tenkai#809 omits as not reported, never as bearer", async () => {
+    const { runtime_client_cert_required: _omitted, ...older } = TRUST;
+    serve((path) =>
+      path === "v1/trust"
+        ? { body: older }
+        : path === "v1/runners"
+          ? {
+              body: { runners: [{ id: "a", environment: "prod", state: "active", instances: [] }] },
+            }
+          : { body: [{ name: "prod" }] },
+    );
+    await render();
+    expect(cells()[1]).toStrictEqual(["Runner mTLS", "not reported"]);
+    expect(cells().at(-1)).toStrictEqual(["prod", "1", "0", "0", "1"]);
+    expect(container.querySelector("thead")?.textContent).toContain("Auth not reported");
   });
 });
