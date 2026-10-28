@@ -376,9 +376,8 @@ const th = "border-b border-line px-3 py-1.5 text-left font-medium whitespace-no
 const td = "border-b border-line px-3 py-1.5 whitespace-nowrap";
 
 /**
- * Pick B (#38): collected approvers by policy group, and how far the plan
- * is from its quorum. Rows are the approvals Tenkai collected; it does not
- * report who else may sign.
+ * Pick B (#38): approvers by policy group, each cell signed (when), pending
+ * or n/a, and how far the plan is from its quorum.
  */
 const Quorum = ({
   view,
@@ -425,7 +424,7 @@ const Quorum = ({
             {matrix.rows.length === 0 ? (
               <tr>
                 <td className={`${td} border-b-0 text-muted`} colSpan={matrix.groups.length + 2}>
-                  No approvals collected
+                  {view.eligible ? "No eligible approvers" : "No approvals collected"}
                 </td>
               </tr>
             ) : (
@@ -437,12 +436,18 @@ const Quorum = ({
                   {row.cells.map((cell, column) => (
                     <td
                       key={matrix.groups[column]}
-                      className={`${td} ${cell === "approved" ? "text-ok" : "text-muted"}`}
+                      className={`${td} ${typeof cell === "object" ? "text-ok" : cell === "pending" ? "text-warning" : "text-muted"}`}
                     >
-                      {cell}
+                      {typeof cell === "object"
+                        ? cell.signedAt === undefined
+                          ? "signed"
+                          : new Date(cell.signedAt).toISOString()
+                        : cell}
                     </td>
                   ))}
-                  <td className={`${td} text-muted`}>{new Date(row.expiresAt).toISOString()}</td>
+                  <td className={`${td} text-muted`}>
+                    {row.expiresAt === undefined ? "" : new Date(row.expiresAt).toISOString()}
+                  </td>
                 </tr>
               ))
             )}

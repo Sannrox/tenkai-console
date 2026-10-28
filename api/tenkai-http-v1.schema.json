@@ -626,6 +626,11 @@
         "key_id": {
           "type": "string"
         },
+        "signed_at": {
+          "description": "When the signer signed it: the statement's `issued_at`, Unix\nmilliseconds (#817).",
+          "format": "int64",
+          "type": "integer"
+        },
         "signer_identity": {
           "type": "string"
         }
@@ -1309,6 +1314,26 @@
       "required": [
         "configured",
         "mode"
+      ],
+      "type": "object"
+    },
+    "EligibleApprover": {
+      "properties": {
+        "collected": {
+          "description": "An approval from this key is among `collected`.",
+          "type": "boolean"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "key_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "identity",
+        "key_id",
+        "collected"
       ],
       "type": "object"
     },
@@ -2510,6 +2535,14 @@
       ],
       "type": "object"
     },
+    "FirstAdministrator": {
+      "description": "Whether a first administrator is configured: a `[grants]` rule that gives\nfleet management (#631). Without one, only the management token can\nadminister the server. Reported unauthenticated on `/healthz` (#815), so\nit is one coarse status and never names a rule or an identity.",
+      "enum": [
+        "configured",
+        "missing"
+      ],
+      "type": "string"
+    },
     "FleetEnvironmentRow": {
       "description": "One environment's row in a fleet posture table (no credentials).",
       "properties": {
@@ -2630,6 +2663,25 @@
         "environments_behind",
         "environments_unhealthy",
         "environments_empty"
+      ],
+      "type": "object"
+    },
+    "GroupApprovers": {
+      "description": "Who may approve for one group of the plan's rule (#817): identities and\nkey ids from the plan-approval trust roots, never key material.",
+      "properties": {
+        "approvers": {
+          "items": {
+            "$ref": "#/$defs/EligibleApprover"
+          },
+          "type": "array"
+        },
+        "group": {
+          "description": "The rule's group; absent when the rule names none, so any trusted\nsigner counts.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "approvers"
       ],
       "type": "object"
     },
@@ -3577,6 +3629,13 @@
           },
           "type": "array"
         },
+        "eligible": {
+          "description": "Eligible human approvers per group of the rule, from the trust roots\nthis host verifies plan approvals with (#817). Absent when the host\nhas none configured. The rule stays N signers from any listed group.",
+          "items": {
+            "$ref": "#/$defs/GroupApprovers"
+          },
+          "type": "array"
+        },
         "exclude_requester": {
           "type": "boolean"
         },
@@ -4418,6 +4477,10 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "first_administrator": {
+          "$ref": "#/$defs/FirstAdministrator",
+          "description": "`configured` when a grant rule gives fleet management, else `missing`\n(#815), for a console's first-run screen. Never names a rule. Absent\nwhile the server is still opening."
         },
         "profile": {
           "type": "string"

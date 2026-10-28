@@ -125,7 +125,7 @@ describe("PlanPage approvals", () => {
     ).toStrictEqual(["Signer", "quality 1", "ops 0", "Valid until"]);
     expect(
       [...(table?.querySelectorAll("tbody td") ?? [])].map((cell) => cell.textContent),
-    ).toStrictEqual(["alice", "approved", "n/a", "2026-11-01T00:00:00.000Z"]);
+    ).toStrictEqual(["alice", "signed", "n/a", "2026-11-01T00:00:00.000Z"]);
     expect(container.querySelector('[aria-label="Quorum"]')?.textContent).toBe(
       "1 of 3 approvals counted; 2 missing. The apply requester's own approval does not count.",
     );
@@ -160,5 +160,27 @@ describe("PlanPage approvals", () => {
       "Approvals: insufficient delivery capability",
     );
     expect(container.querySelector('table[aria-label="Approvals by group"]')).toBeNull();
+  });
+
+  it("lists every eligible approver with signed times and pending cells", async () => {
+    serve({
+      ...APPROVALS,
+      collected: [{ ...APPROVALS.collected?.[0], signed_at: Date.UTC(2026, 9, 28, 9) }],
+      eligible: [
+        {
+          group: "quality",
+          approvers: [{ identity: "alice", key_id: "k1", collected: true }],
+        },
+        { group: "ops", approvers: [{ identity: "bob", key_id: "k2", collected: false }] },
+      ],
+    });
+    await render();
+    const rows = [
+      ...(container.querySelectorAll('table[aria-label="Approvals by group"] tbody tr') ?? []),
+    ].map((row) => [...row.querySelectorAll("td")].map((cell) => cell.textContent));
+    expect(rows).toStrictEqual([
+      ["alice", "2026-10-28T09:00:00.000Z", "n/a", "2026-11-01T00:00:00.000Z"],
+      ["bob", "n/a", "pending", ""],
+    ]);
   });
 });

@@ -20,14 +20,21 @@ describe("quorum matrix", () => {
       view({
         collected: [
           { key_id: "k2", signer_identity: "bob", groups: ["ops"], expires_at: 20 },
-          { key_id: "k1", signer_identity: "alice", groups: ["quality", "ops"], expires_at: 10 },
+          {
+            key_id: "k1",
+            signer_identity: "alice",
+            groups: ["quality", "ops"],
+            expires_at: 10,
+            signed_at: 5,
+          },
         ],
         missing: 0,
       }),
     );
+    // Without trust roots on the server: collected signers only.
     expect(matrix.rows.map((row) => [row.signer, ...row.cells])).toStrictEqual([
-      ["alice", "approved", "approved"],
-      ["bob", "n/a", "approved"],
+      ["alice", { signedAt: 5 }, { signedAt: 5 }],
+      ["bob", "n/a", { signedAt: undefined }],
     ]);
     expect(matrix.perGroup).toStrictEqual([1, 2]);
     expect(matrix.counted).toBe(2);
@@ -46,7 +53,48 @@ describe("quorum matrix", () => {
       }),
     );
     expect(matrix.groups).toStrictEqual(["any group"]);
-    expect(matrix.rows[0]?.cells).toStrictEqual(["approved"]);
+    expect(matrix.rows[0]?.cells).toStrictEqual([{ signedAt: undefined }]);
+  });
+
+  it("makes every eligible approver a row: signed time, pending, or n/a per group", () => {
+    const matrix = quorumMatrix(
+      view({
+        collected: [
+          {
+            key_id: "k-alice",
+            signer_identity: "alice",
+            groups: ["quality"],
+            expires_at: 10,
+            signed_at: 4,
+          },
+          // Signed, then removed from the trust roots: still shown.
+          {
+            key_id: "k-old",
+            signer_identity: "olga",
+            groups: ["ops"],
+            expires_at: 9,
+            signed_at: 3,
+          },
+        ],
+        missing: 1,
+        eligible: [
+          {
+            group: "quality",
+            approvers: [
+              { identity: "alice", key_id: "k-alice", collected: true },
+              { identity: "bob", key_id: "k-bob", collected: false },
+            ],
+          },
+          { group: "ops", approvers: [{ identity: "bob", key_id: "k-bob", collected: false }] },
+        ],
+      }),
+    );
+    expect(matrix.rows.map((row) => [row.signer, row.expiresAt, ...row.cells])).toStrictEqual([
+      ["alice", 10, { signedAt: 4 }, "n/a"],
+      ["bob", undefined, "pending", "pending"],
+      ["olga", 9, "n/a", { signedAt: 3 }],
+    ]);
+    expect(matrix.perGroup).toStrictEqual([1, 1]);
   });
 
   it("blocks Apply only when more approvals are missing than one paste can add", () => {

@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at dbebcc9a02a044fba6d66a9aba5505ff77dbba3c (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at c65ea2dfce1ac722916061ef739b7fba0a8b1f80 (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -224,6 +224,16 @@ export type ExportAction = ("created" | "downloaded")
  */
 export type ExportKind = ("support-bundle" | "audit-export" | "recovery-bundle" | "offline-receipt")
 /**
+ * Whether a first administrator is configured: a `[grants]` rule that gives
+ * fleet management (#631). Without one, only the management token can
+ * administer the server. Reported unauthenticated on `/healthz` (#815), so
+ * it is one coarse status and never names a rule or an identity.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "FirstAdministrator".
+ */
+export type FirstAdministrator = ("configured" | "missing")
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "ImportState".
  */
@@ -296,6 +306,7 @@ DeliveryHoldRequest?: DeliveryHoldRequest
 DeliveryHoldView?: DeliveryHoldView
 DrillEvidence?: DrillEvidence
 EffectiveApprovalPolicy?: EffectiveApprovalPolicy
+EligibleApprover?: EligibleApprover
 EnvironmentConfigChange?: EnvironmentConfigChange
 EnvironmentConfigRequest?: EnvironmentConfigRequest
 EnvironmentConstraint?: EnvironmentConstraint
@@ -322,8 +333,10 @@ ExportEvent?: ExportEvent
 ExportKind?: ExportKind
 ExportList?: ExportList
 ExportRequest?: ExportRequest
+FirstAdministrator?: FirstAdministrator
 FleetEnvironmentRow?: FleetEnvironmentRow
 FleetStatusReport?: FleetStatusReport
+GroupApprovers?: GroupApprovers
 HoldAuditEvent?: HoldAuditEvent
 ImportJob?: ImportJob
 ImportRequest?: ImportRequest
@@ -749,6 +762,11 @@ export interface CollectedApproval {
 expires_at: number
 groups?: string[]
 key_id: string
+/**
+ * When the signer signed it: the statement's `issued_at`, Unix
+ * milliseconds (#817).
+ */
+signed_at?: number
 signer_identity: string
 }
 /**
@@ -938,6 +956,18 @@ exclude_requester?: boolean
 groups?: string[]
 n: number
 purpose: QuorumPurpose
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EligibleApprover".
+ */
+export interface EligibleApprover {
+/**
+ * An approval from this key is among `collected`.
+ */
+collected: boolean
+identity: string
+key_id: string
 }
 /**
  * Body of every `PUT`/`DELETE` configuration route.
@@ -1557,6 +1587,21 @@ environments_unhealthy: number
 server_version?: string
 }
 /**
+ * Who may approve for one group of the plan's rule (#817): identities and
+ * key ids from the plan-approval trust roots, never key material.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "GroupApprovers".
+ */
+export interface GroupApprovers {
+approvers: EligibleApprover[]
+/**
+ * The rule's group; absent when the rule names none, so any trusted
+ * signer counts.
+ */
+group?: string
+}
+/**
  * `GET /v1/imports/{id}` and the job file.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -1854,6 +1899,12 @@ source: string
  */
 export interface PlanApprovalsView {
 collected?: CollectedApproval[]
+/**
+ * Eligible human approvers per group of the rule, from the trust roots
+ * this host verifies plan approvals with (#817). Absent when the host
+ * has none configured. The rule stays N signers from any listed group.
+ */
+eligible?: GroupApprovers[]
 exclude_requester: boolean
 groups?: string[]
 missing: number
@@ -2254,6 +2305,13 @@ clock?: ClockHealth1
  * API contract ids this server serves, for client compatibility checks.
  */
 contracts: string[]
+/**
+ * Whether a first administrator is configured: a `[grants]` rule that gives
+ * fleet management (#631). Without one, only the management token can
+ * administer the server. Reported unauthenticated on `/healthz` (#815), so
+ * it is one coarse status and never names a rule or an identity.
+ */
+first_administrator?: ("configured" | "missing")
 profile: string
 status: string
 /**
