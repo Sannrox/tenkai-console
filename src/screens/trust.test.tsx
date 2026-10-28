@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TrustPosture } from "../api/tenkai.gen";
+import type { PlanRunways, TrustPosture } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
 import { Trust } from "./trust";
 
@@ -20,6 +20,7 @@ const TRUST: TrustPosture = {
       purpose: "release",
       file: "release.toml",
       source: "file",
+      signer_validity: "not_recorded",
       signers: [{ key_id: "k1", identity: "release-bot", revoked: true }],
     },
   ],
@@ -27,6 +28,8 @@ const TRUST: TrustPosture = {
     file: "revocations.json",
     sequence: 4,
     signer_key_id: "authority",
+    issued_at: Date.UTC(2026, 9, 1),
+    installed_at: Date.UTC(2026, 9, 2),
     revoked_keys: 1,
   },
   tls: [
@@ -80,11 +83,40 @@ const rows = (index: number) =>
     [...row.querySelectorAll("td")].map((cell) => cell.textContent),
   );
 
-beforeEach(() => {
+const BLOCKED: PlanRunways = {
+  plans: [
+    { plan_id: "plan-lab", environment: "lab", plan_state: "computed" },
+    {
+      plan_id: "plan-prod",
+      environment: "prod",
+      plan_state: "computed",
+      window_opens_at_ms: Date.UTC(2026, 10, 5),
+      blocked_by: {
+        credential: "runner_ca (CN=runner-ca)",
+        expires_at_ms: Date.UTC(2026, 10, 1),
+        window_opens_at_ms: Date.UTC(2026, 10, 5),
+      },
+    },
+  ],
+};
+
+/** Answer `/v1/trust` and `/v1/trust/runway`; a `Response` is sent as is. */
+const serve = (trust: unknown, runway: unknown) => {
+  const reply = (body: unknown) =>
+    body instanceof Response ? body.clone() : new Response(JSON.stringify(body));
   vi.stubGlobal(
     "fetch",
-    vi.fn<typeof fetch>(async () => new Response(JSON.stringify(TRUST))),
+    vi.fn<typeof fetch>(async (input) => {
+      const url = input instanceof Request ? input.url : input instanceof URL ? input.href : input;
+      return reply(url.endsWith("v1/trust/runway") ? runway : trust);
+    }),
   );
+};
+
+const runwayBanner = () => container.querySelector('[aria-label="Credential runway"]');
+
+beforeEach(() => {
+  serve(TRUST, BLOCKED);
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -110,75 +142,112 @@ afterEach(async () => {
 });
 
 describe("Trust", () => {
-  it("names the first expiry, lists signers and certificates by expiry, and the revocation list", async () => {
+  it("names the first blocked plan, lists signers and certificates, and the revocation list", async () => {
     await render();
-    expect(container.textContent).toContain(
-      "Credential runway: runner_ca CN=runner-ca, until 2026-11-01 (3 days)",
+    expect(runwayBanner()?.textContent).toBe(
+      "Plan plan-prod for prod waits for the window opening 2026-11-05T00:00:00.000Z, but runner_ca (CN=runner-ca) expires 2026-11-01T00:00:00.000Z.",
     );
-    expect(container.textContent).toContain("Which scheduled plan it blocks is not reported");
+    expect(runwayBanner()?.className).toContain("text-danger");
     expect(rows(0)).toStrictEqual([["release", "release-bot", "k1", "on disk", "revoked"]]);
-    const source = container.querySelector("table tbody td:nth-child(4)");
-    expect(source?.className).toContain("text-muted");
-    expect(container.textContent).toContain(
-      "release (release.toml): As on disk now. The server adopts changes after a restart.",
+    expect(container.querySelector("table tbody td:nth-child(4)")?.className).toContain(
+      "text-muted",
     );
+    expect(container.textContent).not.toContain("restart");
+    expect(container.textContent).toContain("Signer validity is not recorded in trust roots.");
     expect(rows(1)).toStrictEqual([
       ["runner_ca", "CN=runner-ca, until 2026-11-01 (3 days)", "critical"],
       ["listener", "CN=hub, until 2027-06-01 (200 days)", "ok"],
     ]);
-    const critical = container.querySelectorAll("table")[1]?.querySelector("tbody td:last-child");
-    expect(critical?.className).toContain("text-danger");
+    expect(
+      container.querySelectorAll("table")[1]?.querySelector("tbody td:last-child")?.className,
+    ).toContain("text-danger");
     expect(container.querySelector('[aria-label="Revocation list"]')?.textContent).toBe(
-      "Revocation list sequence 4, 1 revoked keys, signed by authority. Import time not reported.",
+      "Revocation list sequence 4, 1 revoked keys, signed by authority, issued 2026-10-01T00:00:00.000Z, file written 2026-10-02T00:00:00.000Z",
     );
   });
 
-  it("shows Loading before the first answer and keeps data after a failed refresh", async () => {
-    let answer: (response: Response) => void = () => {};
+  it("shows no banner when nothing is blocked, and the restart line only for a loaded root", async () => {
+    const loaded = {
+      purpose: "package_migration_approval",
+      file: "package migration trust roots in use",
+      source: "loaded",
+      signers: [{ key_id: "k2", identity: "approver", revoked: false }],
+    };
+    serve({ ...TRUST, signing: [...TRUST.signing, loaded] }, { plans: [BLOCKED.plans[0]] });
+    await render();
+    expect(runwayBanner()).toBeNull();
+    expect(container.querySelector('[aria-label="Runway"]')).toBeNull();
+    const restart = [...container.querySelectorAll("p")].filter((line) =>
+      line.textContent?.includes("restart"),
+    );
+    expect(restart.map((line) => line.textContent)).toStrictEqual([
+      "package_migration_approval (package migration trust roots in use): Loaded at startup; changes apply after a restart.",
+    ]);
+  });
+
+  it("omits the validity line when roots do not report it as not recorded", async () => {
+    serve({ ...TRUST, signing: [{ ...TRUST.signing[0], signer_validity: undefined }] }, BLOCKED);
+    await render();
+    expect(container.textContent).not.toContain("Signer validity is not recorded");
+  });
+
+  it("shows Loading, then the runway's error, and keeps data after a failed refresh", async () => {
+    // Requests that never answer: both stay loading.
     vi.stubGlobal(
       "fetch",
-      vi.fn<typeof fetch>(
-        async () =>
-          new Promise<Response>((resolve) => {
-            answer = resolve;
-          }),
-      ),
+      vi.fn<typeof fetch>(async () => new Promise<Response>(() => {})),
     );
     await render();
-    expect(container.textContent).toContain("Loading");
+    expect(container.querySelector('[aria-label="Runway"]')?.textContent).toBe("Runway: Loading");
     expect(container.querySelector("table")).toBeNull();
-    await act(async () => {
-      answer(new Response(JSON.stringify({ ...TRUST, tls: [] })));
-    });
-    await settle();
-    expect(container.textContent).toContain("every certificate is beyond its warning threshold");
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn<typeof fetch>(
-        async () =>
-          new Response(JSON.stringify({ error: "trust posture unavailable" }), { status: 503 }),
-      ),
-    );
-    const refresh = [...container.querySelectorAll("button")].find(
-      (element) => element.textContent === "Refresh",
-    );
+    // A fresh mount: the runway fails, the posture still shows.
     await act(async () => {
-      refresh?.click();
+      root.unmount();
+    });
+    root = createRoot(container);
+    serve(
+      TRUST,
+      new Response(JSON.stringify({ error: "not available in tenant mode" }), { status: 503 }),
+    );
+    await render();
+    const refresh = () =>
+      [...container.querySelectorAll("button")].find(
+        (element) => element.textContent === "Refresh",
+      );
+    expect(container.querySelector('[aria-label="Runway"]')?.textContent).toBe(
+      "Runway: not available in tenant mode",
+    );
+
+    serve(TRUST, BLOCKED);
+    await act(async () => {
+      refresh()?.click();
     });
     await settle();
-    expect(container.querySelector('[role="alert"]')?.textContent).toMatch(
-      /^Refresh failed: trust posture unavailable\. Showing data from /,
+    expect(runwayBanner()).not.toBeNull();
+    serve(
+      new Response(JSON.stringify({ error: "trust posture unavailable" }), { status: 503 }),
+      new Response(JSON.stringify({ error: "runway unavailable" }), { status: 503 }),
     );
+    await act(async () => {
+      refresh()?.click();
+    });
+    await settle();
+    expect(
+      [...container.querySelectorAll('[role="alert"]')].map((line) =>
+        line.textContent?.replace(/ Showing data from .*$/, ""),
+      ),
+    ).toStrictEqual([
+      "Refresh failed: trust posture unavailable.",
+      "Refresh failed: runway unavailable.",
+    ]);
+    expect(runwayBanner()).not.toBeNull();
     expect(rows(0)).toStrictEqual([["release", "release-bot", "k1", "on disk", "revoked"]]);
   });
 
   it("shows a root with no signers as a warning row, and the empty notice only without roots", async () => {
     const empty = { purpose: "bundle_import", file: "bundles.toml", source: "file", signers: [] };
-    vi.stubGlobal(
-      "fetch",
-      vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ...TRUST, signing: [empty] }))),
-    );
+    serve({ ...TRUST, signing: [empty] }, BLOCKED);
     await render();
     expect(rows(0)).toStrictEqual([["bundle_import", "", "", "on disk", "no signers"]]);
     expect(container.querySelector("table tbody td:last-child")?.className).toContain(
@@ -190,10 +259,7 @@ describe("Trust", () => {
       root.unmount();
     });
     root = createRoot(container);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ...TRUST, signing: [] }))),
-    );
+    serve({ ...TRUST, signing: [] }, BLOCKED);
     await render();
     expect(rows(0)).toStrictEqual([["No trust roots configured"]]);
   });

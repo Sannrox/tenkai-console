@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at a566f7d5733cfc10f2b19e974cf23f8f885d20dd (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 6834e7f77a5f25d297fed2bcef1747c742b32ea1 (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -237,6 +237,13 @@ export type MigrationStatus = ("admitted" | "running" | "succeeded" | "failed" |
  */
 export type RunnerAuth = ("client_certificate" | "bearer")
 /**
+ * Whether a trust root's format records when each signer is valid.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "SignerValidity".
+ */
+export type SignerValidity = "not_recorded"
+/**
  * Status ordering: `ok` < `warning` < `critical` < `expired`.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -278,6 +285,7 @@ ComponentPin?: ComponentPin
 ConnectivityClass?: ConnectivityClass
 ContentInventory?: ContentInventory
 ContentItem?: ContentItem
+CredentialRunway?: CredentialRunway
 DeliveryHold?: DeliveryHold
 DeliveryHoldRequest?: DeliveryHoldRequest
 DeliveryHoldView?: DeliveryHoldView
@@ -345,6 +353,8 @@ PlanApprovalTrustedSigner?: PlanApprovalTrustedSigner
 PlanApprovalView?: PlanApprovalView1
 PlanApprovalsView?: PlanApprovalsView
 PlanRequest?: PlanRequest
+PlanRunway?: PlanRunway
+PlanRunways?: PlanRunways
 PreviewInspect?: PreviewInspect1
 PromoteRequest?: PromoteRequest
 Provenance?: Provenance
@@ -373,6 +383,7 @@ RuntimeRunnerList?: RuntimeRunnerList
 ScanEvidence?: ScanEvidence1
 ServiceStatus?: ServiceStatus
 SignatureEnvelope?: SignatureEnvelope
+SignerValidity?: SignerValidity
 SigningRoot?: SigningRoot
 StagedBundle?: StagedBundle
 StatusRow?: StatusRow
@@ -840,6 +851,22 @@ size_bytes?: number
  * path. Absent when the store that would hold it is not configured.
  */
 stored?: boolean
+}
+/**
+ * A certificate that lapses before an environment's next maintenance window
+ * opens, so a plan waiting for that window would fail at apply time (#778).
+ * Advisory: it never blocks the plan or changes its steps.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "CredentialRunway".
+ */
+export interface CredentialRunway {
+/**
+ * The certificate's purpose, with its subject when readable.
+ */
+credential: string
+expires_at_ms: number
+window_opens_at_ms: number
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -1562,6 +1589,16 @@ version: number
 export interface InstalledRevocations {
 error?: string
 file: string
+/**
+ * When the installed file was last written, Unix milliseconds: an
+ * install or bundle import replaces it, and the process applies it at
+ * start (#811).
+ */
+installed_at?: number
+/**
+ * When the authority signed the list, Unix milliseconds (#811).
+ */
+issued_at?: number
 revoked_keys: number
 sequence?: number
 signer_key_id?: string
@@ -1800,6 +1837,47 @@ environment: string
 expected_generation: number
 operation: string
 version: number
+}
+/**
+ * A plan waiting to apply and the first certificate that would lapse
+ * before it can (#811).
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "PlanRunway".
+ */
+export interface PlanRunway {
+blocked_by?: CredentialRunway1
+environment: string
+plan_id: string
+/**
+ * `computed` or `blocked`.
+ */
+plan_state: string
+/**
+ * When the plan can next apply: the environment's next maintenance
+ * window, Unix milliseconds. Absent when it may apply now.
+ */
+window_opens_at_ms?: number
+}
+/**
+ * A certificate that lapses before an environment's next maintenance window
+ * opens, so a plan waiting for that window would fail at apply time (#778).
+ * Advisory: it never blocks the plan or changes its steps.
+ */
+export interface CredentialRunway1 {
+/**
+ * The certificate's purpose, with its subject when readable.
+ */
+credential: string
+expires_at_ms: number
+window_opens_at_ms: number
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "PlanRunways".
+ */
+export interface PlanRunways {
+plans: PlanRunway[]
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -2147,6 +2225,10 @@ export interface SigningRoot {
 error?: string
 file: string
 purpose: string
+/**
+ * Whether a trust root's format records when each signer is valid.
+ */
+signer_validity?: "not_recorded"
 signers: TrustedSignerView[]
 /**
  * Whether an entry shows material the server loaded and uses, or a file as

@@ -1,5 +1,7 @@
 import type {
   CertificateEntry,
+  PlanRunway,
+  PlanRunways,
   RuntimeRunner,
   SigningRoot,
   TrustPosture,
@@ -120,13 +122,20 @@ export const byExpiry = (certificates: CertificateEntry[]): CertificateEntry[] =
   );
 
 /**
- * The first TLS certificate to lapse, for the runway banner, unless every
- * certificate is `ok`. Tenkai checks a plan against certificate expiry when
- * the plan is created (Sannrox/tenkai#778) but reports that only in the
- * plan's creation message, so the banner cannot name a scheduled plan.
+ * The waiting plan whose blocking certificate lapses first, for the runway
+ * banner (GET `/v1/trust/runway`, Sannrox/tenkai#811); none when no plan is
+ * blocked.
  */
-export const firstExpiry = (posture: TrustPosture): CertificateEntry | undefined =>
-  byExpiry(posture.tls).find((certificate) => certificate.status !== "ok");
+export const firstBlocked = (
+  runways: PlanRunways,
+): (PlanRunway & { blocked_by: NonNullable<PlanRunway["blocked_by"]> }) | undefined =>
+  runways.plans
+    .flatMap((plan) => (plan.blocked_by ? [{ ...plan, blocked_by: plan.blocked_by }] : []))
+    .toSorted(
+      (a, b) =>
+        a.blocked_by.expires_at_ms - b.blocked_by.expires_at_ms ||
+        a.environment.localeCompare(b.environment),
+    )[0];
 
 export type SignerRow = {
   purpose: string;
@@ -197,9 +206,9 @@ export const signerRows = (roots: SigningRoot[]): SignerRow[] => {
 };
 
 /**
- * Trust roots shown as their file is on disk now (`source: "file"`). The
- * server loaded them at start, so a changed file takes effect only after a
- * restart; a root reported as `loaded` is what the server uses and needs no note.
+ * Roots a verifier loaded at startup (`source: "loaded"`, the
+ * package-migration roots), which adopt a changed file only after a restart.
+ * `file` roots are re-read on each use (Sannrox/tenkai#811).
  */
-export const onDiskRoots = (roots: SigningRoot[]): SigningRoot[] =>
-  roots.filter((root) => root.source === "file");
+export const startupRoots = (roots: SigningRoot[]): SigningRoot[] =>
+  roots.filter((root) => root.source === "loaded");

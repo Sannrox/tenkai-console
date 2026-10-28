@@ -4,10 +4,10 @@ import {
   byExpiry,
   describeCertificate,
   environmentAuth,
-  firstExpiry,
+  firstBlocked,
   hubTransport,
-  onDiskRoots,
   signerRows,
+  startupRoots,
 } from "./transport";
 
 const certificate = (
@@ -121,13 +121,11 @@ describe("environment runner auth", () => {
 });
 
 describe("trust tables", () => {
-  it("orders certificates by expiry, an unreadable one first, and names the first to lapse", () => {
+  it("orders certificates by expiry, an unreadable one first", () => {
     const later = certificate("listener", { not_after: 2_000, status: "ok" });
     const soon = certificate("runner_ca", { not_after: 1_000, status: "warning" });
     const unreadable = certificate("outbound_ca_bundle", { status: "critical", error: "missing" });
     expect(byExpiry([later, soon, unreadable])).toStrictEqual([unreadable, soon, later]);
-    expect(firstExpiry(posture([later, soon]))).toStrictEqual(soon);
-    expect(firstExpiry(posture([later]))).toBeUndefined();
   });
 
   it("marks each signer trusted or revoked, merging a key two sources list", () => {
@@ -168,13 +166,28 @@ describe("trust tables", () => {
     ]);
   });
 
-  it("notes only roots read from disk, not one the server reports as loaded", () => {
+  it("picks the waiting plan whose blocking certificate lapses first, none when unblocked", () => {
+    const blocked = (environment: string, expires_at_ms: number) => ({
+      plan_id: `plan-${environment}`,
+      environment,
+      plan_state: "computed",
+      window_opens_at_ms: 5_000,
+      blocked_by: { credential: "listener (CN=hub)", expires_at_ms, window_opens_at_ms: 5_000 },
+    });
+    const open = { plan_id: "plan-lab", environment: "lab", plan_state: "computed" };
+    expect(
+      firstBlocked({ plans: [open, blocked("prod", 3_000), blocked("edge", 2_000)] })?.plan_id,
+    ).toBe("plan-edge");
+    expect(firstBlocked({ plans: [open] })).toBeUndefined();
+  });
+
+  it("notes only roots a verifier loaded at startup, not re-read files", () => {
     const root = (source: "file" | "loaded") => ({
       purpose: "release",
       file: `release ${source}`,
       source,
       signers: [],
     });
-    expect(onDiskRoots([root("loaded"), root("file")])).toStrictEqual([root("file")]);
+    expect(startupRoots([root("loaded"), root("file")])).toStrictEqual([root("loaded")]);
   });
 });
