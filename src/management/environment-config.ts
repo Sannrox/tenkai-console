@@ -42,6 +42,9 @@ const SEGMENT: Record<EnvironmentConfigChange["kind"], string> = {
   clear_webhooks: "webhooks",
   set_approval_policy: "approval-policy",
   clear_approval_policy: "approval-policy",
+  // Routable for completeness; the console has no editor for it yet.
+  set_runner_attestation: "runner-attestation",
+  clear_runner_attestation: "runner-attestation",
 };
 
 const CLEARS = new Set<EnvironmentConfigChange["kind"]>([
@@ -50,6 +53,7 @@ const CLEARS = new Set<EnvironmentConfigChange["kind"]>([
   "remove_maintenance_window",
   "clear_webhooks",
   "clear_approval_policy",
+  "clear_runner_attestation",
 ]);
 
 /** The route, method and body of one change, as the server routes it. */

@@ -226,4 +226,175 @@ describe("environment configuration", () => {
     ]);
     expect(container.textContent).toContain("environment edge added");
   });
+
+  it("edits one webhook by URL with its existing events, and never clears them all", async () => {
+    serve(() => ok);
+    const report = {
+      ...REPORT,
+      webhooks: [
+        {
+          url: "https://hooks.example/deploy",
+          secret_env: "DEPLOY_SECRET",
+          events: ["apply.failed"],
+          operational: ["plan.held"],
+        },
+        { url: "https://hooks.example/audit", secret_env: "AUDIT_SECRET" },
+      ],
+    } as EnvironmentInspectReport;
+    await render(<ConfigSections report={report} token="operator" />);
+    expect(container.querySelector('[aria-label="Webhooks configured"]')?.textContent).toBe(
+      "https://hooks.example/deploy (DEPLOY_SECRET) apply.failed,plan.held · https://hooks.example/audit (AUDIT_SECRET) apply.succeeded,apply.failed,apply.rolled_back",
+    );
+    await click("Edit", 3);
+    await click("https://hooks.example/deploy");
+    await type("Secret variable", "DEPLOY_SECRET_V2");
+    await type("Reason", "rotate secret");
+    await click("Save");
+    await click("Save webhook https://hooks.example/deploy");
+    expect(calls[0]).toStrictEqual({
+      method: "PUT",
+      path: "v1/environments/prod/webhooks",
+      body: {
+        version: 1,
+        operation: "configure",
+        environment: "prod",
+        expected_generation: 7,
+        reason: "rotate secret",
+        change: {
+          kind: "set_webhook",
+          url: "https://hooks.example/deploy",
+          secret_env: "DEPLOY_SECRET_V2",
+          events: ["apply.failed"],
+          operational: ["plan.held"],
+        },
+      },
+    });
+    await click("Remove");
+    await click("Remove webhook https://hooks.example/deploy");
+    expect(calls[1]).toMatchObject({
+      method: "DELETE",
+      path: "v1/environments/prod/webhooks",
+      body: { change: { kind: "clear_webhooks", url: "https://hooks.example/deploy" } },
+    });
+  });
+
+  it("shows the policy path and sets or clears it", async () => {
+    serve(() => ok);
+    const report = {
+      ...REPORT,
+      approval_policy: "/etc/tenkai/prod-policy.toml",
+    } as EnvironmentInspectReport;
+    await render(<ConfigSections report={report} token="operator" />);
+    expect(container.querySelector('[aria-label="Approval policy configured"]')?.textContent).toBe(
+      "/etc/tenkai/prod-policy.toml",
+    );
+    await click("Edit", 4);
+    await type("Policy file path", "/etc/tenkai/prod-policy-v2.toml");
+    await type("Reason", "new quorum");
+    await click("Set");
+    await click("Set policy /etc/tenkai/prod-policy-v2.toml");
+    await click("Clear");
+    await click("Clear the approval policy");
+    expect(calls.map((call) => [call.method, call.path, call.body])).toStrictEqual([
+      [
+        "PUT",
+        "v1/environments/prod/approval-policy",
+        expect.objectContaining({
+          change: { kind: "set_approval_policy", path: "/etc/tenkai/prod-policy-v2.toml" },
+        }),
+      ],
+      [
+        "DELETE",
+        "v1/environments/prod/approval-policy",
+        expect.objectContaining({ change: { kind: "clear_approval_policy" } }),
+      ],
+    ]);
+  });
+
+  it("shows an empty subscription as every outcome and never sends an empty list", async () => {
+    serve(() => ok);
+    const report = {
+      ...REPORT,
+      webhooks: [{ url: "https://hooks.example/audit", secret_env: "AUDIT_SECRET" }],
+    } as EnvironmentInspectReport;
+    await render(<ConfigSections report={report} token="operator" />);
+    await click("Edit", 3);
+    await click("https://hooks.example/audit");
+    const boxes = () => [
+      ...container.querySelectorAll<HTMLInputElement>('[aria-label="Events"] input'),
+    ];
+    // The server sends every apply outcome to it: all three show checked.
+    expect(
+      boxes()
+        .slice(0, 3)
+        .map((box) => box.checked),
+    ).toStrictEqual([true, true, true]);
+    await type("Reason", "narrow");
+    // Unchecking every box blocks Save instead of sending `events: []`.
+    for (const box of boxes().slice(0, 3)) {
+      await act(async () => {
+        box.click();
+      });
+    }
+    expect(container.textContent).toContain("Choose at least one outcome");
+    expect(buttons("Save")[0]?.disabled).toBe(true);
+    // One outcome left is sent explicitly.
+    await act(async () => {
+      boxes()[1]?.click();
+    });
+    expect(container.textContent).not.toContain("Choose at least one outcome");
+    await click("Save");
+    await click("Save webhook https://hooks.example/audit");
+    expect(calls[0]?.body).toMatchObject({
+      change: { kind: "set_webhook", events: ["apply.failed"], operational: [] },
+    });
+  });
+
+  it("sends the generation a draft was loaded at, so a refresh cannot hide a newer change", async () => {
+    serve(() => ok);
+    const hook = { url: "https://hooks.example/deploy", secret_env: "DEPLOY_SECRET" };
+    const at = (generation: number) =>
+      ({
+        ...REPORT,
+        lease: { held: true, generation },
+        webhooks: [hook],
+      }) as EnvironmentInspectReport;
+    const client = new QueryClient({ defaultOptions: { mutations: { networkMode: "always" } } });
+    const show = async (report: EnvironmentInspectReport) => {
+      await act(async () => {
+        root.render(
+          <QueryClientProvider client={client}>
+            <ConfigSections report={report} token="operator" />
+          </QueryClientProvider>,
+        );
+      });
+      await settle();
+    };
+    await show(at(7));
+    await click("Edit", 0);
+    // Facts is open, so its Edit reads Close: Webhooks is now the third Edit.
+    await click("Edit", 2);
+    await click("https://hooks.example/deploy");
+    // Another operator's change lands; the report refreshes to generation 8.
+    await show(at(8));
+    const reasons = container.querySelectorAll<HTMLInputElement>('input[aria-label="Reason"]');
+    expect(reasons).toHaveLength(2);
+    await act(async () => {
+      // oxlint-disable-next-line typescript/unbound-method -- called with the input as `this`
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      for (const input of reasons) {
+        setter?.call(input, "stale draft");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    await click("Save");
+    await click("Save webhook https://hooks.example/deploy");
+    await type("Fact key", "architecture");
+    await type("Fact value", "arm64");
+    await click("Set");
+    await click("Set architecture=arm64");
+    expect(
+      calls.map((call) => (call.body as { expected_generation: number }).expected_generation),
+    ).toStrictEqual([7, 7]);
+  });
 });
