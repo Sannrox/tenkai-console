@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 6834e7f77a5f25d297fed2bcef1747c742b32ea1 (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at dbebcc9a02a044fba6d66a9aba5505ff77dbba3c (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -153,6 +153,11 @@ kind: "set_approval_policy"
 path: string
 } | {
 kind: "clear_approval_policy"
+} | {
+kind: "set_runner_attestation"
+max_age_ms: number
+} | {
+kind: "clear_runner_attestation"
 })
 /**
  * Stable apply-lifecycle events a webhook endpoint may subscribe to.
@@ -169,7 +174,7 @@ export type WebhookEvent = ("apply.succeeded" | "apply.failed" | "apply.rolled_b
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "OperationalEvent".
  */
-export type OperationalEvent = (("plan.held" | "plan.awaiting_approval" | "import.failed" | "backup.stale" | "clock.drift") | "trust.expiring")
+export type OperationalEvent = (("plan.held" | "plan.awaiting_approval" | "import.failed" | "backup.stale" | "clock.drift") | "trust.expiring" | "runner.attestation_refused")
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "EnvironmentStatus".
@@ -378,6 +383,7 @@ RuntimeEnrollmentIssued?: RuntimeEnrollmentIssued
 RuntimeEnrollmentRequest?: RuntimeEnrollmentRequest
 RuntimeRevokeRequest?: RuntimeRevokeRequest
 RuntimeRunner?: RuntimeRunner
+RuntimeRunnerAttestation?: RuntimeRunnerAttestation1
 RuntimeRunnerInstance?: RuntimeRunnerInstance
 RuntimeRunnerList?: RuntimeRunnerList
 ScanEvidence?: ScanEvidence1
@@ -395,6 +401,7 @@ TrustSource?: TrustSource
 TrustStatus?: TrustStatus
 TrustedSignerView?: TrustedSignerView
 WebhookDelivery?: WebhookDelivery
+WebhookEndpoint?: WebhookEndpoint
 WebhookEvent?: WebhookEvent
 }
 /**
@@ -971,6 +978,11 @@ value: string
  */
 export interface EnvironmentInspectReport {
 /**
+ * The plan approval policy file this environment uses, as configured,
+ * when one is set (#820).
+ */
+approval_policy?: string
+/**
  * Environment constraints (`version_pin`, `version_range`, `require_fact`).
  */
 constraints?: EnvironmentConstraint[]
@@ -1017,6 +1029,12 @@ subscriptions: EnvironmentSubscriptionView[]
  * payloads and retry errors are intentionally excluded.
  */
 terminal_outcomes?: TerminalOutcomeProjection[]
+/**
+ * Configured post-deploy webhooks (#820): URL, the name of the variable
+ * holding the HMAC secret, and events. The secret itself is never stored
+ * or returned. Edits are conditional on `lease.generation`.
+ */
+webhooks?: WebhookEndpoint[]
 }
 /**
  * Durable evidence that delivery is paused for a scope.
@@ -1237,6 +1255,22 @@ release_digest: string
 release_id: string
 schema: string
 terminal_state: string
+}
+/**
+ * Operator-facing endpoint configuration. The HMAC secret is never stored;
+ * `secret_env` names a process environment variable.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "WebhookEndpoint".
+ */
+export interface WebhookEndpoint {
+events?: WebhookEvent[]
+/**
+ * Operational events this endpoint also receives; none unless listed.
+ */
+operational?: OperationalEvent[]
+secret_env: string
+url: string
 }
 /**
  * Summary row for fleet listing (no credentials).
@@ -2084,6 +2118,7 @@ reason: string
  * via the `definition` "RuntimeRunner".
  */
 export interface RuntimeRunner {
+attestation?: RuntimeRunnerAttestation
 /**
  * How a runner authenticates (#809), from what the server issued it, not
  * from what a request presented.
@@ -2110,6 +2145,28 @@ revoked_by?: string
 state: string
 }
 /**
+ * The latest bound runner attestation and the latest refusal (#675),
+ * once the runner was attested or refused.
+ */
+export interface RuntimeRunnerAttestation {
+bound_at?: number
+checked_at?: number
+/**
+ * `sha256:` digest of the latest bound evidence.
+ */
+evidence_digest?: string
+/**
+ * `sha256:` fingerprint of the bound runner key.
+ */
+key_fingerprint?: string
+/**
+ * The code of the latest refusal since the last binding, for example
+ * `fact_mismatch`.
+ */
+last_refusal?: string
+last_refused_at?: number
+}
+/**
  * What one instance of a runner last did. Activity is recorded at most
  * every 30 seconds per kind, so times can trail by that much.
  * 
@@ -2131,6 +2188,30 @@ runtime_version?: string
  * (one minor release, supported), `unsupported` or `ahead` (#761).
  */
 skew?: string
+}
+/**
+ * A runner's attestation state (#675). Digests only, never evidence content.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RuntimeRunnerAttestation".
+ */
+export interface RuntimeRunnerAttestation1 {
+bound_at?: number
+checked_at?: number
+/**
+ * `sha256:` digest of the latest bound evidence.
+ */
+evidence_digest?: string
+/**
+ * `sha256:` fingerprint of the bound runner key.
+ */
+key_fingerprint?: string
+/**
+ * The code of the latest refusal since the last binding, for example
+ * `fact_mismatch`.
+ */
+last_refusal?: string
+last_refused_at?: number
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
