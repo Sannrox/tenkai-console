@@ -11,6 +11,7 @@ const TABS = [
   { label: "Environments", to: "/environments" },
   { label: "Runners", to: "/runners" },
   { label: "Server", to: "/server" },
+  { label: "Trust", to: "/trust" },
   { label: "Access", to: "/access" },
 ] as const;
 

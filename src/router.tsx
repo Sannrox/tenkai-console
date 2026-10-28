@@ -20,6 +20,7 @@ const Environments = lazyRouteComponent(() => import("./screens/environments"), 
 const Releases = lazyRouteComponent(() => import("./screens/releases"), "Releases");
 const Runners = lazyRouteComponent(() => import("./screens/runners"), "Runners");
 const Server = lazyRouteComponent(() => import("./screens/server"), "Server");
+const Trust = lazyRouteComponent(() => import("./screens/trust"), "Trust");
 const Access = lazyRouteComponent(() => import("./screens/access"), "Access");
 const AuthCallback = lazyRouteComponent(() => import("./screens/auth-callback"), "AuthCallback");
 
@@ -106,6 +107,12 @@ const serverRoute = createRoute({
   component: Server,
 });
 
+const trustRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/trust",
+  component: Trust,
+});
+
 const accessRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/access",
@@ -138,6 +145,7 @@ export const router = createRouter({
       releasesRoute,
       runnersRoute,
       serverRoute,
+      trustRoute,
       accessRoute,
     ]),
     callbackRoute,

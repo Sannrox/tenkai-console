@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { CertificateEntry, RuntimeRunner, TrustPosture } from "../api/tenkai.gen";
-import { describeCertificate, environmentAuth, hubTransport } from "./transport";
+import {
+  byExpiry,
+  describeCertificate,
+  environmentAuth,
+  firstExpiry,
+  hubTransport,
+  onDiskRoots,
+  signerRows,
+} from "./transport";
 
 const certificate = (
   purpose: string,
@@ -109,5 +117,64 @@ describe("environment runner auth", () => {
       { environment: "prod", runners: 3, mtls: 1, bearer: 1, unknown: 1 },
       { environment: "staging", runners: 0, mtls: 0, bearer: 0, unknown: 0 },
     ]);
+  });
+});
+
+describe("trust tables", () => {
+  it("orders certificates by expiry, an unreadable one first, and names the first to lapse", () => {
+    const later = certificate("listener", { not_after: 2_000, status: "ok" });
+    const soon = certificate("runner_ca", { not_after: 1_000, status: "warning" });
+    const unreadable = certificate("outbound_ca_bundle", { status: "critical", error: "missing" });
+    expect(byExpiry([later, soon, unreadable])).toStrictEqual([unreadable, soon, later]);
+    expect(firstExpiry(posture([later, soon]))).toStrictEqual(soon);
+    expect(firstExpiry(posture([later]))).toBeUndefined();
+  });
+
+  it("marks each signer trusted or revoked, merging a key two sources list", () => {
+    const signer = (key_id: string, identity: string, revoked = false) => ({
+      key_id,
+      identity,
+      revoked,
+    });
+    expect(
+      signerRows([
+        {
+          purpose: "release",
+          file: "release trust in use",
+          source: "loaded",
+          signers: [signer("k1", "ci"), signer("k2", "release-bot", true)],
+        },
+        {
+          purpose: "release",
+          file: "release.toml",
+          source: "file",
+          signers: [signer("k1", "ci"), signer("k3", "rotated")],
+        },
+        {
+          purpose: "approval",
+          file: "approval.toml",
+          source: "file",
+          signers: [],
+          error: "reading approval.toml: missing",
+        },
+        { purpose: "bundle_import", file: "bundles.toml", source: "file", signers: [] },
+      ]).map((row) => [row.purpose, row.identity, row.sources, row.state, row.tone]),
+    ).toStrictEqual([
+      ["approval", "", ["file"], "reading approval.toml: missing", "bad"],
+      ["bundle_import", "", ["file"], "no signers", "warning"],
+      ["release", "ci", ["loaded", "file"], "trusted", "ok"],
+      ["release", "release-bot", ["loaded"], "revoked", "bad"],
+      ["release", "rotated", ["file"], "trusted", "ok"],
+    ]);
+  });
+
+  it("notes only roots read from disk, not one the server reports as loaded", () => {
+    const root = (source: "file" | "loaded") => ({
+      purpose: "release",
+      file: `release ${source}`,
+      source,
+      signers: [],
+    });
+    expect(onDiskRoots([root("loaded"), root("file")])).toStrictEqual([root("file")]);
   });
 });

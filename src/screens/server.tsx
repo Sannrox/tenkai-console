@@ -1,11 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { request } from "../api/http";
-import type {
-  CertificateEntry,
-  EnvironmentListEntry,
-  RuntimeRunnerList,
-  TrustPosture,
-} from "../api/tenkai.gen";
+import type { CertificateEntry, EnvironmentListEntry, RuntimeRunnerList } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
 import {
   describeCertificate,
@@ -13,17 +8,8 @@ import {
   hubTransport,
   type HubTransport,
 } from "../delivery/transport";
-import { Button, Card, Notice } from "../ui/kit";
-
-const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
-const td = "border-b border-line px-3.5 py-2 align-top whitespace-nowrap";
-
-const STATUS_TONE: Record<string, string> = {
-  ok: "",
-  warning: "text-warning",
-  critical: "text-danger",
-  expired: "text-danger",
-};
+import { Button, Card } from "../ui/kit";
+import { RefreshFailed, STATUS_TONE, td, th, useTrustPosture } from "../ui/posture";
 
 /**
  * The 2026-10-28 pick B (#39): hub transport facts (TLS mode, whether runner
@@ -33,12 +19,7 @@ const STATUS_TONE: Record<string, string> = {
  */
 export const Server = () => {
   const token = useSession((state) => state.session?.accessToken);
-  const trust = useQuery({
-    queryKey: ["trust", token],
-    queryFn: () => request<TrustPosture>("v1/trust", { token }),
-    enabled: token !== undefined,
-    retry: false,
-  });
+  const trust = useTrustPosture(token);
   // Same keys and requests as the Runners screen, so the cache is shared.
   const runners = useQuery({
     queryKey: ["runners", token],
@@ -82,22 +63,13 @@ export const Server = () => {
           Refresh
         </Button>
       </div>
-      {(
-        [
+      <RefreshFailed
+        queries={[
           ["trust", trust],
           ["runners", runners],
           ["environments", environments],
-        ] as const
-      ).map(([name, query]) =>
-        query.error && query.data !== undefined ? (
-          <div key={name} className="mb-3">
-            <Notice tone="bad">
-              Refresh failed: {query.error.message}. Showing data from{" "}
-              {new Date(query.dataUpdatedAt).toISOString()}.
-            </Notice>
-          </div>
-        ) : null,
-      )}
+        ]}
+      />
       <Card className="mb-3 overflow-x-auto">
         {trust.data ? (
           <Facts transport={hubTransport(trust.data)} />
