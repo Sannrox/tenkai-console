@@ -1,33 +1,58 @@
-import type { InstalledRevocations, TrustPosture } from "../api/tenkai.gen";
+import { useQuery } from "@tanstack/react-query";
+import { request } from "../api/http";
+import type { InstalledRevocations, PlanRunways, TrustPosture } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
 import {
   byExpiry,
   describeCertificate,
-  firstExpiry,
-  onDiskRoots,
+  firstBlocked,
   signerRows,
+  startupRoots,
 } from "../delivery/transport";
 import { Button, Card } from "../ui/kit";
 import { RefreshFailed, STATUS_TONE, td, th, useTrustPosture } from "../ui/posture";
 
 /**
- * The 2026-10-28 pick A (#36): a runway banner, then signing trust and TLS
- * certificates as two tables, the revocation list under the signing table.
- * A top-level tab of its own (#34). Tenkai reports no per-plan runway, no
- * signer expiry and no revocation import time, so none of those is shown.
+ * The 2026-10-28 pick A (#36): a runway banner naming the first plan a
+ * lapsing certificate blocks, then signing trust and TLS certificates as two
+ * tables, the revocation list under the signing table. A top-level tab of its
+ * own (#34). Trust roots record no signer validity (Sannrox/tenkai#812), so
+ * signers have no expiry and the signing table is not sorted by one.
  */
 export const Trust = () => {
   const token = useSession((state) => state.session?.accessToken);
   const trust = useTrustPosture(token);
+  const runway = useQuery({
+    queryKey: ["trust-runway", token],
+    queryFn: () => request<PlanRunways>("v1/trust/runway", { token }),
+    enabled: token !== undefined,
+    retry: false,
+  });
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h1 className="m-0 text-lg font-semibold">Trust</h1>
-        <Button variant="ghost" className="ml-auto" onClick={() => void trust.refetch()}>
+        <Button
+          variant="ghost"
+          className="ml-auto"
+          onClick={() => void Promise.all([trust.refetch(), runway.refetch()])}
+        >
           Refresh
         </Button>
       </div>
-      <RefreshFailed queries={[["trust", trust]]} />
+      <RefreshFailed
+        queries={[
+          ["trust", trust],
+          ["runway", runway],
+        ]}
+      />
+      {runway.data ? (
+        <Runway runways={runway.data} />
+      ) : (
+        <p aria-label="Runway" className="m-0 mb-3 text-xs text-muted">
+          Runway: {runway.error ? runway.error.message : "Loading"}
+        </p>
+      )}
       {trust.data ? (
         <Posture posture={trust.data} />
       ) : (
@@ -44,29 +69,21 @@ const SIGNER_TONE = { bad: "text-danger", warning: "text-warning", ok: "" } as c
 const SOURCE_LABEL = { loaded: "loaded", file: "on disk" } as const;
 
 const Posture = ({ posture }: { posture: TrustPosture }) => {
-  const first = firstExpiry(posture);
   const signers = signerRows(posture.signing);
   const certificates = byExpiry(posture.tls);
   return (
     <>
-      <Card className="mb-3 px-3.5 py-2 text-xs">
-        {first ? (
-          <div className={STATUS_TONE[first.status]}>
-            Credential runway: {first.purpose} {describeCertificate(first)}
-          </div>
-        ) : (
-          <div>Credential runway: every certificate is beyond its warning threshold</div>
-        )}
-        <div className="text-muted">
-          Which scheduled plan it blocks is not reported by this server.
-        </div>
-      </Card>
       <h2 className="m-0 mb-2 text-sm font-semibold">Signing trust</h2>
-      {onDiskRoots(posture.signing).map((root) => (
+      {startupRoots(posture.signing).map((root) => (
         <p key={`${root.purpose}|${root.file}`} className="m-0 mb-1 text-xs">
-          {root.purpose} ({root.file}): As on disk now. The server adopts changes after a restart.
+          {root.purpose} ({root.file}): Loaded at startup; changes apply after a restart.
         </p>
       ))}
+      {posture.signing.some((root) => root.signer_validity === "not_recorded") && (
+        <p className="m-0 mb-1 text-xs text-muted">
+          Signer validity is not recorded in trust roots.
+        </p>
+      )}
       <Card className="mb-3 overflow-x-auto">
         <table className="w-full border-collapse text-xs">
           <thead>
@@ -156,6 +173,32 @@ const Revocations = ({ list }: { list: InstalledRevocations | undefined }) => (
       ? "Revocation list: none installed"
       : list.error
         ? `Revocation list ${list.file}: ${list.error}`
-        : `Revocation list sequence ${list.sequence ?? "unknown"}, ${list.revoked_keys} revoked keys, signed by ${list.signer_key_id ?? "unknown"}. Import time not reported.`}
+        : [
+            `Revocation list sequence ${list.sequence ?? "unknown"}, ${list.revoked_keys} revoked keys, signed by ${list.signer_key_id ?? "unknown"}`,
+            list.issued_at === undefined ? undefined : `issued ${iso(list.issued_at)}`,
+            list.installed_at === undefined ? undefined : `file written ${iso(list.installed_at)}`,
+          ]
+            .filter(Boolean)
+            .join(", ")}
   </p>
 );
+
+const iso = (ms: number) => new Date(ms).toISOString();
+
+/**
+ * The first waiting plan a certificate lapse blocks, in bad colour: it
+ * would fail when its window opens. Nothing when no plan is blocked.
+ */
+const Runway = ({ runways }: { runways: PlanRunways }) => {
+  const plan = firstBlocked(runways);
+  if (!plan) {
+    return null;
+  }
+  return (
+    <Card aria-label="Credential runway" className="mb-3 px-3.5 py-2 text-xs text-danger">
+      Plan <span className="font-mono">{plan.plan_id}</span> for {plan.environment} waits for the
+      window opening {iso(plan.blocked_by.window_opens_at_ms)}, but {plan.blocked_by.credential}{" "}
+      expires {iso(plan.blocked_by.expires_at_ms)}.
+    </Card>
+  );
+};
