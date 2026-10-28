@@ -64,6 +64,41 @@ export const request = async <T>(
   return (await response.json()) as T;
 };
 
+/**
+ * Fetch a file with the bearer in the header, never in the URL, and hand it
+ * to the browser as a download. The bytes live only in a short-lived object
+ * URL, revoked once the download has started.
+ */
+export const download = async (
+  path: string,
+  token: string,
+  fileName: string,
+  fetcher: typeof fetch = fetch,
+): Promise<void> => {
+  const response = await fetcher(new URL(path, apiRoot), {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => undefined);
+    throw new ApiError(
+      response.status,
+      typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
+        ? body.error
+        : `HTTP ${response.status}`,
+    );
+  }
+  const url = URL.createObjectURL(await response.blob());
+  try {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    link.click();
+  } finally {
+    // The click starts the download synchronously; the bytes are not kept.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+};
+
 // Validated at runtime: /healthz is read before we know the server speaks our contract.
 const ServiceStatus = type({
   status: "string",
