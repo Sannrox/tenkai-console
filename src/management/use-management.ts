@@ -82,6 +82,10 @@ export const useManagementCall = <T>(
         queryClient.invalidateQueries({ queryKey: ["migrations"] }),
         queryClient.invalidateQueries({ queryKey: ["migration"] }),
         queryClient.invalidateQueries({ queryKey: ["runners"] }),
+        queryClient.invalidateQueries({ queryKey: ["backups"] }),
+        // Backup age and state come from /healthz.
+        queryClient.invalidateQueries({ queryKey: ["health"] }),
+        queryClient.invalidateQueries({ queryKey: ["exports"] }),
       ]),
   });
   // By status, not data: some routes answer success with JSON `null`.
