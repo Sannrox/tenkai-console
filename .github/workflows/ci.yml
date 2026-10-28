@@ -34,3 +34,10 @@ jobs:
       # Initial JS stays under 200 KB gzipped and within 10% of the baseline.
       - run: pnpm perf:bundle
       - run: VERSION=ci sh scripts/package.sh
+
+  workflow-skills:
+    name: Workflow Skills
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - run: bash scripts/validate-workflow-skills.sh
