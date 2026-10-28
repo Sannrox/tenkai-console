@@ -1,6 +1,15 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 48e56eb154462af5cbddcd510d1a731bd230dd12 (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at ee771b0281af674edd5d55bcc4fafc49641c4f24 (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
+/**
+ * Whether an entry shows material the server loaded and uses, or a file as
+ * it is on disk now, which a client that read it at startup adopts only
+ * once restarted.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "TrustSource".
+ */
+export type TrustSource = ("loaded" | "file")
 /**
  * Closed set of change-event kinds advertised on the HTTP contract.
  * 
@@ -87,6 +96,14 @@ reason: "migration_state"
  */
 export type ConnectivityClass = ("connected" | "intermittent" | "isolated")
 /**
+ * Purpose a quorum rule applies to. Derived from the plan and apply flags;
+ * the v1 envelope purpose stays `execute_plan`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "QuorumPurpose".
+ */
+export type QuorumPurpose = ("execute_plan" | "rollback" | "skip_gates" | "downgrade")
+/**
  * One configuration change. The variant decides the route: its resource
  * path and whether it is a `PUT` or a `DELETE`.
  * 
@@ -152,7 +169,7 @@ export type WebhookEvent = ("apply.succeeded" | "apply.failed" | "apply.rolled_b
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "OperationalEvent".
  */
-export type OperationalEvent = ("plan.held" | "plan.awaiting_approval" | "import.failed" | "backup.stale" | "clock.drift")
+export type OperationalEvent = (("plan.held" | "plan.awaiting_approval" | "import.failed" | "backup.stale" | "clock.drift") | "trust.expiring")
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "EnvironmentStatus".
@@ -193,6 +210,16 @@ state: "busy"
 export type EvaluationOutcome = ("passed" | "failed")
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ExportAction".
+ */
+export type ExportAction = ("created" | "downloaded")
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ExportKind".
+ */
+export type ExportKind = ("support-bundle" | "audit-export" | "recovery-bundle" | "offline-receipt")
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "ImportState".
  */
 export type ImportState = (("running" | "succeeded" | "failed") | "previewed")
@@ -201,6 +228,13 @@ export type ImportState = (("running" | "succeeded" | "failed") | "previewed")
  * via the `definition` "MigrationStatus".
  */
 export type MigrationStatus = ("admitted" | "running" | "succeeded" | "failed" | "rolled_back" | "recovery_required")
+/**
+ * Status ordering: `ok` < `warning` < `critical` < `expired`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "TrustStatus".
+ */
+export type TrustStatus = ("ok" | "warning" | "critical" | "expired")
 
 export interface TenkaiHttpV1 {
 ApplyRequest?: ApplyRequest
@@ -214,6 +248,7 @@ BackupHealth?: BackupHealth
 BackupManifest?: BackupManifest
 BackupStatus?: BackupStatus
 BindPreview?: BindPreview
+CertificateEntry?: CertificateEntry
 ChangeEvent?: ChangeEvent
 ChangeEventKind?: ChangeEventKind
 ChangeEventPage?: ChangeEventPage
@@ -224,6 +259,7 @@ CheckpointClass?: CheckpointClass
 CheckpointDecl?: CheckpointDecl
 CheckpointReceipt?: CheckpointReceipt
 ClockHealth?: ClockHealth
+CollectedApproval?: CollectedApproval
 CompatibilityEvidence?: CompatibilityEvidence
 CompatibilityEvidence2?: CompatibilityEvidence2
 CompatibilityFailure?: CompatibilityFailure
@@ -259,12 +295,19 @@ EvaluationOutcome?: EvaluationOutcome
 EvaluationTrustRoots?: EvaluationTrustRoots
 EvaluationTrustedSigner?: EvaluationTrustedSigner
 EvidenceSigner?: EvidenceSigner
+ExportAction?: ExportAction
+ExportEntry?: ExportEntry
+ExportEvent?: ExportEvent
+ExportKind?: ExportKind
+ExportList?: ExportList
+ExportRequest?: ExportRequest
 FleetEnvironmentRow?: FleetEnvironmentRow
 FleetStatusReport?: FleetStatusReport
 HoldAuditEvent?: HoldAuditEvent
 ImportJob?: ImportJob
 ImportRequest?: ImportRequest
 ImportState?: ImportState
+InstalledRevocations?: InstalledRevocations
 ManagementLifecycleResult?: ManagementLifecycleResult
 MigrationApprovalEnvelope?: MigrationApprovalEnvelope
 MigrationApprovalStatement?: MigrationApprovalStatement
@@ -292,11 +335,14 @@ PageQuery?: PageQuery
 PlanApprovalTrustRoots?: PlanApprovalTrustRoots
 PlanApprovalTrustedSigner?: PlanApprovalTrustedSigner
 PlanApprovalView?: PlanApprovalView1
+PlanApprovalsView?: PlanApprovalsView
 PlanRequest?: PlanRequest
 PreviewInspect?: PreviewInspect1
 PromoteRequest?: PromoteRequest
 Provenance?: Provenance
 PublishRequest?: PublishRequest
+QuorumPurpose?: QuorumPurpose
+QuorumRule?: QuorumRule
 RecallRequest?: RecallRequest
 RegisterEnvironmentRequest?: RegisterEnvironmentRequest
 ReleaseContent?: ReleaseContent
@@ -308,14 +354,26 @@ ReleaseTrustedSigner?: ReleaseTrustedSigner
 RetireEnvironmentRequest?: RetireEnvironmentRequest
 RetryFailedTargetRequest?: RetryFailedTargetRequest
 RollbackRequest?: RollbackRequest
+RuntimeCredentialRevoked?: RuntimeCredentialRevoked
+RuntimeEnrollmentIssued?: RuntimeEnrollmentIssued
+RuntimeEnrollmentRequest?: RuntimeEnrollmentRequest
+RuntimeRevokeRequest?: RuntimeRevokeRequest
+RuntimeRunner?: RuntimeRunner
+RuntimeRunnerInstance?: RuntimeRunnerInstance
+RuntimeRunnerList?: RuntimeRunnerList
 ScanEvidence?: ScanEvidence1
 ServiceStatus?: ServiceStatus
 SignatureEnvelope?: SignatureEnvelope
+SigningRoot?: SigningRoot
 StagedBundle?: StagedBundle
 StatusRow?: StatusRow
 SubscribeRequest?: SubscribeRequest
 TerminalOutcomeProjection?: TerminalOutcomeProjection
 TickReport?: TickReport
+TrustPosture?: TrustPosture
+TrustSource?: TrustSource
+TrustStatus?: TrustStatus
+TrustedSignerView?: TrustedSignerView
 WebhookDelivery?: WebhookDelivery
 WebhookEvent?: WebhookEvent
 }
@@ -325,6 +383,7 @@ WebhookEvent?: WebhookEvent
  */
 export interface ApplyRequest {
 approval: ApprovalEnvelope
+approvals?: ApprovalEnvelope[]
 emergency_reason?: (string | null)
 environment: string
 expected_generation: number
@@ -372,6 +431,7 @@ version: number
  */
 export interface PlanApprovalTrustedSigner {
 environments?: string[]
+groups?: string[]
 identity: string
 key_id: string
 providers?: string[]
@@ -444,6 +504,11 @@ schema: string
 sha256: string
 size_bytes: number
 taken_at_ms: number
+/**
+ * The tool that took a recorded database-native backup. Absent on
+ * backups this module takes, so their manifests are unchanged.
+ */
+tool?: string
 }
 /**
  * `GET /v1/backups`: `status.json` plus the newest drill.
@@ -514,6 +579,26 @@ stdout_sha256: string
  * most 200 bytes.
  */
 summary: string
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "CertificateEntry".
+ */
+export interface CertificateEntry {
+days_left?: number
+error?: string
+file: string
+/**
+ * Unix seconds.
+ */
+not_after?: number
+purpose: string
+source: TrustSource
+/**
+ * An unreadable certificate file is `critical`.
+ */
+status: ("ok" | "warning" | "critical" | "expired")
+subject?: string
 }
 /**
  * One durable change. `cursor` is the opaque resume token (monotonic sequence).
@@ -621,6 +706,18 @@ skew_ms?: number
  */
 state: string
 warn_ms: number
+}
+/**
+ * One collected, still-detached envelope for a plan.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "CollectedApproval".
+ */
+export interface CollectedApproval {
+expires_at: number
+groups?: string[]
+key_id: string
+signer_identity: string
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -775,8 +872,24 @@ auto_signers?: string[]
 configured: boolean
 digest?: string
 mode: string
+quorums?: QuorumRule[]
 require_human?: string[]
 ttl_ms?: number
+}
+/**
+ * N distinct human signers from named groups for one purpose.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "QuorumRule".
+ */
+export interface QuorumRule {
+/**
+ * When true, the apply requester's principal cannot count toward N.
+ */
+exclude_requester?: boolean
+groups?: string[]
+n: number
+purpose: QuorumPurpose
 }
 /**
  * Body of every `PUT`/`DELETE` configuration route.
@@ -1241,6 +1354,73 @@ key_id: string
 signature: string
 }
 /**
+ * An export with its events, oldest first.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ExportEntry".
+ */
+export interface ExportEntry {
+created_at_ms: number
+/**
+ * Set exactly for environment-scoped kinds.
+ */
+environment?: string
+events: ExportEvent[]
+/**
+ * The name the download carries, as the CLI would name the file.
+ */
+file_name: string
+id: string
+kind: ExportKind
+schema: string
+sha256: string
+size_bytes: number
+}
+/**
+ * Who created or downloaded an export, when, and why.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ExportEvent".
+ */
+export interface ExportEvent {
+action: ExportAction
+at_ms: number
+principal: string
+reason: string
+}
+/**
+ * `GET /v1/exports`, newest first.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ExportList".
+ */
+export interface ExportList {
+exports: ExportEntry[]
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ExportRequest".
+ */
+export interface ExportRequest {
+/**
+ * Required for `recovery-bundle` and `offline-receipt`, refused otherwise.
+ */
+environment?: (string | null)
+kind: ExportKind
+/**
+ * The plan of a `recovery-bundle`.
+ */
+plan_id?: (string | null)
+/**
+ * Why the export is made; recorded with the creator.
+ */
+reason: string
+/**
+ * The connectivity upgrade of an `offline-receipt`.
+ */
+upgrade?: (string | null)
+}
+/**
  * One environment's row in a fleet posture table (no credentials).
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -1295,6 +1475,11 @@ environments_behind: number
 environments_current: number
 environments_empty: number
 environments_unhealthy: number
+/**
+ * The server's own version, which runners and consoles compare
+ * against (#761).
+ */
+server_version?: string
 }
 /**
  * `GET /v1/imports/{id}` and the job file.
@@ -1355,6 +1540,17 @@ operation: string
  */
 upgrade: string
 version: number
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "InstalledRevocations".
+ */
+export interface InstalledRevocations {
+error?: string
+file: string
+revoked_keys: number
+sequence?: number
+signer_key_id?: string
 }
 /**
  * Versioned result shared by catalog lifecycle routes.
@@ -1566,6 +1762,22 @@ reason?: string
 source: string
 }
 /**
+ * Collected versus missing approvals for one plan and purpose.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "PlanApprovalsView".
+ */
+export interface PlanApprovalsView {
+collected?: CollectedApproval[]
+exclude_requester: boolean
+groups?: string[]
+missing: number
+plan_digest: string
+plan_id: string
+purpose: string
+required: number
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "PlanRequest".
  */
@@ -1734,6 +1946,103 @@ recovery_reason?: (string | null)
 version: number
 }
 /**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RuntimeCredentialRevoked".
+ */
+export interface RuntimeCredentialRevoked {
+credential_id: string
+environment: string
+revoked_at: number
+}
+/**
+ * A new enrollment. `token` is shown only here.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RuntimeEnrollmentIssued".
+ */
+export interface RuntimeEnrollmentIssued {
+environment: string
+expires_at: number
+token: string
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RuntimeEnrollmentRequest".
+ */
+export interface RuntimeEnrollmentRequest {
+/**
+ * How long the token may be redeemed; default 15 minutes, at most 24 hours.
+ */
+ttl_seconds?: (number | null)
+}
+/**
+ * Why a runner is revoked; recorded and shown on inspect.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RuntimeRevokeRequest".
+ */
+export interface RuntimeRevokeRequest {
+reason: string
+}
+/**
+ * One runner of the registry: an enrolled credential, or a static token
+ * configured on the server. Never carries a secret.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RuntimeRunner".
+ */
+export interface RuntimeRunner {
+created_at?: number
+created_by?: string
+environment: string
+/**
+ * `sha256:` digest of the credential or token; what revoke takes.
+ */
+id: string
+/**
+ * Instances that presented this runner's credential, most recent first.
+ */
+instances: RuntimeRunnerInstance[]
+revoke_reason?: string
+revoked_at?: number
+revoked_by?: string
+/**
+ * `active`, `revoked`, or `static` for a configured token, which only
+ * server configuration changes.
+ */
+state: string
+}
+/**
+ * What one instance of a runner last did. Activity is recorded at most
+ * every 30 seconds per kind, so times can trail by that much.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RuntimeRunnerInstance".
+ */
+export interface RuntimeRunnerInstance {
+/**
+ * Holds an unexpired runtime plan lease now.
+ */
+holds_lease: boolean
+instance_id: string
+last_heartbeat_at?: number
+last_inventory_at?: number
+last_work_at?: number
+runtime_version?: string
+/**
+ * The instance's version against this server: `current`, `behind`
+ * (one minor release, supported), `unsupported` or `ahead` (#761).
+ */
+skew?: string
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RuntimeRunnerList".
+ */
+export interface RuntimeRunnerList {
+runners: RuntimeRunner[]
+}
+/**
  * What the scanner said about one import.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -1769,6 +2078,15 @@ clock?: ClockHealth1
 contracts: string[]
 profile: string
 status: string
+/**
+ * The worst status of the host's certificates (#676), when any are
+ * configured. It never fails readiness; `GET /v1/trust` has details.
+ */
+trust?: ("ok" | "warning" | "critical" | "expired")
+/**
+ * This server's version (#761).
+ */
+version: string
 }
 /**
  * Backup age as health reports it.
@@ -1798,6 +2116,37 @@ skew_ms?: number
  */
 state: string
 warn_ms: number
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "SigningRoot".
+ */
+export interface SigningRoot {
+/**
+ * Why the file could not be read, when it could not.
+ */
+error?: string
+file: string
+purpose: string
+signers: TrustedSignerView[]
+/**
+ * Whether an entry shows material the server loaded and uses, or a file as
+ * it is on disk now, which a client that read it at startup adopts only
+ * once restarted.
+ */
+source: ("loaded" | "file")
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "TrustedSignerView".
+ */
+export interface TrustedSignerView {
+identity: string
+key_id: string
+/**
+ * Revoked by the key revocations this process enforces.
+ */
+revoked: boolean
 }
 /**
  * One archive in the staging directory.
@@ -1862,6 +2211,21 @@ version: number
  */
 export interface TickReport {
 environments: EnvironmentResult[]
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "TrustPosture".
+ */
+export interface TrustPosture {
+critical_days: number
+revocation_list?: InstalledRevocations
+signing: SigningRoot[]
+/**
+ * The worst certificate status; `ok` when nothing is about to lapse.
+ */
+status: ("ok" | "warning" | "critical" | "expired")
+tls: CertificateEntry[]
+warning_days: number
 }
 /**
  * One webhook delivery as `GET .../webhooks/deliveries` reports it.
