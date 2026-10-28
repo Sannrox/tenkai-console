@@ -22,6 +22,7 @@ const Runners = lazyRouteComponent(() => import("./screens/runners"), "Runners")
 const Server = lazyRouteComponent(() => import("./screens/server"), "Server");
 const Trust = lazyRouteComponent(() => import("./screens/trust"), "Trust");
 const Operations = lazyRouteComponent(() => import("./screens/operations"), "Operations");
+const Imports = lazyRouteComponent(() => import("./screens/imports"), "Imports");
 const Access = lazyRouteComponent(() => import("./screens/access"), "Access");
 const AuthCallback = lazyRouteComponent(() => import("./screens/auth-callback"), "AuthCallback");
 
@@ -120,6 +121,12 @@ const operationsRoute = createRoute({
   component: Operations,
 });
 
+const importsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/imports",
+  component: Imports,
+});
+
 const accessRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/access",
@@ -153,6 +160,7 @@ export const router = createRouter({
       runnersRoute,
       serverRoute,
       trustRoute,
+      importsRoute,
       operationsRoute,
       accessRoute,
     ]),
