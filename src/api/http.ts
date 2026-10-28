@@ -31,7 +31,7 @@ export const request = async <T>(
   path: string,
   init: {
     token?: string | undefined;
-    method?: "GET" | "POST";
+    method?: "GET" | "POST" | "PUT" | "DELETE";
     body?: unknown;
     /** Sent as `x-request-id`; the server uses it to correlate audit records. */
     requestId?: string;

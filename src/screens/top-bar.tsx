@@ -12,6 +12,7 @@ const TABS = [
   { label: "Runners", to: "/runners" },
   { label: "Server", to: "/server" },
   { label: "Trust", to: "/trust" },
+  { label: "Imports", to: "/imports" },
   { label: "Operations", to: "/operations" },
   { label: "Access", to: "/access" },
 ] as const;
