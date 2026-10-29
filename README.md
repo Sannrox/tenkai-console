@@ -75,7 +75,7 @@ TENKAI_URL=http://127.0.0.1:8080 pnpm dev   # proxies /v1 and /healthz to tenkai
 pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build
 VERSION=v0.0.0-dev pnpm package             # release/ zip + SHA256SUMS
 pnpm perf:bundle                             # CI: initial JS ≤ 200 KB gzipped, ≤ 10% over perf/bundle-baseline.json
-pnpm perf:load                               # browser timings at fleet scale (needs `pnpm exec playwright install chromium`)
+pnpm perf:load                               # CI: fleet-scale table budgets (needs `pnpm exec playwright install chromium`)
 ```
 
 Stack: TypeScript (strict), React, Vite, ArkType for runtime validation of

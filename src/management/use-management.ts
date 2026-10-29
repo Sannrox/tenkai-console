@@ -83,6 +83,8 @@ export const useManagementCall = <T>(
     onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ["environments"] }),
+        queryClient.invalidateQueries({ queryKey: ["fleet"] }),
+        queryClient.invalidateQueries({ queryKey: ["channels"] }),
         queryClient.invalidateQueries({ queryKey: ["environment"] }),
         queryClient.invalidateQueries({ queryKey: ["runtime"] }),
         queryClient.invalidateQueries({ queryKey: ["migrations"] }),

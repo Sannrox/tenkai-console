@@ -9,7 +9,7 @@ import type {
   RetireEnvironmentRequest,
 } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
-import { channelTable, environmentRows } from "../delivery/configuration";
+import { channelMatrix, fleetTableRows } from "../delivery/configuration";
 import {
   maintenanceDetail,
   maintenanceRefreshAt,
@@ -24,7 +24,7 @@ import {
   rollbackSummary,
 } from "../delivery/rollback";
 import { runtimeRows } from "../delivery/runtime";
-import { useDelivery } from "../delivery/use-delivery";
+import { useDelivery, useEnvironmentInspect } from "../delivery/use-delivery";
 import { useManagementCall } from "../management/use-management";
 import {
   expectedGeneration,
@@ -37,6 +37,7 @@ import {
 } from "../plan/requests";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { AddEnvironment, ConfigSections } from "./environment-config";
+import { FleetTable } from "./fleet-table";
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2 align-top";
@@ -50,10 +51,11 @@ export const Environments = ({ focus }: { focus?: string }) => {
   const token = useSession((state) => state.session?.accessToken);
   const navigate = useNavigate({ from: "/environments" });
   const delivery = useDelivery(token);
-  const rows = environmentRows(delivery.reports);
+  const rows = fleetTableRows(delivery.fleet, delivery.list);
   const shown = rows.some((row) => row.name === focus) ? focus : rows[0]?.name;
-  const report = delivery.reports.find((candidate) => candidate.name === shown);
-  const { products, channels } = channelTable(delivery.reports);
+  const inspect = useEnvironmentInspect(token, shown);
+  const report = inspect.data;
+  const known = channelMatrix(delivery.channels);
   const select = (name: string) => {
     void navigate({ search: { environment: name }, replace: true });
   };
@@ -71,45 +73,22 @@ export const Environments = ({ focus }: { focus?: string }) => {
         </span>
         {token && <AddEnvironment token={token} />}
       </div>
-      <Card className="overflow-x-auto">
-        <table className="w-full border-collapse text-xs">
-          <thead>
-            <tr>
-              <th className={th}>Environment</th>
-              <th className={th}>Channels</th>
-              <th className={th}>Deployed</th>
-              <th className={th}>Facts</th>
-              <th className={th}>Lease</th>
-              <th className={th}>Hold</th>
-              <th className={th}>Latest plan</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr
-                key={row.name}
-                aria-selected={row.name === report?.name}
-                onClick={() => select(row.name)}
-                className={`cursor-pointer [&:last-child>td]:border-b-0 ${row.name === report?.name ? "bg-selected" : ""}`}
-              >
-                <td className={`${td} font-semibold`}>{row.name}</td>
-                <td className={td}>{row.channels.join(", ") || "none"}</td>
-                <td className={`${td} font-mono`}>
-                  {row.deployed}/{row.subscribed}
-                </td>
-                <td className={`${td} text-muted`}>{row.facts || "none"}</td>
-                <td className={td}>{row.lease}</td>
-                <td className={`${td} ${row.hold ? "text-warning" : "text-muted"}`}>
-                  {row.hold ?? "none"}
-                </td>
-                <td className={td}>{row.plan}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+      <FleetTable rows={rows} selected={shown} onSelect={select} label="Environments" />
+      {inspect.error && (
+        <div className="mt-3">
+          <Notice tone="bad">
+            {inspect.error instanceof Error ? inspect.error.message : String(inspect.error)}
+          </Notice>
+        </div>
+      )}
+      {inspect.isLoading && <p className="mt-3 text-xs text-muted">Loading</p>}
       {report && token && (
-        <Detail key={report.name} report={report} token={token} known={{ products, channels }} />
+        <Detail
+          key={report.name}
+          report={report}
+          token={token}
+          known={{ products: known.products, channels: known.channels }}
+        />
       )}
     </>
   );
