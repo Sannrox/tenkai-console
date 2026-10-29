@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { ImportJob, StagedBundle } from "../api/tenkai.gen";
-import { bundleCards, contentRows, finishedSince, importBody } from "./imports";
+import {
+  bundleCards,
+  chunkLine,
+  contentRows,
+  finishedSince,
+  importBody,
+  storeSpace,
+  upgradeFor,
+} from "./imports";
 
 const bundle = (file: string): StagedBundle => ({
   file,
@@ -82,6 +90,45 @@ describe("import columns", () => {
     expect(bundleCards([bundle("b.tar")], unproven, { "b.tar": "u1" })[0]?.column).toBe("staged");
   });
 
+  it("matches jobs by archive digest when they carry one", () => {
+    const staged = { ...bundle("b.tar"), archive_digest: "sha256:new" };
+    const older = [
+      job("b.tar", { archive_digest: "sha256:old" }),
+      job("b.tar", {
+        archive_digest: "sha256:old",
+        dry_run: false,
+        state: "succeeded",
+        started_at_ms: 2,
+      }),
+    ];
+    // Same name, same plan, different bytes: the history is not this archive's.
+    expect(bundleCards([staged], older, { "b.tar": "u1" })[0]?.column).toBe("staged");
+    const current = [
+      job("b.tar", { archive_digest: "sha256:new" }),
+      job("b.tar", {
+        archive_digest: "sha256:new",
+        dry_run: false,
+        state: "succeeded",
+        started_at_ms: 2,
+      }),
+    ];
+    expect(bundleCards([staged], current, {})[0]?.column).toBe("imported");
+    // A digest match counts even when the plan is not proven by a preview.
+    const unpreviewed = [job("b.tar", { archive_digest: "sha256:new" })];
+    delete unpreviewed[0]?.preview;
+    expect(bundleCards([staged], unpreviewed, { "b.tar": "u1" })[0]?.column).toBe("checked");
+  });
+
+  it("prefills the derived upgrade, after an entered one and a passing dry run", () => {
+    const derived = { ...bundle("b.tar"), upgrade: "fleet-7" };
+    expect(upgradeFor(derived, [], {})).toBe("fleet-7");
+    expect(upgradeFor(derived, [job("b.tar", { upgrade: "u1" })], {})).toBe("u1");
+    expect(upgradeFor(derived, [], { "b.tar": "mine" })).toBe("mine");
+    expect(upgradeFor(bundle("b.tar"), [], {})).toBe("");
+    // The derived upgrade alone does not make a bundle checked.
+    expect(bundleCards([derived], [], {})[0]?.column).toBe("staged");
+  });
+
   it("sees one job finish while another still runs", () => {
     const a = job("a.tar", { id: "a", state: "running" });
     const b = job("b.tar", { id: "b", state: "running" });
@@ -131,6 +178,7 @@ describe("content rows", () => {
         sizeBytes: 2_048,
         stored: true,
         usedBy: ["deployed prod"],
+        chunks: [],
       },
       {
         release: "app 1.0.0",
@@ -139,7 +187,21 @@ describe("content rows", () => {
         sizeBytes: undefined,
         stored: undefined,
         usedBy: ["deployed prod"],
+        chunks: [],
       },
     ]);
+  });
+});
+
+describe("store space and chunks", () => {
+  it("shows used and free space, and each chunk as staged or missing", () => {
+    expect(storeSpace("OCI store", 4_096, 2 * 1_073_741_824)).toBe(
+      "OCI store 4.0 KB used, 2.0 GB free",
+    );
+    expect(storeSpace("OCI store", 4_096, undefined)).toBe("OCI store 4.0 KB used");
+    expect(storeSpace("weight cache", undefined, undefined)).toBe("weight cache not configured");
+    expect(chunkLine({ index: 2, digest: "sha256:c2", size_bytes: 1_048_576, staged: false })).toBe(
+      "#2 sha256:c2 1.0 MB missing",
+    );
   });
 });

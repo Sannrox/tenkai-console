@@ -6,10 +6,12 @@ import { useSession } from "../auth/session";
 import {
   anyRunning,
   bundleCards,
+  chunkLine,
   finishedSince,
   contentRows,
   importBody,
   progressLine,
+  storeSpace,
   upgradeFor,
   type BundleCard,
   type Column,
@@ -173,6 +175,7 @@ const Bundle = ({
         {[
           environment || "environment unknown",
           bundle.plan_id,
+          bundle.upgrade ? `upgrade ${bundle.upgrade}` : "no upgrade derived",
           size(bundle.size_bytes),
           bundle.chunked ? "chunked" : undefined,
           bundle.expires_at_ms === undefined
@@ -248,20 +251,22 @@ const Inventory = ({
     );
   }
   const rows = contentRows(inventory);
-  const used = [
-    inventory.oci_store_bytes === undefined
-      ? "OCI store not configured"
-      : `OCI store ${size(inventory.oci_store_bytes)}`,
-    inventory.weight_cache_bytes === undefined
-      ? "weight cache not configured"
-      : `weight cache ${size(inventory.weight_cache_bytes)}`,
+  const space = [
+    storeSpace("OCI store", inventory.oci_store_bytes, inventory.oci_store_free_bytes),
+    storeSpace("weight cache", inventory.weight_cache_bytes, inventory.weight_cache_free_bytes),
   ];
+  const plans = inventory.pending_plans ?? [];
   return (
     <>
       <h2 className="m-0 mb-1 text-sm font-semibold">Content</h2>
-      <p aria-label="Space used" className="m-0 mb-2 text-xs text-muted">
-        Used: {used.join(", ")}
+      <p aria-label="Space" className="m-0 mb-2 text-xs text-muted">
+        {space.join("; ")}
       </p>
+      {inventory.staging_unavailable && (
+        <p aria-label="Staging unavailable" className="m-0 mb-2 text-xs text-danger">
+          Staged chunks unavailable: {inventory.staging_unavailable}
+        </p>
+      )}
       <Card className="overflow-x-auto">
         <table aria-label="Content inventory" className="w-full border-collapse text-xs">
           <thead>
@@ -286,7 +291,24 @@ const Inventory = ({
                 <tr key={`${row.release}|${row.digest}`} className="[&:last-child>td]:border-b-0">
                   <td className={td}>{row.release}</td>
                   <td className={td}>{row.kind}</td>
-                  <td className={`${td} font-mono break-all`}>{row.digest}</td>
+                  <td className={`${td} font-mono break-all`}>
+                    {row.digest}
+                    {row.chunks.length > 0 && (
+                      <ul
+                        aria-label={`Chunks of ${row.digest}`}
+                        className="m-0 mt-1 list-none p-0 text-muted"
+                      >
+                        {row.chunks.map((chunk) => (
+                          <li
+                            key={chunk.index}
+                            className={chunk.staged ? undefined : "text-danger"}
+                          >
+                            {chunkLine(chunk)}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </td>
                   <td className={td}>{row.sizeBytes === undefined ? "" : size(row.sizeBytes)}</td>
                   <td className={`${td} ${row.stored === false ? "text-danger" : "text-muted"}`}>
                     {STORED(row.stored)}
@@ -303,6 +325,41 @@ const Inventory = ({
           Missing here: {inventory.missing.join(", ")}
         </p>
       )}
+      <h2 className="mt-4 mb-2 text-sm font-semibold">Pending plans</h2>
+      <Card className="overflow-x-auto">
+        <table aria-label="Pending plans" className="w-full border-collapse text-xs">
+          <thead>
+            <tr>
+              <th className={th}>Plan</th>
+              <th className={th}>Environment</th>
+              <th className={th}>State</th>
+              <th className={th}>Missing here</th>
+            </tr>
+          </thead>
+          <tbody>
+            {plans.length === 0 ? (
+              <tr>
+                <td className={`${td} border-b-0 text-muted`} colSpan={4}>
+                  No plan waiting
+                </td>
+              </tr>
+            ) : (
+              plans.map((plan) => (
+                <tr key={plan.plan_id} className="[&:last-child>td]:border-b-0">
+                  <td className={`${td} font-mono`}>{plan.plan_id}</td>
+                  <td className={td}>{plan.environment}</td>
+                  <td className={td}>{plan.state}</td>
+                  <td
+                    className={`${td} font-mono break-all ${plan.missing.length > 0 ? "text-danger" : "text-muted"}`}
+                  >
+                    {plan.missing.join(", ") || "nothing"}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </Card>
     </>
   );
 };
