@@ -2,15 +2,15 @@ import type { ExportEntry, ExportKind, ExportRequest } from "../api/tenkai.gen";
 
 /**
  * The Operations screen (#37) over server backups (GET/POST `/v1/backups`,
- * Sannrox/tenkai#672) and exports (`/v1/exports`, Sannrox/tenkai#682). Every
- * value is the server's. Tenkai keeps only the newest restore drill, exports
- * the next audit-chain entry rather than a chosen range, and never deletes
- * an export, so there is no drill history, range, or expiry to show.
+ * Sannrox/tenkai#672) and exports (`/v1/exports`, Sannrox/tenkai#682), with
+ * drill history and export retention (Sannrox/tenkai#818). Every value is
+ * the server's.
  */
 
 /** Each kind, what it needs besides a reason, and how a row names it. */
 export const EXPORT_KINDS = [
   { kind: "support-bundle", label: "Support bundle", needs: [] },
+  // The next chain entry only: a chosen range waits on Sannrox/tenkai#825.
   { kind: "audit-export", label: "Audit export (next in chain)", needs: [] },
   { kind: "recovery-bundle", label: "Recovery bundle", needs: ["environment", "plan_id"] },
   { kind: "offline-receipt", label: "Offline receipt", needs: ["environment", "upgrade"] },
@@ -58,6 +58,10 @@ export type HistoryRow = {
   reason: string;
   sizeBytes: number;
   downloads: number;
+  /** When it stops being downloadable, with a retention on the server. */
+  expiresAt: number | undefined;
+  /** Past its retention or already removed: listed, never downloadable. */
+  expired: boolean;
 };
 
 /** One row per export, newest first as the server lists them. */
@@ -74,6 +78,8 @@ export const historyRows = (exports: ExportEntry[]): HistoryRow[] =>
       reason: created?.reason ?? "",
       sizeBytes: entry.size_bytes,
       downloads: entry.events.filter((event) => event.action === "downloaded").length,
+      expiresAt: entry.expires_at_ms,
+      expired: entry.expired,
     };
   });
 

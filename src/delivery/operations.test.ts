@@ -39,6 +39,8 @@ describe("export history", () => {
       sha256: "abc",
       size_bytes: 2_048,
       created_at_ms: 1_000,
+      expires_at_ms: 9_000,
+      expired: false,
       events: [
         { action: "created", at_ms: 1_000, principal: "alice", reason: "incident 7" },
         { action: "downloaded", at_ms: 2_000, principal: "bob", reason: "review" },
@@ -56,6 +58,8 @@ describe("export history", () => {
         reason: "incident 7",
         sizeBytes: 2_048,
         downloads: 2,
+        expiresAt: 9_000,
+        expired: false,
       },
     ]);
     expect([size(512), size(2_048), size(3 * 1_048_576)]).toStrictEqual([
