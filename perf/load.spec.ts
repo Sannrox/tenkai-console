@@ -1,17 +1,17 @@
 import { readFile } from "node:fs/promises";
-// Browser load measurement (#21): sign-in to first table, and the environments
-// and releases screens at fleet scale, on a throttled mid-range CPU, against a
-// mocked API serving 1 000 environments and a 50 x 10 product x channel matrix.
-// Run with `pnpm build && pnpm perf:load`; it prints the timings. The budgets
-// are enforced once fleet-scale loading lands (#45); until then
-// `PERF_ENFORCE=1` checks them.
+// Browser load measurement (#21, #45): sign-in to first table, and the
+// environments and releases screens at fleet scale, on a throttled mid-range
+// CPU, against a mocked API serving 1 000 environments and a 50 x 10 product
+// x channel matrix. Run with `pnpm build && pnpm perf:load`.
 import { type Server, createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { expect, test } from "@playwright/test";
 import type {
+  ChannelListEntry,
   EnvironmentInspectReport,
   EnvironmentListEntry,
   EnvironmentSubscriptionView,
+  FleetEnvironmentRow,
 } from "../src/api/tenkai.gen";
 
 const ENVIRONMENTS = 1_000;
@@ -52,6 +52,36 @@ const inspect = (index: number): EnvironmentInspectReport => ({
   latest_plan: null,
   subscriptions: [subscription(index)],
 });
+const fleetRow = (index: number): FleetEnvironmentRow => {
+  const current = index % 3 !== 0;
+  return {
+    id: `env:${name(index)}`,
+    name: name(index),
+    description: "fixture",
+    subscription_count: 1,
+    products_current: current ? 1 : 0,
+    products_behind: 0,
+    products_missing: current ? 0 : 1,
+    unhealthy: false,
+    health_summary: "ok",
+    lease_held: false,
+    posture: current ? "current" : "behind",
+  };
+};
+const channelItems = (): ChannelListEntry[] => {
+  const items: ChannelListEntry[] = [];
+  for (let product = 0; product < PRODUCTS; product += 1) {
+    for (let channel = 0; channel < CHANNELS; channel += 1) {
+      items.push({
+        id: `channel:product-${product}/channel-${channel}`,
+        product: `product-${product}`,
+        name: `channel-${channel}`,
+        head: "1.0.0",
+      });
+    }
+  }
+  return items;
+};
 
 const contentTypes: Record<string, string> = {
   ".html": "text/html",
@@ -80,7 +110,19 @@ const serve = () =>
         return json(404, { error: "no oidc client" });
       }
       if (path === "/v1/fleet/status") {
-        return json(200, { environments: [] });
+        const environments = Array.from({ length: ENVIRONMENTS }, (_, index) => fleetRow(index));
+        const behind = environments.filter((row) => row.posture === "behind").length;
+        return json(200, {
+          environments,
+          environment_count: ENVIRONMENTS,
+          environments_current: ENVIRONMENTS - behind,
+          environments_behind: behind,
+          environments_unhealthy: 0,
+          environments_empty: 0,
+        });
+      }
+      if (path === "/v1/channels") {
+        return json(200, { items: channelItems() });
       }
       if (path === "/v1/environments") {
         return json(
@@ -126,22 +168,22 @@ test("fleet-scale screens stay within the load budget", async ({ page }) => {
   // A mid-range laptop: four times slower than the runner's CPU.
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
   await page.goto(app.url);
-  await page.getByLabel("Bearer token").fill("fixture-token");
+  await page.getByLabel("Platform token").fill("fixture-token");
 
   const signedIn = Date.now();
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.locator("table tbody tr").first()).toBeVisible({ timeout: 30_000 });
   const firstTable = Date.now() - signedIn;
 
-  // Every inspect has arrived once the home screen stops loading.
   await expect(page.getByText("Loading")).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByText(/1000 environments/)).toBeVisible();
   const opened = Date.now();
   await page.getByRole("link", { name: "Environments" }).click();
-  const rows = page.locator("table").first().locator("tbody tr");
-  await expect(rows).toHaveCount(ENVIRONMENTS, { timeout: 30_000 });
+  await expect(page.getByText("1000 active")).toBeVisible({ timeout: 30_000 });
+  const scroller = page.getByRole("region", { name: "Environments" });
+  await expect(scroller.locator("tbody tr").first()).toBeVisible();
   const environments = Date.now() - opened;
 
-  // Long tasks while scrolling the full table.
   await page.evaluate(() => {
     const tasks: number[] = [];
     new PerformanceObserver((list) => {
@@ -152,7 +194,9 @@ test("fleet-scale screens stay within the load budget", async ({ page }) => {
     (window as unknown as { longTasks: number[] }).longTasks = tasks;
   });
   for (let step = 0; step < 20; step += 1) {
-    await page.mouse.wheel(0, 1_500);
+    await scroller.evaluate((node) => {
+      node.scrollTop += 1_500;
+    });
     await page.waitForTimeout(50);
   }
   const longest = Math.max(
@@ -172,9 +216,7 @@ test("fleet-scale screens stay within the load budget", async ({ page }) => {
       longest_task_ms: longest,
     }),
   );
-  if (process.env.PERF_ENFORCE === "1") {
-    expect(firstTable).toBeLessThanOrEqual(FIRST_TABLE_MS);
-    expect(environments).toBeLessThanOrEqual(ENVIRONMENTS_INTERACTIVE_MS);
-    expect(longest).toBeLessThanOrEqual(LONG_TASK_MS);
-  }
+  expect(firstTable).toBeLessThanOrEqual(FIRST_TABLE_MS);
+  expect(environments).toBeLessThanOrEqual(ENVIRONMENTS_INTERACTIVE_MS);
+  expect(longest).toBeLessThanOrEqual(LONG_TASK_MS);
 });

@@ -9,14 +9,15 @@ import {
 import { checkServer, consoleRoot, fetchOidcSettings } from "./api/http";
 import { useSession } from "./auth/session";
 import { useSessionRefresh } from "./auth/use-session-refresh";
+import { Environments } from "./screens/environments";
 import { Home } from "./screens/home";
 import { ServerStatus } from "./screens/server-status";
 import { SignedIn } from "./screens/signed-in";
 import { Centered, Title } from "./ui/kit";
 
 // Screens other than home load on first visit, so the initial bundle stays small.
+// Environments is eager: the fleet table must paint within the load budget.
 const PlanPage = lazyRouteComponent(() => import("./screens/plan-page"), "PlanPage");
-const Environments = lazyRouteComponent(() => import("./screens/environments"), "Environments");
 const Releases = lazyRouteComponent(() => import("./screens/releases"), "Releases");
 const Runners = lazyRouteComponent(() => import("./screens/runners"), "Runners");
 const Server = lazyRouteComponent(() => import("./screens/server"), "Server");

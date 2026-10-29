@@ -72,6 +72,7 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
       void queryClient.invalidateQueries({ queryKey: ["environment", environment] });
       void queryClient.invalidateQueries({ queryKey: ["plan-approvals"] });
       void queryClient.invalidateQueries({ queryKey: ["environments"] });
+      void queryClient.invalidateQueries({ queryKey: ["fleet"] });
     },
     onError: (error) =>
       setResult({ ok: false, text: error instanceof ApiError ? error.message : String(error) }),

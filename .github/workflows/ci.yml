@@ -33,6 +33,8 @@ jobs:
       - run: pnpm build
       # Initial JS stays under 200 KB gzipped and within 10% of the baseline.
       - run: pnpm perf:bundle
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm perf:load
       - run: VERSION=ci sh scripts/package.sh
 
   workflow-skills:

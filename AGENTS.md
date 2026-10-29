@@ -43,6 +43,8 @@ pnpm format:check
 pnpm test
 pnpm build
 pnpm perf:bundle
+pnpm exec playwright install --with-deps chromium
+pnpm perf:load
 VERSION=ci sh scripts/package.sh
 bash scripts/validate-workflow-skills.sh
 ```
@@ -175,6 +177,7 @@ Rows beyond `## Testing Guidelines`:
 | Tenkai API client or response schemas | schema tests against recorded responses; `pnpm api:check`; compare with Tenkai's versioned public API |
 | routing, base URL, or asset paths     | `pnpm build`, then serve `dist/` under `/ui/` and `/<prefix>/ui/`                                     |
 | bundle size                           | `pnpm perf:bundle`                                                                                    |
+| fleet-scale table load                | `pnpm perf:load` after `pnpm build`                                                                   |
 | packaging or release workflow         | `VERSION=v0.0.0-dev pnpm package`, inspect the zip and `SHA256SUMS`                                   |
 | dependencies                          | `pnpm install --frozen-lockfile`, pinned versions, no new outbound origins                            |
 | any diff                              | no `dist/`, `release/`, or `*.tsbuildinfo` staged                                                     |

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ManagementLifecycleResult } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
-import { channelTable } from "../delivery/configuration";
+import { channelMatrix, fleetTableRows } from "../delivery/configuration";
 import { useDelivery } from "../delivery/use-delivery";
 import { isReleaseSpec, parsePublish, promoteBody, recallBody } from "../management/catalog";
 import { refusesCredential, useManagementCall } from "../management/use-management";
@@ -13,24 +13,24 @@ const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-no
 
 /**
  * The software catalog. Channels (decision 4D): the head each channel points
- * to and who follows it, read from environment inspects; below it, a
- * release's compatibility per environment, publish, promote, recall, and
- * package migrations. Four tabs stay; a migration is
- * part of a release.
+ * to, from the channel catalog; below it, a release's compatibility per
+ * environment, publish, promote, recall, and package migrations.
  */
 export const Releases = () => {
   const token = useSession((state) => state.session?.accessToken);
   const delivery = useDelivery(token);
-  const table = channelTable(delivery.reports);
+  const table = channelMatrix(delivery.channels);
+  const names = fleetTableRows(delivery.fleet, delivery.list).map((row) => row.name);
+  const failed = delivery.channelsError ?? delivery.error;
 
   return (
     <>
       <div className="mb-4 flex items-center gap-3">
         <h1 className="m-0 text-lg font-semibold">Releases</h1>
         <span className="text-xs text-muted">
-          {delivery.error
-            ? delivery.error.message
-            : delivery.loading
+          {failed
+            ? failed.message
+            : delivery.channelsLoading
               ? "Loading"
               : `${table.channels.length} ${table.channels.length === 1 ? "channel" : "channels"}`}
         </span>
@@ -52,16 +52,11 @@ export const Releases = () => {
               <tr key={product} className="[&:last-child>td]:border-b-0">
                 <td className="border-b border-line px-3.5 py-2 font-semibold">{product}</td>
                 {table.channels.map((channel) => {
-                  const head = table.head(product, channel);
+                  const cell = table.cell(product, channel);
                   return (
                     <td key={channel} className="border-b border-l border-line px-3.5 py-2">
-                      {head ? (
-                        <>
-                          <span className="font-mono">{head}</span>
-                          <span className="block text-[11px] text-muted">
-                            {table.subscribers(product, channel).join(", ")}
-                          </span>
-                        </>
+                      {cell ? (
+                        <span className="font-mono">{cell.version}</span>
                       ) : (
                         <span className="text-muted">·</span>
                       )}
@@ -73,19 +68,9 @@ export const Releases = () => {
           </tbody>
         </table>
       </Card>
-      {token && (
-        <Compatibility
-          token={token}
-          environments={delivery.reports.map((report) => report.name).toSorted()}
-        />
-      )}
+      {token && <Compatibility token={token} environments={names} />}
       {token && <Catalog token={token} channels={table.channels} />}
-      {token && (
-        <Migrations
-          token={token}
-          environments={delivery.reports.map((report) => report.name).toSorted()}
-        />
-      )}
+      {token && <Migrations token={token} environments={names} />}
     </>
   );
 };

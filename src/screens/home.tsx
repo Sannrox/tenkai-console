@@ -1,6 +1,6 @@
 import type { TickReport } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
-import { attention } from "../delivery/model";
+import { fleetAttention, fleetTableRows } from "../delivery/configuration";
 import { useDelivery } from "../delivery/use-delivery";
 import { tickLines, tickSummary } from "../management/reconcile";
 import { refusesCredential, useManagementCall } from "../management/use-management";
@@ -9,11 +9,12 @@ import { Delivery } from "./delivery";
 
 const TONE = { ok: "text-ok", warn: "text-warning", bad: "text-danger" } as const;
 
-/** Signed-in landing: the delivery matrix (decision 2B) and one reconcile tick on request. */
+/** Signed-in landing: fleet counts from bulk routes and one reconcile tick on request. */
 export const Home = () => {
   const token = useSession((state) => state.session?.accessToken);
   const delivery = useDelivery(token);
-  const needs = attention(delivery.reports).length;
+  const rows = fleetTableRows(delivery.fleet, delivery.list);
+  const items = fleetAttention(delivery.fleet?.environments ?? []);
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -23,14 +24,16 @@ export const Home = () => {
             ? delivery.error.message
             : delivery.loading
               ? "Loading"
-              : needs === 0
-                ? `${delivery.reports.length} environments, all current`
-                : `${needs} need attention`}
+              : items.length > 0
+                ? `${items.length} need attention`
+                : delivery.fleet && delivery.fleet.environments_behind > 0
+                  ? `${rows.length} environments, ${delivery.fleet.environments_behind} behind`
+                  : `${rows.length} environments, all current`}
         </span>
         {token && <Reconcile token={token} />}
       </div>
       {!delivery.loading && !delivery.error && (
-        <Delivery reports={delivery.reports} token={token} />
+        <Delivery rows={rows} items={items} fleet={delivery.fleet} />
       )}
     </>
   );
