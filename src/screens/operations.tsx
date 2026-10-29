@@ -110,7 +110,8 @@ const Backups = ({
   );
   const last = status?.last_success;
   const failed = status?.last_failure;
-  const drill = status?.last_drill;
+  // Newest first, as the server keeps them; older servers report one drill.
+  const drills = status?.drills ?? (status?.last_drill ? [status.last_drill] : []);
   return (
     <>
       <h2 className="m-0 mb-2 text-sm font-semibold">Backups</h2>
@@ -139,11 +140,19 @@ const Backups = ({
                 </tr>
               )}
               <tr className="[&>*]:border-b-0">
-                <th className={th}>Restore drill</th>
-                <td className={`${td} ${drill ? "" : "text-muted"}`}>
-                  {drill
-                    ? `${iso(drill.restored_at_ms)}, ${drill.file}, integrity ${drill.integrity}, ${drill.environments} environments, ${drill.releases} releases, ${drill.plans} plans`
-                    : "none recorded"}
+                <th className={`${th} align-top`}>Restore drills</th>
+                <td className={`${td} ${drills.length > 0 ? "" : "text-muted"}`}>
+                  {drills.length === 0 ? (
+                    "none recorded"
+                  ) : (
+                    <ol aria-label="Restore drills" className="m-0 list-none p-0">
+                      {drills.map((drill) => (
+                        <li key={`${drill.restored_at_ms}|${drill.sha256}`}>
+                          {`${iso(drill.restored_at_ms)}, ${drill.file}, integrity ${drill.integrity}, ${drill.environments} environments, ${drill.releases} releases, ${drill.plans} plans`}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
                 </td>
               </tr>
             </tbody>
@@ -275,19 +284,20 @@ const Exports = ({
               <th className={th}>Reason</th>
               <th className={th}>Size</th>
               <th className={th}>Downloads</th>
+              <th className={th}>Expires</th>
               <th className={th} aria-label="Download" />
             </tr>
           </thead>
           <tbody>
             {list === undefined ? (
               <tr>
-                <td className={`${td} border-b-0 text-muted`} colSpan={7}>
+                <td className={`${td} border-b-0 text-muted`} colSpan={8}>
                   {error ?? "Loading"}
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td className={`${td} border-b-0 text-muted`} colSpan={7}>
+                <td className={`${td} border-b-0 text-muted`} colSpan={8}>
                   No exports yet
                 </td>
               </tr>
@@ -304,14 +314,23 @@ const Exports = ({
                   <td className={`${td} text-muted`}>{row.reason}</td>
                   <td className={td}>{size(row.sizeBytes)}</td>
                   <td className={td}>{row.downloads}</td>
+                  <td className={`${td} ${row.expired ? "text-muted" : ""}`}>
+                    {row.expired
+                      ? "expired"
+                      : row.expiresAt === undefined
+                        ? "kept"
+                        : iso(row.expiresAt)}
+                  </td>
                   <td className={td}>
-                    <Button
-                      disabled={!reason.trim()}
-                      title={reason.trim() ? undefined : "Enter a reason first"}
-                      onClick={() => void fetchFile(row.id, row.fileName)}
-                    >
-                      Download
-                    </Button>
+                    {!row.expired && (
+                      <Button
+                        disabled={!reason.trim()}
+                        title={reason.trim() ? undefined : "Enter a reason first"}
+                        onClick={() => void fetchFile(row.id, row.fileName)}
+                      >
+                        Download
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))

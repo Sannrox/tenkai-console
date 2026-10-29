@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at c65ea2dfce1ac722916061ef739b7fba0a8b1f80 (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at b2b64170c7396aa0a9743d799856a0e67600a200 (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -551,12 +551,18 @@ taken_at_ms: number
 tool?: string
 }
 /**
- * `GET /v1/backups`: `status.json` plus the newest drill.
+ * `GET /v1/backups`: `status.json` plus the newest drill and the drill
+ * history.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "BackupStatus".
  */
 export interface BackupStatus {
+/**
+ * The kept restore drills, newest first, at most [`DRILL_HISTORY`]
+ * (#818). Never written to `status.json`, so older versions read it.
+ */
+drills?: DrillEvidence[]
 last_drill?: DrillEvidence
 last_failure?: BackupFailure
 last_success?: BackupManifest
@@ -1471,6 +1477,16 @@ created_at_ms: number
  */
 environment?: string
 events: ExportEvent[]
+/**
+ * Past `expires_at_ms`, or its artifact already removed (a retention
+ * that was later raised or unset does not bring it back): listed, never
+ * downloadable.
+ */
+expired: boolean
+/**
+ * When it stops being downloadable, with a retention configured (#818).
+ */
+expires_at_ms?: number
 /**
  * The name the download carries, as the CLI would name the file.
  */

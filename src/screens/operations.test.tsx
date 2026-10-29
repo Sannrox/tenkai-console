@@ -19,6 +19,28 @@ const BACKUPS: BackupStatus = {
     size_bytes: 4_096,
     taken_at_ms: Date.UTC(2026, 9, 28),
   },
+  drills: [
+    {
+      schema: "tenkai.restore-drill.v1",
+      file: "tenkai-1.db",
+      sha256: "abc",
+      restored_at_ms: Date.UTC(2026, 9, 28, 1),
+      integrity: "ok",
+      environments: 2,
+      releases: 3,
+      plans: 4,
+    },
+    {
+      schema: "tenkai.restore-drill.v1",
+      file: "tenkai-0.db",
+      sha256: "abd",
+      restored_at_ms: Date.UTC(2026, 9, 27, 1),
+      integrity: "ok",
+      environments: 1,
+      releases: 1,
+      plans: 1,
+    },
+  ],
   last_drill: {
     schema: "tenkai.restore-drill.v1",
     file: "tenkai-1.db",
@@ -41,7 +63,20 @@ const EXPORTS: ExportList = {
       sha256: "abc",
       size_bytes: 512,
       created_at_ms: Date.UTC(2026, 9, 28),
+      expired: false,
       events: [{ action: "created", at_ms: 1, principal: "alice", reason: "ticket 7" }],
+    },
+    {
+      schema: "tenkai.export.v1",
+      id: "e0",
+      kind: "audit-export",
+      file_name: "audit-00000001.json",
+      sha256: "def",
+      size_bytes: 256,
+      created_at_ms: Date.UTC(2026, 8, 1),
+      expires_at_ms: Date.UTC(2026, 9, 1),
+      expired: true,
+      events: [{ action: "created", at_ms: 1, principal: "bob", reason: "audit" }],
     },
   ],
 };
@@ -157,8 +192,13 @@ describe("Operations", () => {
       [...(backups?.querySelectorAll("td") ?? [])].map((cell) => cell.textContent),
     ).toStrictEqual([
       "2026-10-28T00:00:00.000Z, 4.0 KB, 2h old, ok",
-      "2026-10-28T01:00:00.000Z, tenkai-1.db, integrity ok, 2 environments, 3 releases, 4 plans",
+      "2026-10-28T01:00:00.000Z, tenkai-1.db, integrity ok, 2 environments, 3 releases, 4 plans2026-10-27T01:00:00.000Z, tenkai-0.db, integrity ok, 1 environments, 1 releases, 1 plans",
     ]);
+    expect(
+      [...container.querySelectorAll('[aria-label="Restore drills"] li')].map((item) =>
+        item.textContent?.slice(0, 24),
+      ),
+    ).toStrictEqual(["2026-10-28T01:00:00.000Z", "2026-10-27T01:00:00.000Z"]);
     const history = container.querySelector('table[aria-label="Export history"] tbody tr');
     expect(
       [...(history?.querySelectorAll("td") ?? [])].map((cell) => cell.textContent),
@@ -169,7 +209,21 @@ describe("Operations", () => {
       "ticket 7",
       "512 B",
       "0",
+      "kept",
       "Download",
+    ]);
+    const expired = container.querySelectorAll('table[aria-label="Export history"] tbody tr')[1];
+    expect(
+      [...(expired?.querySelectorAll("td") ?? [])].map((cell) => cell.textContent),
+    ).toStrictEqual([
+      "2026-09-01T00:00:00.000Z",
+      "bob",
+      "audit-export audit-00000001.json",
+      "audit",
+      "256 B",
+      "0",
+      "expired",
+      "",
     ]);
   });
 
