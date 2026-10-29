@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { download, request } from "../api/http";
 import type {
   BackupManifest,
@@ -192,6 +192,8 @@ const Exports = ({
     environment: "",
     plan_id: "",
     upgrade: "",
+    from_sequence: "",
+    to_sequence: "",
   });
   const [downloaded, setDownloaded] = useState<Outcome>();
   const create = useManagementCall(
@@ -263,7 +265,28 @@ const Exports = ({
                 allowed={create.allowed}
                 pending={create.isPending}
                 onCreate={(body) => create.mutate({ path: "v1/exports", body })}
-              />
+              >
+                {kind === "audit-export" && (
+                  <span className="ml-2 inline-flex gap-1">
+                    <input
+                      aria-label="From sequence"
+                      placeholder="from"
+                      inputMode="numeric"
+                      value={fields.from_sequence}
+                      onChange={(event) => set("from_sequence")(event.target.value)}
+                      className={`${field} w-16`}
+                    />
+                    <input
+                      aria-label="To sequence"
+                      placeholder="to"
+                      inputMode="numeric"
+                      value={fields.to_sequence}
+                      onChange={(event) => set("to_sequence")(event.target.value)}
+                      className={`${field} w-16`}
+                    />
+                  </span>
+                )}
+              </KindRow>
             ))}
           </tbody>
         </table>
@@ -308,7 +331,8 @@ const Exports = ({
                   <td className={td}>{row.createdBy}</td>
                   <td className={td} title={row.id}>
                     {row.kind}
-                    {row.environment ? ` ${row.environment}` : ""}{" "}
+                    {row.environment ? ` ${row.environment}` : ""}
+                    {row.sequences ? ` ${row.sequences}` : ""}{" "}
                     <span className="font-mono text-muted">{row.fileName}</span>
                   </td>
                   <td className={`${td} text-muted`}>{row.reason}</td>
@@ -355,6 +379,7 @@ const KindRow = ({
   allowed,
   pending,
   onCreate,
+  children,
 }: {
   kind: ExportKind;
   label: string;
@@ -362,9 +387,14 @@ const KindRow = ({
   allowed: boolean;
   pending: boolean;
   onCreate: (body: Exclude<ReturnType<typeof exportRequest>, string>) => void;
+  /** Inputs only this kind takes. */
+  children?: ReactNode;
 }) => (
   <tr className="[&:last-child>td]:border-b-0">
-    <td className={td}>{label}</td>
+    <td className={td}>
+      {label}
+      {children}
+    </td>
     <td className={`${td} text-muted`}>{typeof body === "string" ? body : ""}</td>
     <td className={`${td} text-right`}>
       {allowed && (

@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 0a5b35d0521e3c1b76b9f56130f5173127783e21 (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at bd322ef12eddd1158bd2ea31361b814aea79b161 (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -273,6 +273,7 @@ ApprovalStatement?: ApprovalStatement
 ApprovalTrustRoots?: ApprovalTrustRoots
 ApprovalTrustedSigner?: ApprovalTrustedSigner
 ApproveRequest?: ApproveRequest
+AuditSequences?: AuditSequences
 BackupFailure?: BackupFailure
 BackupHealth?: BackupHealth
 BackupManifest?: BackupManifest
@@ -507,6 +508,16 @@ expected_generation: number
 operation: string
 trust_roots: PlanApprovalTrustRoots
 version: number
+}
+/**
+ * Inclusive chain sequences.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "AuditSequences".
+ */
+export interface AuditSequences {
+from: number
+to: number
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -1488,6 +1499,7 @@ signature: string
  * via the `definition` "ExportEntry".
  */
 export interface ExportEntry {
+audit_range?: AuditSequences1
 created_at_ms: number
 /**
  * Set exactly for environment-scoped kinds.
@@ -1513,6 +1525,13 @@ kind: ExportKind
 schema: string
 sha256: string
 size_bytes: number
+}
+/**
+ * Inclusive chain sequences.
+ */
+export interface AuditSequences1 {
+from: number
+to: number
 }
 /**
  * Who created or downloaded an export, when, and why.
@@ -1544,6 +1563,11 @@ export interface ExportRequest {
  * Required for `recovery-bundle` and `offline-receipt`, refused otherwise.
  */
 environment?: (string | null)
+/**
+ * With `to_sequence`, an `audit-export` of the chain's existing exports
+ * `from_sequence..=to_sequence` (#825) instead of the next entry.
+ */
+from_sequence?: (number | null)
 kind: ExportKind
 /**
  * The plan of a `recovery-bundle`.
@@ -1553,6 +1577,7 @@ plan_id?: (string | null)
  * Why the export is made; recorded with the creator.
  */
 reason: string
+to_sequence?: (number | null)
 /**
  * The connectivity upgrade of an `offline-receipt`.
  */

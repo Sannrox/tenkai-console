@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { ExportEntry } from "../api/tenkai.gen";
-import { exportRequest, historyRows, size } from "./operations";
+import { auditRange, exportRequest, historyRows, size } from "./operations";
 
-const empty = { environment: "", plan_id: "", upgrade: "" };
+const empty = {
+  environment: "",
+  plan_id: "",
+  upgrade: "",
+  from_sequence: "",
+  to_sequence: "",
+};
 
 describe("export requests", () => {
   it("needs a reason, and the fields a kind takes, and sends only those", () => {
@@ -15,6 +21,7 @@ describe("export requests", () => {
     );
     expect(
       exportRequest("offline-receipt", "audit", {
+        ...empty,
         environment: "site",
         plan_id: "p",
         upgrade: "u1",
@@ -25,6 +32,39 @@ describe("export requests", () => {
       environment: "site",
       upgrade: "u1",
     });
+  });
+});
+
+describe("audit ranges", () => {
+  it("sends both sequences or neither, as whole numbers in order", () => {
+    expect(exportRequest("audit-export", "review", empty)).toStrictEqual({
+      kind: "audit-export",
+      reason: "review",
+    });
+    expect(
+      exportRequest("audit-export", "review", { ...empty, from_sequence: " 3 ", to_sequence: "7" }),
+    ).toStrictEqual({ kind: "audit-export", reason: "review", from_sequence: 3, to_sequence: 7 });
+    expect(auditRange("4", "4")).toStrictEqual({ from_sequence: 4, to_sequence: 4 });
+    expect(auditRange("3", "")).toBe("from and to go together");
+    expect(auditRange("", "3")).toBe("from and to go together");
+    for (const [from, to] of [
+      ["1.5", "3"],
+      ["-1", "3"],
+      ["1e2", "300"],
+      ["a", "3"],
+      ["9".repeat(400), "9".repeat(400)],
+      ["9007199254740993", "9007199254740993"],
+    ] as const) {
+      expect(auditRange(from, to)).toBe("from and to are whole sequence numbers");
+    }
+    expect(auditRange("0", "3")).toBe("from is 1 or more and no higher than to");
+    expect(auditRange("7", "3")).toBe("from is 1 or more and no higher than to");
+    expect(auditRange("1", "1001")).toBe("at most 1000 entries");
+    expect(auditRange("1", "1000")).toStrictEqual({ from_sequence: 1, to_sequence: 1_000 });
+    // Other kinds never send a range.
+    expect(
+      exportRequest("support-bundle", "x", { ...empty, from_sequence: "1", to_sequence: "2" }),
+    ).toStrictEqual({ kind: "support-bundle", reason: "x" });
   });
 });
 
@@ -60,8 +100,12 @@ describe("export history", () => {
         downloads: 2,
         expiresAt: 9_000,
         expired: false,
+        sequences: "",
       },
     ]);
+    const audit = (from: number, to: number) =>
+      historyRows([{ ...entry, kind: "audit-export", audit_range: { from, to } }])[0]?.sequences;
+    expect([audit(4, 4), audit(3, 7)]).toStrictEqual(["4", "3 to 7"]);
     expect([size(512), size(2_048), size(3 * 1_048_576)]).toStrictEqual([
       "512 B",
       "2.0 KB",

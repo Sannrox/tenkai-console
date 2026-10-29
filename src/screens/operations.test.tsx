@@ -71,6 +71,7 @@ const EXPORTS: ExportList = {
       id: "e0",
       kind: "audit-export",
       file_name: "audit-00000001.json",
+      audit_range: { from: 1, to: 1 },
       sha256: "def",
       size_bytes: 256,
       created_at_ms: Date.UTC(2026, 8, 1),
@@ -218,7 +219,7 @@ describe("Operations", () => {
     ).toStrictEqual([
       "2026-09-01T00:00:00.000Z",
       "bob",
-      "audit-export audit-00000001.json",
+      "audit-export 1 audit-00000001.json",
       "audit",
       "256 B",
       "0",
@@ -260,6 +261,37 @@ describe("Operations", () => {
       body: { kind: "support-bundle", reason: "ticket 9" },
     });
     expect(container.textContent).toContain("support.json created");
+  });
+
+  it("sends an audit range only once it is valid, and lists the range it covers", async () => {
+    const ranged = {
+      ...EXPORTS.exports[1],
+      id: "e2",
+      file_name: "audit-range-00000003-00000007.json",
+      audit_range: { from: 3, to: 7 },
+      expired: false,
+    };
+    serve((call) => (call.method === "POST" ? new Response(JSON.stringify(ranged)) : undefined));
+    await render();
+    await type("Reason", "review window");
+    const auditRow = () =>
+      [...container.querySelectorAll('table[aria-label="Export kinds"] tbody tr')].find((row) =>
+        row.textContent?.startsWith("Audit export"),
+      );
+    await type("From sequence", "7");
+    await type("To sequence", "3");
+    expect(auditRow()?.textContent).toContain("from is 1 or more and no higher than to");
+    expect(auditRow()?.querySelector("button")?.disabled).toBe(true);
+    await type("From sequence", "3");
+    await type("To sequence", "7");
+    await act(async () => {
+      auditRow()?.querySelector("button")?.click();
+    });
+    await click("Create audit-export");
+    expect(calls.find((call) => call.method === "POST")).toMatchObject({
+      path: "v1/exports",
+      body: { kind: "audit-export", reason: "review window", from_sequence: 3, to_sequence: 7 },
+    });
   });
 
   it("downloads with the bearer in a header and the reason in the query, never the token", async () => {
