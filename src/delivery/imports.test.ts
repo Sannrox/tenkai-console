@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { ImportJob, StagedBundle } from "../api/tenkai.gen";
-import { bundleCards, contentRows, importBody } from "./imports";
+import { bundleCards, contentRows, finishedSince, importBody } from "./imports";
 
 const bundle = (file: string): StagedBundle => ({
   file,
   size_bytes: 10,
   chunked: false,
   environment: "site",
+  plan_id: "p1",
 });
 
 const job = (file: string, overrides: Partial<ImportJob>): ImportJob => ({
@@ -19,6 +20,13 @@ const job = (file: string, overrides: Partial<ImportJob>): ImportJob => ({
   state: "previewed",
   actor: "alice",
   started_at_ms: 1,
+  preview: {
+    already_bound: false,
+    bundle_digest: "sha256:b1",
+    carries_revocations: false,
+    plan_id: "p1",
+    release_ids: [],
+  },
   ...overrides,
 });
 
@@ -46,11 +54,43 @@ describe("import columns", () => {
     const passed = [job("b.tar", {})];
     expect(bundleCards([bundle("b.tar")], passed, { "b.tar": " u1 " })[0]?.column).toBe("checked");
     expect(bundleCards([bundle("b.tar")], passed, { "b.tar": "u2" })[0]?.column).toBe("staged");
-    expect(bundleCards([bundle("b.tar")], passed, {})[0]?.column).toBe("staged");
+    expect(bundleCards([bundle("b.tar")], passed, { "b.tar": "" })[0]?.column).toBe("staged");
+    // Nothing entered yet, as after a reload: the passing dry run's upgrade.
+    expect(bundleCards([bundle("b.tar")], passed, {})[0]?.column).toBe("checked");
     expect(
       bundleCards([{ ...bundle("b.tar"), environment: "other" }], passed, { "b.tar": "u1" })[0]
         ?.column,
     ).toBe("staged");
+  });
+
+  it("keeps a different archive under a known name staged", () => {
+    const history = [
+      job("b.tar", {}),
+      job("b.tar", { dry_run: false, state: "succeeded", started_at_ms: 2 }),
+    ];
+    const replaced = { ...bundle("b.tar"), plan_id: "p2" };
+    expect(bundleCards([replaced], history, {})[0]?.column).toBe("staged");
+    expect(bundleCards([replaced], history, { "b.tar": "u1" })[0]?.column).toBe("staged");
+    // Without a plan on either side the identity is unproven.
+    const { plan_id: _plan, ...planless } = bundle("b.tar");
+    expect(bundleCards([planless], history, {})[0]?.column).toBe("staged");
+    const unproven = history.map((entry) => {
+      const copy = structuredClone(entry);
+      delete copy.preview;
+      return copy;
+    });
+    expect(bundleCards([bundle("b.tar")], unproven, { "b.tar": "u1" })[0]?.column).toBe("staged");
+  });
+
+  it("sees one job finish while another still runs", () => {
+    const a = job("a.tar", { id: "a", state: "running" });
+    const b = job("b.tar", { id: "b", state: "running" });
+    expect(finishedSince([a, b], [a, b])).toBe(false);
+    expect(finishedSince([a, b], [{ ...a, state: "succeeded" }, b])).toBe(true);
+    expect(
+      finishedSince([{ ...a, state: "succeeded" }, b], [{ ...a, state: "succeeded" }, b]),
+    ).toBe(false);
+    expect(finishedSince(undefined, [a])).toBe(false);
   });
 
   it("builds the import request as tenkaictl binds", () => {

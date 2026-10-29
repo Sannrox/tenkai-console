@@ -1,12 +1,16 @@
-import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { request } from "../api/http";
-import type { ContentInventory, ImportJob, StagedBundle } from "../api/tenkai.gen";
+import type { ContentInventory, ImportJob, ImportJobList, StagedBundle } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
 import {
+  anyRunning,
   bundleCards,
+  finishedSince,
   contentRows,
   importBody,
+  progressLine,
+  upgradeFor,
   type BundleCard,
   type Column,
 } from "../delivery/imports";
@@ -24,7 +28,7 @@ const COLUMNS: Array<{ column: Column; title: string }> = [
   { column: "imported", title: "Imported" },
 ];
 
-/** Re-read a running job this often; it stops once the job finishes. */
+/** Re-read the job list this often while a job runs; it stops once none does. */
 const JOB_POLL_MS = 1_000;
 
 /**
@@ -47,33 +51,33 @@ export const Imports = () => {
     enabled: token !== undefined,
     retry: false,
   });
-  // Jobs started from this page; Tenkai offers no list of earlier ones.
-  const [jobIds, setJobIds] = useState<string[]>([]);
   // The upgrade entered per bundle file; a checked bundle is checked for this one.
   const [upgrades, setUpgrades] = useState<Record<string, string>>({});
-  const jobs = useQueries({
-    queries: jobIds.map((id) => ({
-      queryKey: ["import-job", id, token],
-      queryFn: async () => {
-        const job = await request<ImportJob>(`v1/imports/${encodeURIComponent(id)}`, { token });
-        // A finished job may have changed what the host holds.
-        if (job.state !== "running") {
-          void queryClient.invalidateQueries({ queryKey: ["content-inventory"] });
-        }
-        return job;
-      },
-      retry: false,
-      refetchInterval: (query: { state: { data: ImportJob | undefined } }) =>
-        query.state.data?.state === "running" ? JOB_POLL_MS : false,
-    })),
+  const jobs = useQuery({
+    queryKey: ["import-jobs", token],
+    queryFn: async ({ client }) => {
+      const list = await request<ImportJobList>("v1/imports", { token });
+      // Any job that finished since the last read may have changed what the host holds.
+      const before = client.getQueryData<ImportJobList>(["import-jobs", token]);
+      if (finishedSince(before?.jobs, list.jobs)) {
+        void client.invalidateQueries({ queryKey: ["content-inventory"] });
+      }
+      return list;
+    },
+    enabled: token !== undefined,
+    retry: false,
+    refetchInterval: (query) => (anyRunning(query.state.data?.jobs) ? JOB_POLL_MS : false),
   });
-  const known = jobs.flatMap((job) => (job.data ? [job.data] : []));
+  const known = jobs.data?.jobs ?? [];
   if (token === undefined) {
     return null;
   }
   const started = (job: ImportJob) => {
-    queryClient.setQueryData(["import-job", job.id, token], job);
-    setJobIds((ids) => (ids.includes(job.id) ? ids : [...ids, job.id]));
+    // Shown at once; the list read that follows replaces it.
+    queryClient.setQueryData<ImportJobList>(["import-jobs", token], (list) => ({
+      jobs: [job, ...(list?.jobs ?? []).filter((other) => other.id !== job.id)],
+    }));
+    void queryClient.invalidateQueries({ queryKey: ["import-jobs"] });
     void queryClient.invalidateQueries({ queryKey: ["content-inventory"] });
   };
   const cards = staged.data ? bundleCards(staged.data, known, upgrades) : [];
@@ -84,7 +88,7 @@ export const Imports = () => {
         <Button
           variant="ghost"
           className="ml-auto"
-          onClick={() => void Promise.all([staged.refetch(), inventory.refetch()])}
+          onClick={() => void Promise.all([staged.refetch(), jobs.refetch(), inventory.refetch()])}
         >
           Refresh
         </Button>
@@ -92,6 +96,7 @@ export const Imports = () => {
       <RefreshFailed
         queries={[
           ["staged", staged],
+          ["jobs", jobs],
           ["inventory", inventory],
         ]}
       />
@@ -100,27 +105,32 @@ export const Imports = () => {
           {staged.error?.message ?? "Loading"}
         </p>
       ) : (
-        <div className="mb-6 grid gap-3 md:grid-cols-3">
-          {COLUMNS.map(({ column, title }) => (
-            <section key={column} aria-label={title}>
-              <h2 className="m-0 mb-2 text-sm font-semibold">{title}</h2>
-              {cards
-                .filter((card) => card.column === column)
-                .map((card) => (
-                  <Bundle
-                    key={card.bundle.file}
-                    card={card}
-                    token={token}
-                    upgrade={upgrades[card.bundle.file] ?? ""}
-                    setUpgrade={(value) =>
-                      setUpgrades((current) => ({ ...current, [card.bundle.file]: value }))
-                    }
-                    onStarted={started}
-                  />
-                ))}
-            </section>
-          ))}
-        </div>
+        <>
+          <div className="mb-2 grid gap-3 md:grid-cols-3">
+            {COLUMNS.map(({ column, title }) => (
+              <section key={column} aria-label={title}>
+                <h2 className="m-0 mb-2 text-sm font-semibold">{title}</h2>
+                {cards
+                  .filter((card) => card.column === column)
+                  .map((card) => (
+                    <Bundle
+                      key={card.bundle.file}
+                      card={card}
+                      token={token}
+                      upgrade={upgradeFor(card.bundle, known, upgrades)}
+                      setUpgrade={(value) =>
+                        setUpgrades((current) => ({ ...current, [card.bundle.file]: value }))
+                      }
+                      onStarted={started}
+                    />
+                  ))}
+              </section>
+            ))}
+          </div>
+          <p aria-label="Job scope" className="m-0 mb-6 text-xs text-muted">
+            Jobs of this server only: each server lists the imports it ran.
+          </p>
+        </>
       )}
       <Inventory inventory={inventory.data} error={inventory.error?.message} />
     </>
@@ -179,6 +189,15 @@ const Bundle = ({
           {job.refusal ? `: ${job.refusal}` : ""}
           {job.preview ? ` · bundle ${job.preview.bundle_digest}` : ""}
         </div>
+      )}
+      {job?.state === "running" && job.progress && job.progress.length > 0 && (
+        <ul aria-label={`Progress of ${bundle.file}`} className="m-0 list-none p-0 text-muted">
+          {job.progress.map((entry) => (
+            <li key={entry.digest} className="font-mono break-all">
+              {progressLine(entry)}
+            </li>
+          ))}
+        </ul>
       )}
       {call.outcome?.tone !== "ok" && call.outcome && (
         <Notice tone={call.outcome.tone}>{call.outcome.text}</Notice>
