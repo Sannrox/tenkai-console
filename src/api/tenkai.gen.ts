@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 144912e32eaaaa1d1fbef7e2a52797fdb10e0fbd (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at eca0cff138af8b66ae12fac5896d530e19090919 (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -302,6 +302,7 @@ ConnectivityClass?: ConnectivityClass
 ContentChunk?: ContentChunk
 ContentInventory?: ContentInventory
 ContentItem?: ContentItem
+CreateGrantRuleRequest?: CreateGrantRuleRequest
 CredentialRunway?: CredentialRunway
 DeliveryHold?: DeliveryHold
 DeliveryHoldRequest?: DeliveryHoldRequest
@@ -339,6 +340,8 @@ ExportRequest?: ExportRequest
 FirstAdministrator?: FirstAdministrator
 FleetEnvironmentRow?: FleetEnvironmentRow
 FleetStatusReport?: FleetStatusReport
+GrantRuleList?: GrantRuleList
+GrantRuleView?: GrantRuleView
 GroupApprovers?: GroupApprovers
 HoldAuditEvent?: HoldAuditEvent
 ImportJob?: ImportJob
@@ -363,6 +366,7 @@ ObservedModelRuntime?: ObservedModelRuntime
 ObservedRuntimeComponent?: ObservedRuntimeComponent
 ObservedRuntimeUnit?: ObservedRuntimeUnit
 OidcClientDiscovery?: OidcClientDiscovery
+OidcGrantRule?: OidcGrantRule
 OperationalEvent?: OperationalEvent
 PackageMigrationApplyRequest?: PackageMigrationApplyRequest
 PackageMigrationMutateRequest?: PackageMigrationMutateRequest
@@ -392,6 +396,7 @@ ReleasePage?: ReleasePage
 ReleaseStatement?: ReleaseStatement
 ReleaseTrustRoots?: ReleaseTrustRoots
 ReleaseTrustedSigner?: ReleaseTrustedSigner
+RemoveGrantRuleRequest?: RemoveGrantRuleRequest
 RetireEnvironmentRequest?: RetireEnvironmentRequest
 RetryFailedTargetRequest?: RetryFailedTargetRequest
 RollbackRequest?: RollbackRequest
@@ -958,6 +963,53 @@ size_bytes?: number
  * path. Absent when the store that would hold it is not configured.
  */
 stored?: boolean
+}
+/**
+ * `POST /v1/grant-rules`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "CreateGrantRuleRequest".
+ */
+export interface CreateGrantRuleRequest {
+/**
+ * The generation the caller listed.
+ */
+generation: number
+/**
+ * Why; recorded with the rule and in the audit log.
+ */
+reason: string
+rule: OidcGrantRule
+}
+/**
+ * One claim value and the grants it confers.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "OidcGrantRule".
+ */
+export interface OidcGrantRule {
+/**
+ * `read`, `management`, and/or `publish`.
+ */
+capabilities: string[]
+/**
+ * When non-empty and the token has no fleet management, promote is
+ * confined to these channels. Publish ignores channel bindings.
+ */
+channels?: string[]
+/**
+ * When set, management from this rule is confined to one environment.
+ */
+environment?: (string | null)
+/**
+ * Principal kind for this rule. Default remains human; `service` is for CI.
+ */
+kind?: (string | null)
+/**
+ * Products this rule may publish or promote.
+ */
+products?: string[]
+value: string
 }
 /**
  * A certificate that lapses before an environment's next maintenance window
@@ -1708,6 +1760,41 @@ environments_unhealthy: number
 server_version?: string
 }
 /**
+ * `GET /v1/grant-rules`: the stored rules and their generation.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "GrantRuleList".
+ */
+export interface GrantRuleList {
+/**
+ * Pass it back with a change; a change against another generation is
+ * refused.
+ */
+generation: number
+rules: GrantRuleView[]
+}
+/**
+ * A stored rule: the rule as the configuration file would hold it, and who
+ * created it, when and why.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "GrantRuleView".
+ */
+export interface GrantRuleView {
+created_at_ms: number
+/**
+ * The principal, or the management token's use, that created it.
+ */
+created_by: string
+/**
+ * The configuration file declares this claim value, so the stored
+ * rule is ignored.
+ */
+declared_by_config: boolean
+reason: string
+rule: OidcGrantRule
+}
+/**
  * Who may approve for one group of the plan's rule (#817): identities and
  * key ids from the plan-approval trust roots, never key material.
  * 
@@ -2229,6 +2316,20 @@ version: string
 export interface ReleasePage {
 items: ReleaseListEntry[]
 next_cursor?: string
+}
+/**
+ * `DELETE /v1/grant-rules`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RemoveGrantRuleRequest".
+ */
+export interface RemoveGrantRuleRequest {
+generation: number
+reason: string
+/**
+ * The claim value of the rule to remove.
+ */
+value: string
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema

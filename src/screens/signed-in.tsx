@@ -6,6 +6,7 @@ import { useSession } from "../auth/session";
 import { useSignOut } from "../auth/use-sign-out";
 import { useDelivery } from "../delivery/use-delivery";
 import { Button, Centered, Title } from "../ui/kit";
+import { FirstAdministratorBanner } from "./first-administrator";
 import { SignIn } from "./sign-in";
 import { TopBar } from "./top-bar";
 
@@ -29,6 +30,9 @@ export const SignedIn = ({ settings }: { settings: OidcClientDiscovery | null })
   if (status === 403) {
     return (
       <Centered>
+        {/* On a hub with no first administrator nobody has access yet; the
+            management token, not this account, authorizes the setup. */}
+        <FirstAdministratorBanner />
         <Title subtitle="Signed in, no access" />
         <p className="m-0 text-xs text-warning">
           {session.subject ?? "This account"} has no Tenkai access. Ask the platform team.
@@ -43,6 +47,7 @@ export const SignedIn = ({ settings }: { settings: OidcClientDiscovery | null })
     <div className="min-h-screen bg-surface">
       <TopBar session={session} settings={settings} />
       <main className="px-6 py-5">
+        <FirstAdministratorBanner />
         <Outlet />
       </main>
     </div>
