@@ -38,18 +38,29 @@ const job = (overrides: Partial<ImportJob>): ImportJob => ({
   state: "previewed",
   actor: "alice",
   started_at_ms: 1,
+  preview: {
+    already_bound: false,
+    bundle_digest: "sha256:b1",
+    carries_revocations: false,
+    plan_id: "p1",
+    release_ids: [],
+  },
   ...overrides,
 });
 
 type Call = { method: string; path: string; body: unknown };
 let calls: Call[];
-/** The job a GET of `/v1/imports/{id}` answers: the last one started. */
-let lastJob: unknown;
+/** What `GET /v1/imports` answers: the host's jobs, newest first. */
+let listed: ImportJob[];
 let root: Root;
 let container: HTMLElement;
 
-const serve = (onPost: (body: { dry_run: boolean }) => { status?: number; body: unknown }) => {
+const serve = (
+  onPost: (body: { dry_run: boolean }) => { status?: number; body: unknown },
+  existing: ImportJob[] = [],
+) => {
   calls = [];
+  listed = existing;
   vi.stubGlobal(
     "fetch",
     vi.fn<typeof fetch>(async (input, init) => {
@@ -62,14 +73,17 @@ const serve = (onPost: (body: { dry_run: boolean }) => { status?: number; body: 
       calls.push(call);
       if (call.method === "POST") {
         const reply = onPost(call.body as { dry_run: boolean });
-        lastJob = reply.body;
+        if ((reply.status ?? 200) === 200) {
+          const started = reply.body as ImportJob;
+          listed = [started, ...listed.filter((other) => other.id !== started.id)];
+        }
         return new Response(JSON.stringify(reply.body), { status: reply.status ?? 200 });
       }
       const body =
         call.path === "v1/imports/staged"
           ? STAGED
-          : call.path.startsWith("v1/imports/")
-            ? lastJob
+          : call.path === "v1/imports"
+            ? { jobs: listed }
             : INVENTORY;
       return new Response(JSON.stringify(body));
     }),
@@ -151,7 +165,9 @@ const render = async () => {
 describe("Imports", () => {
   it("moves a bundle from staged to checked to imported, and shows the content inventory", async () => {
     serve((body) => ({
-      body: body.dry_run ? job({}) : job({ dry_run: false, state: "succeeded", started_at_ms: 2 }),
+      body: body.dry_run
+        ? job({})
+        : job({ id: "job-2", dry_run: false, state: "succeeded", started_at_ms: 2 }),
     }));
     await render();
     expect(column("Staged")).toContain("site.tar");
@@ -212,6 +228,125 @@ describe("Imports", () => {
     expect(button("Dry run")).toBeDefined();
   });
 
+  it("places bundles from the host's job list after a reload, dry run and import kept apart", async () => {
+    STAGED.push({
+      file: "other.tar",
+      size_bytes: 10,
+      chunked: false,
+      environment: "site",
+      plan_id: "p1",
+    });
+    try {
+      serve(
+        () => ({ body: job({}) }),
+        [
+          job({
+            id: "imp-b",
+            bundle: "other.tar",
+            dry_run: false,
+            state: "succeeded",
+            started_at_ms: 3,
+          }),
+          job({ id: "imp-b-dry", bundle: "other.tar", started_at_ms: 2 }),
+          job({ id: "imp-a-dry", started_at_ms: 1 }),
+        ],
+      );
+      await render();
+      expect(column("Checked (dry run passed)")).toContain("site.tar");
+      expect(
+        container.querySelector<HTMLInputElement>('input[aria-label="Upgrade for site.tar"]')
+          ?.value,
+      ).toBe("u1");
+      expect(column("Imported")).toContain("other.tar");
+      expect(column("Imported")).toContain("import succeeded");
+      expect(container.querySelector('[aria-label="Job scope"]')?.textContent).toContain(
+        "each server lists the imports it ran",
+      );
+    } finally {
+      STAGED.pop();
+    }
+  });
+
+  it("shows each entry's progress while an import runs, until it finishes", async () => {
+    const running = job({
+      dry_run: false,
+      state: "running",
+      progress: [
+        { digest: "sha256:l1", kind: "layer", bytes_done: 1_024, bytes_total: 4_096 },
+        { digest: "sha256:w1", kind: "weights", bytes_done: 0, bytes_total: 2_048 },
+      ],
+    });
+    serve(() => ({ body: job({}) }), [running]);
+    await render();
+    const progress = () =>
+      [...container.querySelectorAll('[aria-label="Progress of site.tar"] li')].map(
+        (item) => item.textContent,
+      );
+    const tick = async () => {
+      await act(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 1_100);
+        });
+      });
+      await settle();
+    };
+    expect(progress()).toStrictEqual([
+      "layer sha256:l1 1.0 KB / 4.0 KB (25%)",
+      "weights sha256:w1 0 B / 2.0 KB (0%)",
+    ]);
+    listed = [
+      {
+        ...running,
+        progress: [
+          { digest: "sha256:l1", kind: "layer", bytes_done: 4_096, bytes_total: 4_096 },
+          { digest: "sha256:w1", kind: "weights", bytes_done: 1_024, bytes_total: 2_048 },
+        ],
+      },
+    ];
+    await tick();
+    expect(progress()).toStrictEqual([
+      "layer sha256:l1 4.0 KB / 4.0 KB (100%)",
+      "weights sha256:w1 1.0 KB / 2.0 KB (50%)",
+    ]);
+    listed = [{ ...running, state: "succeeded" }];
+    await tick();
+    expect(progress()).toStrictEqual([]);
+    expect(column("Imported")).toContain("site.tar");
+    const reads = calls.filter((call) => call.path === "v1/imports").length;
+    await tick();
+    expect(calls.filter((call) => call.path === "v1/imports").length).toBe(reads);
+  });
+
+  it("reloads the inventory when one of two running imports finishes", async () => {
+    STAGED.push({
+      file: "other.tar",
+      size_bytes: 10,
+      chunked: false,
+      environment: "site",
+      plan_id: "p1",
+    });
+    try {
+      const first = job({ id: "imp-a", dry_run: false, state: "running" });
+      const second = job({ id: "imp-b", bundle: "other.tar", dry_run: false, state: "running" });
+      serve(() => ({ body: job({}) }), [first, second]);
+      await render();
+      const inventoryReads = () =>
+        calls.filter((call) => call.path === "v1/content/inventory").length;
+      const before = inventoryReads();
+      listed = [{ ...first, state: "succeeded" }, second];
+      await act(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 1_100);
+        });
+      });
+      await settle();
+      expect(column("Imported")).toContain("site.tar");
+      expect(inventoryReads()).toBeGreaterThan(before);
+    } finally {
+      STAGED.pop();
+    }
+  });
+
   it("reloads the inventory when a polled job finishes", async () => {
     serve((body) => ({ body: job({ dry_run: body.dry_run, state: "running" }) }));
     await render();
@@ -220,7 +355,7 @@ describe("Imports", () => {
     const inventoryReads = () =>
       calls.filter((call) => call.path === "v1/content/inventory").length;
     const before = inventoryReads();
-    lastJob = job({ state: "previewed" });
+    listed = [job({ state: "previewed" })];
     await act(async () => {
       await new Promise((resolve) => {
         setTimeout(resolve, 1_100);

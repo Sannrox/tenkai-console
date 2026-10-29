@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at b2b64170c7396aa0a9743d799856a0e67600a200 (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 0a5b35d0521e3c1b76b9f56130f5173127783e21 (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -307,6 +307,7 @@ DeliveryHoldView?: DeliveryHoldView
 DrillEvidence?: DrillEvidence
 EffectiveApprovalPolicy?: EffectiveApprovalPolicy
 EligibleApprover?: EligibleApprover
+EntryProgress?: EntryProgress
 EnvironmentConfigChange?: EnvironmentConfigChange
 EnvironmentConfigRequest?: EnvironmentConfigRequest
 EnvironmentConstraint?: EnvironmentConstraint
@@ -339,6 +340,7 @@ FleetStatusReport?: FleetStatusReport
 GroupApprovers?: GroupApprovers
 HoldAuditEvent?: HoldAuditEvent
 ImportJob?: ImportJob
+ImportJobList?: ImportJobList
 ImportRequest?: ImportRequest
 ImportState?: ImportState
 InstalledRevocations?: InstalledRevocations
@@ -974,6 +976,21 @@ export interface EligibleApprover {
 collected: boolean
 identity: string
 key_id: string
+}
+/**
+ * One content entry of an import.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EntryProgress".
+ */
+export interface EntryProgress {
+bytes_done: number
+bytes_total: number
+digest: string
+/**
+ * `layer` or `weights`.
+ */
+kind: string
 }
 /**
  * Body of every `PUT`/`DELETE` configuration route.
@@ -1632,6 +1649,11 @@ finished_at_ms?: number
 id: string
 preview?: BindPreview1
 /**
+ * Per content entry (layer or weight) the bytes stored so far and the
+ * total (#821), from the job's progress file; never in the job file.
+ */
+progress?: EntryProgress[]
+/**
  * The exact refusal, for example a missing layer digest or an expired interval.
  */
 refusal?: string
@@ -1656,6 +1678,15 @@ carries_revocations: boolean
 plan_id: string
 release_ids: string[]
 scan?: ScanEvidence
+}
+/**
+ * `GET /v1/imports`: this host's import jobs, newest first.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ImportJobList".
+ */
+export interface ImportJobList {
+jobs: ImportJob[]
 }
 /**
  * Body of `POST /v1/imports`.
