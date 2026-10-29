@@ -1,4 +1,5 @@
 import type {
+  ContentChunk,
   ContentInventory,
   EntryProgress,
   ImportJob,
@@ -13,8 +14,10 @@ import { size } from "./operations";
  * The columns follow the host's job list (`GET /v1/imports`,
  * Sannrox/tenkai#821), so they survive a reload; a running job carries
  * per-entry progress. The list is per host: each server lists the imports
- * it ran. Free space and chunk-level inventory are not offered yet
- * (Sannrox/tenkai#827).
+ * it ran. Jobs and staged archives carry the archive's digest
+ * (Sannrox/tenkai#830); the inventory carries free space, staged chunks
+ * and each pending plan's missing content, and a staged bundle the upgrade
+ * it serves (Sannrox/tenkai#827).
  */
 
 /** `POST /v1/imports`, as `tenkaictl upgrade bind-bundle` binds. */
@@ -42,24 +45,25 @@ export type BundleCard = {
 };
 
 /**
- * Whether a finished job was about this staged archive, not an earlier file
- * of the same name. Tenkai reports no archive digest on the staging list and
- * no size or staging time on a job, so the identity both carry is the file,
- * the environment and the plan (the job's from its verified preview). A job
- * without a preview, or a staged file without a plan, is never matched, so
- * an unproven bundle stays staged. A re-export for the same plan under the
- * same name is not told apart.
+ * Whether a job was about this staged archive, not an earlier file of the
+ * same name: its `archive_digest` equals the archive's current one. A job
+ * from before Tenkai recorded digests falls back to file, environment and
+ * plan (the job's from its verified preview); without a preview, or for a
+ * staged file without a plan, it is never matched, so an unproven bundle
+ * stays staged.
  */
 const sameBundle = (bundle: StagedBundle, job: ImportJob): boolean =>
   job.bundle === bundle.file &&
-  job.environment === bundle.environment &&
-  bundle.plan_id !== undefined &&
-  job.preview?.plan_id === bundle.plan_id;
+  (job.archive_digest !== undefined
+    ? job.archive_digest === bundle.archive_digest
+    : job.environment === bundle.environment &&
+      bundle.plan_id !== undefined &&
+      job.preview?.plan_id === bundle.plan_id);
 
 /**
  * The upgrade a bundle's input shows: what was entered for it, else the
- * upgrade of its newest passing dry run, so a checked bundle stays checked
- * after a reload.
+ * upgrade of its newest passing dry run (so a checked bundle stays checked
+ * after a reload), else the upgrade Tenkai derived for it.
  */
 export const upgradeFor = (
   bundle: StagedBundle,
@@ -69,6 +73,7 @@ export const upgradeFor = (
   upgrades[bundle.file] ??
   newest(jobs.filter((job) => job.dry_run && job.state === "previewed" && sameBundle(bundle, job)))
     ?.upgrade ??
+  bundle.upgrade ??
   "";
 
 const newest = (jobs: ImportJob[]) => jobs.toSorted((a, b) => b.started_at_ms - a.started_at_ms)[0];
@@ -126,6 +131,8 @@ export type ContentRow = {
   /** `true` held, `false` missing, `undefined` when no store is configured. */
   stored: boolean | undefined;
   usedBy: string[];
+  /** Its chunks staged for import, in order; empty when none are. */
+  chunks: ContentChunk[];
 };
 
 /** One row per layer or weight of each release, with what references the release. */
@@ -138,5 +145,20 @@ export const contentRows = (inventory: ContentInventory): ContentRow[] =>
       sizeBytes: item.size_bytes,
       stored: item.stored,
       usedBy: release.referenced_by,
+      chunks: item.chunks ?? [],
     })),
   );
+
+/** `used 4.0 KB, free 1.0 GB` of one store, or that it is not configured. */
+export const storeSpace = (
+  name: string,
+  used: number | undefined,
+  free: number | undefined,
+): string =>
+  used === undefined
+    ? `${name} not configured`
+    : `${name} ${size(used)} used${free === undefined ? "" : `, ${size(free)} free`}`;
+
+/** `#0 sha256:<hex> 1.0 MB staged` per chunk. */
+export const chunkLine = (chunk: ContentChunk): string =>
+  `#${chunk.index} ${chunk.digest} ${size(chunk.size_bytes)} ${chunk.staged ? "staged" : "missing"}`;

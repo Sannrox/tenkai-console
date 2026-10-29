@@ -139,10 +139,12 @@ export const historyRows = (exports: ExportEntry[]): HistoryRow[] =>
     };
   });
 
-/** `512 B`, `3.4 KB`, `1.2 MB`. */
+/** `512 B`, `3.4 KB`, `1.2 MB`, `2.0 GB`. */
 export const size = (bytes: number): string =>
   bytes < 1_024
     ? `${bytes} B`
     : bytes < 1_048_576
       ? `${(bytes / 1_024).toFixed(1)} KB`
-      : `${(bytes / 1_048_576).toFixed(1)} MB`;
+      : bytes < 1_073_741_824
+        ? `${(bytes / 1_048_576).toFixed(1)} MB`
+        : `${(bytes / 1_073_741_824).toFixed(1)} GB`;

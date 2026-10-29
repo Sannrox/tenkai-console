@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at bd322ef12eddd1158bd2ea31361b814aea79b161 (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 144912e32eaaaa1d1fbef7e2a52797fdb10e0fbd (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -299,6 +299,7 @@ CompatibilityStatus?: CompatibilityStatus
 ComponentObservation?: ComponentObservation
 ComponentPin?: ComponentPin
 ConnectivityClass?: ConnectivityClass
+ContentChunk?: ContentChunk
 ContentInventory?: ContentInventory
 ContentItem?: ContentItem
 CredentialRunway?: CredentialRunway
@@ -369,6 +370,7 @@ PackageMigrationPreviewRequest?: PackageMigrationPreviewRequest
 PackageMigrationResult?: PackageMigrationResult
 PackagePin?: PackagePin
 PageQuery?: PageQuery
+PendingPlanContent?: PendingPlanContent
 PlanApprovalTrustRoots?: PlanApprovalTrustRoots
 PlanApprovalTrustedSigner?: PlanApprovalTrustedSigner
 PlanApprovalView?: PlanApprovalView1
@@ -844,6 +846,22 @@ release_digest: string
 version: number
 }
 /**
+ * One chunk of a chunked layer or weight, as a staged archive indexes it.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ContentChunk".
+ */
+export interface ContentChunk {
+digest: string
+index: number
+size_bytes: number
+/**
+ * Whether the chunk file sits in a staged chunk store. Found by name,
+ * not re-hashed; import verifies every chunk.
+ */
+staged: boolean
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "ContentInventory".
  */
@@ -856,11 +874,51 @@ missing: string[]
  * Bytes under the OCI store; absent when no store is configured.
  */
 oci_store_bytes?: number
+/**
+ * Bytes available to this process on the filesystem of the OCI store;
+ * absent when no store is configured or it cannot be read.
+ */
+oci_store_free_bytes?: number
+/**
+ * Plans waiting to apply (`computed` or `blocked`) and the content each
+ * still needs here (#827).
+ */
+pending_plans?: PendingPlanContent[]
 releases: ReleaseContent[]
+/**
+ * Why staged chunks are not listed when the staging directory could
+ * not be read; the rest of the inventory stands without them.
+ */
+staging_unavailable?: string
 /**
  * Bytes under the weight cache; absent when no cache is configured.
  */
 weight_cache_bytes?: number
+/**
+ * The same for the weight cache.
+ */
+weight_cache_free_bytes?: number
+}
+/**
+ * One plan waiting to apply and the content of its releases this host
+ * holds no bytes for.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "PendingPlanContent".
+ */
+export interface PendingPlanContent {
+environment: string
+/**
+ * As `<release> <digest>`; empty once everything is here. Content of a
+ * store that is not configured is not counted.
+ */
+missing: string[]
+plan_id: string
+/**
+ * The releases its steps apply.
+ */
+releases: string[]
+state: string
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -881,6 +939,11 @@ version: string
  * via the `definition` "ContentItem".
  */
 export interface ContentItem {
+/**
+ * Its chunks staged for import, in order (#827); empty when no staged
+ * archive carries it chunked.
+ */
+chunks?: ContentChunk[]
 digest: string
 /**
  * `layer` or `weights`.
@@ -1667,6 +1730,12 @@ group?: string
  */
 export interface ImportJob {
 actor: string
+/**
+ * `sha256:<hex>` of the archive bytes this job read (#830), from the
+ * job's archive file; never in the job file. Absent before the archive
+ * was read, and on jobs from earlier versions.
+ */
+archive_digest?: string
 bundle: string
 dry_run: boolean
 environment: string
@@ -2468,6 +2537,11 @@ revoked: boolean
  */
 export interface StagedBundle {
 /**
+ * `sha256:<hex>` of the archive file (#830); absent when it could not
+ * be read.
+ */
+archive_digest?: string
+/**
  * True when a `<stem>.chunks/` store sits beside the archive.
  */
 chunked: boolean
@@ -2483,6 +2557,13 @@ size_bytes: number
  * Why the file is not a readable bundle.
  */
 unreadable?: string
+/**
+ * The upgrade this bundle serves (#827), derived from the upgrade
+ * records: the one upgrade with this bundle's environment on its plan
+ * and its release among the bundle's releases. Absent when none or
+ * more than one matches; the bundle itself names no upgrade.
+ */
+upgrade?: string
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema

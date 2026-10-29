@@ -11,11 +11,19 @@ import { Imports } from "./imports";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const STAGED: StagedBundle[] = [
-  { file: "site.tar", size_bytes: 2_048, chunked: true, environment: "site", plan_id: "p1" },
+  {
+    file: "site.tar",
+    size_bytes: 2_048,
+    chunked: true,
+    environment: "site",
+    plan_id: "p1",
+    upgrade: "u1",
+  },
 ];
 
 const INVENTORY: ContentInventory = {
   oci_store_bytes: 4_096,
+  oci_store_free_bytes: 1_073_741_824,
   missing: ["app 1.0.0 sha256:w1"],
   releases: [
     {
@@ -23,9 +31,31 @@ const INVENTORY: ContentInventory = {
       product: "app",
       version: "1.0.0",
       referenced_by: ["deployed site"],
-      content: [{ digest: "sha256:l1", kind: "layer", size_bytes: 1_024, stored: true }],
+      content: [
+        {
+          digest: "sha256:l1",
+          kind: "layer",
+          size_bytes: 1_024,
+          stored: true,
+          chunks: [
+            { index: 0, digest: "sha256:c0", size_bytes: 512, staged: true },
+            { index: 1, digest: "sha256:c1", size_bytes: 512, staged: false },
+          ],
+        },
+      ],
     },
   ],
+  pending_plans: [
+    {
+      plan_id: "p1",
+      environment: "site",
+      state: "computed",
+      releases: ["r1"],
+      missing: ["r1 sha256:w1"],
+    },
+    { plan_id: "p2", environment: "lab", state: "blocked", releases: ["r1"], missing: [] },
+  ],
+  staging_unavailable: "reading staging: permission denied",
 };
 
 const job = (overrides: Partial<ImportJob>): ImportJob => ({
@@ -171,7 +201,11 @@ describe("Imports", () => {
     }));
     await render();
     expect(column("Staged")).toContain("site.tar");
-    await type("Upgrade for site.tar", "u1");
+    // Prefilled with the upgrade Tenkai derived for the bundle.
+    expect(
+      container.querySelector<HTMLInputElement>('input[aria-label="Upgrade for site.tar"]')?.value,
+    ).toBe("u1");
+    expect(column("Staged")).toContain("upgrade u1");
     await click("Dry run");
     expect(calls.find((call) => call.method === "POST")?.body).toStrictEqual({
       version: 1,
@@ -185,14 +219,25 @@ describe("Imports", () => {
     await click("Import");
     await click("Import into site");
     expect(column("Imported")).toContain("site.tar");
-    expect(container.querySelector('[aria-label="Space used"]')?.textContent).toBe(
-      "Used: OCI store 4.0 KB, weight cache not configured",
+    expect(container.querySelector('[aria-label="Space"]')?.textContent).toBe(
+      "OCI store 4.0 KB used, 1.0 GB free; weight cache not configured",
+    );
+    expect(container.querySelector('[aria-label="Staging unavailable"]')?.textContent).toBe(
+      "Staged chunks unavailable: reading staging: permission denied",
     );
     expect(
-      [...container.querySelectorAll('table[aria-label="Content inventory"] tbody td')].map(
-        (cell) => cell.textContent,
+      [...container.querySelectorAll('[aria-label="Chunks of sha256:l1"] li')].map(
+        (item) => item.textContent,
       ),
-    ).toStrictEqual(["app 1.0.0", "layer", "sha256:l1", "1.0 KB", "held", "deployed site"]);
+    ).toStrictEqual(["#0 sha256:c0 512 B staged", "#1 sha256:c1 512 B missing"]);
+    expect(
+      [...container.querySelectorAll('table[aria-label="Pending plans"] tbody tr')].map((row) =>
+        [...row.querySelectorAll("td")].map((cell) => cell.textContent),
+      ),
+    ).toStrictEqual([
+      ["p1", "site", "computed", "r1 sha256:w1"],
+      ["p2", "lab", "blocked", "nothing"],
+    ]);
     expect(container.querySelector('[aria-label="Missing content"]')?.textContent).toBe(
       "Missing here: app 1.0.0 sha256:w1",
     );
