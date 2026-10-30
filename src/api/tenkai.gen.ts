@@ -1,6 +1,13 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at eca0cff138af8b66ae12fac5896d530e19090919 (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 4d518dea32bcf8b4b257f07b8317cd6c1d7f4822 (contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
+/**
+ * Ordered advisory severities. Higher values are more severe.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "Severity".
+ */
+export type Severity = ("info" | "low" | "medium" | "high" | "critical")
 /**
  * Whether an entry shows material the server loaded and uses, or a file as
  * it is on disk now, which a client that read it at startup adopts only
@@ -96,6 +103,20 @@ reason: "migration_state"
  */
 export type ConnectivityClass = ("connected" | "intermittent" | "isolated")
 /**
+ * Ordered operator-facing criticality. Higher values matter more.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "CriticalityLevel".
+ */
+export type CriticalityLevel = ("low" | "medium" | "high" | "critical")
+/**
+ * Who a criticality assignment names.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "CriticalityTargetKind".
+ */
+export type CriticalityTargetKind = ("environment" | "product")
+/**
  * Purpose a quorum rule applies to. Derived from the plan and apply flags;
  * the v1 envelope purpose stays `execute_plan`.
  * 
@@ -156,8 +177,16 @@ kind: "clear_approval_policy"
 } | {
 kind: "set_runner_attestation"
 max_age_ms: number
+require_hardware_key?: boolean
 } | {
 kind: "clear_runner_attestation"
+} | {
+kind: "set_criticality"
+level: CriticalityLevel
+owner: string
+reason: string
+} | {
+kind: "clear_criticality"
 })
 /**
  * Stable apply-lifecycle events a webhook endpoint may subscribe to.
@@ -175,6 +204,20 @@ export type WebhookEvent = ("apply.succeeded" | "apply.failed" | "apply.rolled_b
  * via the `definition` "OperationalEvent".
  */
 export type OperationalEvent = (("plan.held" | "plan.awaiting_approval" | "import.failed" | "backup.stale" | "clock.drift") | "trust.expiring" | "runner.attestation_refused")
+/**
+ * How current an environment's deployed release observation is.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "Freshness".
+ */
+export type Freshness = ({
+kind: "hub"
+} | {
+imported_at: number
+kind: "as_of_last_bundle_import"
+} | {
+kind: "unknown"
+})
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "EnvironmentStatus".
@@ -257,7 +300,7 @@ export type RunnerAuth = ("client_certificate" | "bearer")
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "SignerValidity".
  */
-export type SignerValidity = "not_recorded"
+export type SignerValidity = ("not_recorded" | "recorded")
 /**
  * Status ordering: `ok` < `warning` < `critical` < `expired`.
  * 
@@ -267,6 +310,7 @@ export type SignerValidity = "not_recorded"
 export type TrustStatus = ("ok" | "warning" | "critical" | "expired")
 
 export interface TenkaiHttpV1 {
+AdvisoryFeedStatus?: AdvisoryFeedStatus
 ApplyRequest?: ApplyRequest
 ApprovalEnvelope?: ApprovalEnvelope
 ApprovalStatement?: ApprovalStatement
@@ -304,16 +348,29 @@ ContentInventory?: ContentInventory
 ContentItem?: ContentItem
 CreateGrantRuleRequest?: CreateGrantRuleRequest
 CredentialRunway?: CredentialRunway
+CriticalityLevel?: CriticalityLevel
+CriticalityTargetKind?: CriticalityTargetKind
+DeclaredCriticality?: DeclaredCriticality
 DeliveryHold?: DeliveryHold
 DeliveryHoldRequest?: DeliveryHoldRequest
 DeliveryHoldView?: DeliveryHoldView
+DerivedAssignment?: DerivedAssignment
+DerivedCriticality?: DerivedCriticality
+DerivedEnvelope?: DerivedEnvelope
+DerivedImportResult?: DerivedImportResult
+DerivedStatement?: DerivedStatement
 DrillEvidence?: DrillEvidence
 EffectiveApprovalPolicy?: EffectiveApprovalPolicy
+EffectiveCriticality?: EffectiveCriticality
 EligibleApprover?: EligibleApprover
 EntryProgress?: EntryProgress
 EnvironmentConfigChange?: EnvironmentConfigChange
 EnvironmentConfigRequest?: EnvironmentConfigRequest
 EnvironmentConstraint?: EnvironmentConstraint
+EnvironmentCriticality?: EnvironmentCriticality
+EnvironmentDeclaredCriticality?: EnvironmentDeclaredCriticality
+EnvironmentDerivedCriticality?: EnvironmentDerivedCriticality
+EnvironmentExposure?: EnvironmentExposure
 EnvironmentInspectReport?: EnvironmentInspectReport
 EnvironmentLeaseInspect?: EnvironmentLeaseInspect
 EnvironmentListEntry?: EnvironmentListEntry
@@ -337,9 +394,12 @@ ExportEvent?: ExportEvent
 ExportKind?: ExportKind
 ExportList?: ExportList
 ExportRequest?: ExportRequest
+ExposureQueryRequest?: ExposureQueryRequest
+ExposureQueryResult?: ExposureQueryResult
 FirstAdministrator?: FirstAdministrator
 FleetEnvironmentRow?: FleetEnvironmentRow
 FleetStatusReport?: FleetStatusReport
+Freshness?: Freshness
 GrantRuleList?: GrantRuleList
 GrantRuleView?: GrantRuleView
 GroupApprovers?: GroupApprovers
@@ -350,6 +410,7 @@ ImportRequest?: ImportRequest
 ImportState?: ImportState
 InstalledRevocations?: InstalledRevocations
 ManagementLifecycleResult?: ManagementLifecycleResult
+MatchedExposure?: MatchedExposure
 MigrationApprovalEnvelope?: MigrationApprovalEnvelope
 MigrationApprovalStatement?: MigrationApprovalStatement
 MigrationDeclaration?: MigrationDeclaration
@@ -391,6 +452,7 @@ QuorumRule?: QuorumRule
 RecallRequest?: RecallRequest
 RegisterEnvironmentRequest?: RegisterEnvironmentRequest
 ReleaseContent?: ReleaseContent
+ReleaseExposure?: ReleaseExposure
 ReleaseListEntry?: ReleaseListEntry
 ReleasePage?: ReleasePage
 ReleaseStatement?: ReleaseStatement
@@ -411,6 +473,8 @@ RuntimeRunnerInstance?: RuntimeRunnerInstance
 RuntimeRunnerList?: RuntimeRunnerList
 ScanEvidence?: ScanEvidence1
 ServiceStatus?: ServiceStatus
+SetCriticalityRequest?: SetCriticalityRequest
+Severity?: Severity
 SignatureEnvelope?: SignatureEnvelope
 SignerValidity?: SignerValidity
 SigningRoot?: SigningRoot
@@ -426,6 +490,34 @@ TrustedSignerView?: TrustedSignerView
 WebhookDelivery?: WebhookDelivery
 WebhookEndpoint?: WebhookEndpoint
 WebhookEvent?: WebhookEvent
+}
+/**
+ * Imported feed age and the releases it currently flags.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "AdvisoryFeedStatus".
+ */
+export interface AdvisoryFeedStatus {
+advisory_count: number
+age_ms: number
+generated_at: number
+imported: boolean
+imported_at: number
+matches: MatchedExposure[]
+}
+/**
+ * A release component that matches an advisory.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "MatchedExposure".
+ */
+export interface MatchedExposure {
+advisory_id: string
+component: string
+component_version: string
+release: string
+release_id: string
+severity: Severity
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -484,6 +576,14 @@ environments?: string[]
 groups?: string[]
 identity: string
 key_id: string
+/**
+ * Unix milliseconds. Absent: validity is not recorded (#812).
+ */
+not_after?: number
+/**
+ * Unix milliseconds. Absent: validity is not recorded (#812).
+ */
+not_before?: number
 providers?: string[]
 public_key: string
 }
@@ -502,6 +602,14 @@ version: number
 export interface ApprovalTrustedSigner {
 identity: string
 key_id: string
+/**
+ * Unix milliseconds. Absent: validity is not recorded (#812).
+ */
+not_after?: number
+/**
+ * Unix milliseconds. Absent: validity is not recorded (#812).
+ */
+not_before?: number
 public_key: string
 }
 /**
@@ -1028,6 +1136,19 @@ expires_at_ms: number
 window_opens_at_ms: number
 }
 /**
+ * Operator-declared criticality, with who set it and why.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DeclaredCriticality".
+ */
+export interface DeclaredCriticality {
+level: CriticalityLevel
+owner: string
+reason: string
+set_at: number
+source: string
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "DeliveryHoldRequest".
  */
@@ -1061,6 +1182,66 @@ at: number
 reason: string
 }
 /**
+ * One assignment inside a signed derived envelope.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DerivedAssignment".
+ */
+export interface DerivedAssignment {
+kind: CriticalityTargetKind
+level: CriticalityLevel
+name: string
+reason?: string
+source: string
+}
+/**
+ * Imported derived criticality. `stale` is computed at read time.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DerivedCriticality".
+ */
+export interface DerivedCriticality {
+age_ms: number
+generated_at: number
+imported_at: number
+level: CriticalityLevel
+reason: string
+source: string
+stale: boolean
+}
+/**
+ * Signed derived criticality from an external evidence source.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DerivedEnvelope".
+ */
+export interface DerivedEnvelope {
+key_id: string
+schema: string
+signature: string
+statement: DerivedStatement
+}
+/**
+ * Signed bytes of a derived-criticality envelope.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DerivedStatement".
+ */
+export interface DerivedStatement {
+assignments: DerivedAssignment[]
+generated_at: number
+max_age_ms: number
+}
+/**
+ * Result of importing a signed derived envelope.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DerivedImportResult".
+ */
+export interface DerivedImportResult {
+applied: number
+}
+/**
  * Operator-facing policy: automatic signer key ids, human rules, and TTL.
  * Never includes seed bytes or file contents.
  * 
@@ -1088,8 +1269,24 @@ export interface QuorumRule {
  */
 exclude_requester?: boolean
 groups?: string[]
+/**
+ * When set, this rule applies only at this criticality or higher (#694).
+ * `low`, `medium`, `high`, or `critical`.
+ */
+min_criticality?: string
 n: number
 purpose: QuorumPurpose
+}
+/**
+ * Declared, derived, and the higher of the two that still counts.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EffectiveCriticality".
+ */
+export interface EffectiveCriticality {
+declared?: DeclaredCriticality
+derived?: DerivedCriticality
+effective?: CriticalityLevel
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -1150,6 +1347,54 @@ name: string
 value: string
 }
 /**
+ * Inspect copy of declared/derived criticality. Lives here so this module
+ * does not import the criticality leaf (that cycle breaks `Send` on inspect).
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EnvironmentCriticality".
+ */
+export interface EnvironmentCriticality {
+declared?: EnvironmentDeclaredCriticality
+derived?: EnvironmentDerivedCriticality
+effective?: string
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EnvironmentDeclaredCriticality".
+ */
+export interface EnvironmentDeclaredCriticality {
+level: string
+owner: string
+reason: string
+set_at: number
+source: string
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EnvironmentDerivedCriticality".
+ */
+export interface EnvironmentDerivedCriticality {
+age_ms: number
+generated_at: number
+imported_at: number
+level: string
+reason: string
+source: string
+stale: boolean
+}
+/**
+ * One environment running a matching release.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EnvironmentExposure".
+ */
+export interface EnvironmentExposure {
+criticality?: CriticalityLevel
+deployed_release: string
+environment: string
+freshness: Freshness
+}
+/**
  * Detailed inspect report for one environment (no credentials).
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -1165,6 +1410,7 @@ approval_policy?: string
  * Environment constraints (`version_pin`, `version_range`, `require_fact`).
  */
 constraints?: EnvironmentConstraint[]
+criticality?: EnvironmentCriticality1
 delivery_hold?: DeliveryHold1
 description: string
 /**
@@ -1214,6 +1460,15 @@ terminal_outcomes?: TerminalOutcomeProjection[]
  * or returned. Edits are conditional on `lease.generation`.
  */
 webhooks?: WebhookEndpoint[]
+}
+/**
+ * Inspect copy of declared/derived criticality. Lives here so this module
+ * does not import the criticality leaf (that cycle breaks `Send` on inspect).
+ */
+export interface EnvironmentCriticality1 {
+declared?: EnvironmentDeclaredCriticality
+derived?: EnvironmentDerivedCriticality
+effective?: string
 }
 /**
  * Durable evidence that delivery is paused for a scope.
@@ -1597,6 +1852,14 @@ version: number
  */
 export interface EvaluationTrustedSigner {
 key_id: string
+/**
+ * Unix milliseconds. Absent: validity is not recorded (#812).
+ */
+not_after?: number
+/**
+ * Unix milliseconds. Absent: validity is not recorded (#812).
+ */
+not_before?: number
 public_key: string
 }
 /**
@@ -1699,12 +1962,59 @@ to_sequence?: (number | null)
 upgrade?: (string | null)
 }
 /**
+ * Query parameters for `GET /v1/exposures` and `tenkaictl exposure query`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ExposureQueryRequest".
+ */
+export interface ExposureQueryRequest {
+component?: string
+/**
+ * Ordered operator-facing criticality. Higher values matter more.
+ */
+min_criticality?: ("low" | "medium" | "high" | "critical")
+range?: string
+}
+/**
+ * Result of an exposure query. Matching is local; it does not contact a network.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ExposureQueryResult".
+ */
+export interface ExposureQueryResult {
+component: string
+matches: ReleaseExposure[]
+range: string
+}
+/**
+ * One catalog release that contains the queried component.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ReleaseExposure".
+ */
+export interface ReleaseExposure {
+channels: string[]
+component: string
+component_version: string
+criticality?: CriticalityLevel
+environments: EnvironmentExposure[]
+product: string
+product_criticality?: CriticalityLevel
+release: string
+release_id: string
+version: string
+}
+/**
  * One environment's row in a fleet posture table (no credentials).
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "FleetEnvironmentRow".
  */
 export interface FleetEnvironmentRow {
+/**
+ * Effective environment criticality when set (#694).
+ */
+criticality?: string
 description: string
 /**
  * `ok` | `unknown` | `error` | `n/a` (no subscriptions).
@@ -2152,8 +2462,8 @@ operation: string
 version: number
 }
 /**
- * A plan waiting to apply and the first certificate that would lapse
- * before it can (#811).
+ * A plan waiting to apply and the first certificate or trust-root signer
+ * that would lapse before it can (#811, #812).
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "PlanRunway".
@@ -2271,6 +2581,14 @@ version: number
 export interface ReleaseTrustedSigner {
 identity: string
 key_id: string
+/**
+ * Unix milliseconds. Absent: validity is not recorded (#812).
+ */
+not_after?: number
+/**
+ * Unix milliseconds. Absent: validity is not recorded (#812).
+ */
+not_before?: number
 public_key: string
 }
 /**
@@ -2596,6 +2914,17 @@ state: string
 warn_ms: number
 }
 /**
+ * Body of `PUT` environment/product criticality.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "SetCriticalityRequest".
+ */
+export interface SetCriticalityRequest {
+level: CriticalityLevel
+owner: string
+reason: string
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "SigningRoot".
  */
@@ -2609,7 +2938,7 @@ purpose: string
 /**
  * Whether a trust root's format records when each signer is valid.
  */
-signer_validity?: "not_recorded"
+signer_validity?: ("not_recorded" | "recorded")
 signers: TrustedSignerView[]
 /**
  * Whether an entry shows material the server loaded and uses, or a file as
@@ -2625,6 +2954,14 @@ source: ("loaded" | "file")
 export interface TrustedSignerView {
 identity: string
 key_id: string
+/**
+ * Unix milliseconds. Absent when this signer has no window (#812).
+ */
+not_after?: number
+/**
+ * Unix milliseconds. Absent when this signer has no window (#812).
+ */
+not_before?: number
 /**
  * Revoked by the key revocations this process enforces.
  */
