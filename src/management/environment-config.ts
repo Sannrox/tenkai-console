@@ -45,6 +45,8 @@ const SEGMENT: Record<EnvironmentConfigChange["kind"], string> = {
   // Routable for completeness; the console has no editor for it yet.
   set_runner_attestation: "runner-attestation",
   clear_runner_attestation: "runner-attestation",
+  set_criticality: "criticality",
+  clear_criticality: "criticality",
 };
 
 const CLEARS = new Set<EnvironmentConfigChange["kind"]>([
@@ -54,6 +56,7 @@ const CLEARS = new Set<EnvironmentConfigChange["kind"]>([
   "clear_webhooks",
   "clear_approval_policy",
   "clear_runner_attestation",
+  "clear_criticality",
 ]);
 
 /** The route, method and body of one change, as the server routes it. */

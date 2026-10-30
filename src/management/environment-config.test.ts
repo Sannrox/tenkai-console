@@ -38,6 +38,18 @@ describe("environment configuration requests", () => {
     expect(
       configCall("prod", 0, "r", { kind: "remove_maintenance_window", name: "weekly" }),
     ).toMatchObject({ method: "DELETE", path: "v1/environments/prod/maintenance-windows/weekly" });
+    expect(
+      configCall("prod", 0, "r", {
+        kind: "set_criticality",
+        level: "high",
+        owner: "ops",
+        reason: "site",
+      }),
+    ).toMatchObject({ method: "PUT", path: "v1/environments/prod/criticality" });
+    expect(configCall("prod", 0, "r", { kind: "clear_criticality" })).toMatchObject({
+      method: "DELETE",
+      path: "v1/environments/prod/criticality",
+    });
   });
 });
 

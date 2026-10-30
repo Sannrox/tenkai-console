@@ -8,6 +8,7 @@ import { Button } from "../ui/kit";
 const TABS = [
   { label: "Delivery", to: "/" },
   { label: "Releases", to: "/releases" },
+  { label: "Exposure", to: "/exposure" },
   { label: "Environments", to: "/environments" },
   { label: "Runners", to: "/runners" },
   { label: "Server", to: "/server" },
@@ -24,8 +25,8 @@ const activeTab = (path: string) =>
 /**
  * Top-level tabs, no second menu, account menu on the right. The 2026-10-28
  * navigation decision (#34) supersedes decision 4D's four-tab limit: new
- * screens (Runners, Server, Imports, Trust, Operations) are tabs of their own, each
- * added with its screen.
+ * screens (Exposure, Runners, Server, Imports, Trust, Operations) are tabs of
+ * their own, each added with its screen.
  */
 export const TopBar = ({
   session,

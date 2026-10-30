@@ -94,6 +94,10 @@ export const useManagementCall = <T>(
         // Backup age and state come from /healthz.
         queryClient.invalidateQueries({ queryKey: ["health"] }),
         queryClient.invalidateQueries({ queryKey: ["exports"] }),
+        queryClient.invalidateQueries({ queryKey: ["exposures"] }),
+        queryClient.invalidateQueries({ queryKey: ["advisory-feed"] }),
+        queryClient.invalidateQueries({ queryKey: ["events"] }),
+        queryClient.invalidateQueries({ queryKey: ["product-criticality"] }),
       ]),
   });
   // By status, not data: some routes answer success with JSON `null`.

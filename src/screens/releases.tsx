@@ -1,11 +1,26 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import type { ManagementLifecycleResult } from "../api/tenkai.gen";
-import { useSession } from "../auth/session";
-import { channelMatrix, fleetTableRows } from "../delivery/configuration";
+import { request } from "../api/http";
+import type {
+  ChangeEventPage,
+  EnvironmentInspectReport,
+  ManagementLifecycleResult,
+} from "../api/tenkai.gen";
+import { type DeliveryCapability, isRefused, useSession } from "../auth/session";
+import { channelMatrix, fleetTableRows, type FleetTableRow } from "../delivery/configuration";
+import { cohortNames, recallEvents } from "../delivery/exposure";
 import { useDelivery } from "../delivery/use-delivery";
 import { isReleaseSpec, parsePublish, promoteBody, recallBody } from "../management/catalog";
-import { refusesCredential, useManagementCall } from "../management/use-management";
+import {
+  failure,
+  newRequestId,
+  refusesCredential,
+  useManagementCall,
+  type Outcome,
+} from "../management/use-management";
+import { expectedGeneration, holdBody, releaseHoldBody } from "../plan/requests";
 import { Card, ConfirmButton, Notice } from "../ui/kit";
+import { td } from "../ui/posture";
 import { Compatibility } from "./compatibility";
 import { Migrations } from "./migrations";
 
@@ -70,6 +85,9 @@ export const Releases = () => {
       </Card>
       {token && <Compatibility token={token} environments={names} />}
       {token && <Catalog token={token} channels={table.channels} />}
+      {token && (
+        <RecallFollow token={token} fleet={fleetTableRows(delivery.fleet, delivery.list)} />
+      )}
       {token && <Migrations token={token} environments={names} />}
     </>
   );
@@ -216,4 +234,163 @@ const Catalog = ({ token, channels }: { token: string; channels: string[] }) => 
       )}
     </>
   );
+};
+
+/**
+ * Pick A (#41): recall proposal state from change events, and a cohort table
+ * whose Stop/Resume are environment holds so the table shows server state.
+ */
+const RecallFollow = ({ token, fleet }: { token: string; fleet: FleetTableRow[] }) => {
+  const events = useQuery({
+    queryKey: ["events", token],
+    queryFn: () => request<ChangeEventPage>("v1/events?limit=100", { token }),
+    retry: false,
+  });
+  const recalled = events.data ? recallEvents(events.data.events) : [];
+  const [cohort, setCohort] = useState("");
+  const names = cohortNames(cohort);
+  const byName = new Map(fleet.map((row) => [row.name, row]));
+  const mutate = useSession((state) => !isRefused(state.refused, "fleet", "management"));
+  return (
+    <>
+      <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Recall follow-through</h2>
+      <p className="m-0 mb-2 text-xs text-muted">
+        {events.error
+          ? events.error.message
+          : recalled.length === 0
+            ? "no recall events"
+            : recalled
+                .slice(0, 8)
+                .map((event) => `${event.resource} ${new Date(event.occurred_at).toISOString()}`)
+                .join(" · ")}
+      </p>
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <input
+          aria-label="Cohort"
+          placeholder="Cohort"
+          value={cohort}
+          onChange={(event) => setCohort(event.target.value)}
+          className={field}
+        />
+      </div>
+      {names.length > 0 && (
+        <Card className="overflow-x-auto">
+          <table aria-label="Recall cohort" className="w-full border-collapse text-xs">
+            <thead>
+              <tr>
+                <th className={th}>Cohort</th>
+                <th className={th}>Environment</th>
+                <th className={th}>State</th>
+                <th className={th}>Done</th>
+                {mutate && <th className={th} />}
+              </tr>
+            </thead>
+            <tbody>
+              {names.map((name, index) => {
+                const row = byName.get(name);
+                const state = row?.status ?? "unknown";
+                const done = state === "current" ? "yes" : "no";
+                return (
+                  <tr key={name}>
+                    <td className={td}>{index + 1}</td>
+                    <td className={td}>{name}</td>
+                    <td className={td}>{state}</td>
+                    <td className={td}>{done}</td>
+                    {mutate && (
+                      <td className={td}>
+                        <CohortHold token={token} environment={name} held={state === "held"} />
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
+      )}
+    </>
+  );
+};
+
+const CohortHold = ({
+  token,
+  environment,
+  held,
+}: {
+  token: string;
+  environment: string;
+  held: boolean;
+}) => {
+  const hold = useEnvironmentHold(token, environment);
+  if (!hold.allowed) {
+    return hold.outcome ? <Notice tone={hold.outcome.tone}>{hold.outcome.text}</Notice> : null;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {held ? (
+        <ConfirmButton
+          label="Resume"
+          confirm={`Resume ${environment}`}
+          disabled={hold.isPending}
+          onConfirm={() => hold.mutate("resume")}
+        />
+      ) : (
+        <ConfirmButton
+          label="Stop"
+          confirm={`Stop ${environment}`}
+          disabled={hold.isPending}
+          onConfirm={() => hold.mutate("stop")}
+        />
+      )}
+      {hold.outcome && <Notice tone={hold.outcome.tone}>{hold.outcome.text}</Notice>}
+    </div>
+  );
+};
+
+const useEnvironmentHold = (token: string, environment: string) => {
+  const queryClient = useQueryClient();
+  const capability: DeliveryCapability = "management";
+  const allowed = useSession((state) => !isRefused(state.refused, "fleet", capability));
+  const refuse = useSession((state) => state.refuse);
+  const mutation = useMutation({
+    mutationFn: async (action: "stop" | "resume") => {
+      const report = await request<EnvironmentInspectReport>(
+        `v1/environments/${encodeURIComponent(environment)}`,
+        { token },
+      );
+      const generation = expectedGeneration(report.lease);
+      const path =
+        action === "stop"
+          ? `v1/environments/${encodeURIComponent(environment)}/hold`
+          : `v1/environments/${encodeURIComponent(environment)}/hold/release`;
+      const body =
+        action === "stop"
+          ? holdBody(environment, generation, "recall follow-through")
+          : releaseHoldBody(environment, generation);
+      return request<ManagementLifecycleResult>(path, {
+        token,
+        method: "POST",
+        body,
+        requestId: newRequestId(),
+      });
+    },
+    onError: (error) => {
+      if (refusesCredential(error)) {
+        refuse(token, "fleet", capability);
+      }
+    },
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["environment", environment] }),
+        queryClient.invalidateQueries({ queryKey: ["environments"] }),
+        queryClient.invalidateQueries({ queryKey: ["fleet"] }),
+        queryClient.invalidateQueries({ queryKey: ["events"] }),
+      ]),
+  });
+  const outcome: Outcome | undefined = mutation.isSuccess
+    ? { tone: "ok", text: mutation.data.message }
+    : mutation.error
+      ? failure(mutation.error, capability)
+      : undefined;
+  return { ...mutation, allowed, outcome };
 };

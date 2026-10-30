@@ -1,5 +1,45 @@
 {
   "$defs": {
+    "AdvisoryFeedStatus": {
+      "description": "Imported feed age and the releases it currently flags.",
+      "properties": {
+        "advisory_count": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "age_ms": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "generated_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "imported": {
+          "type": "boolean"
+        },
+        "imported_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "matches": {
+          "items": {
+            "$ref": "#/$defs/MatchedExposure"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "imported",
+        "imported_at",
+        "generated_at",
+        "age_ms",
+        "advisory_count",
+        "matches"
+      ],
+      "type": "object"
+    },
     "ApplyRequest": {
       "additionalProperties": false,
       "properties": {
@@ -151,6 +191,16 @@
         },
         "key_id": {
           "type": "string"
+        },
+        "not_after": {
+          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "not_before": {
+          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
+          "format": "int64",
+          "type": "integer"
         },
         "public_key": {
           "type": "string"
@@ -1262,6 +1312,53 @@
       ],
       "type": "object"
     },
+    "CriticalityLevel": {
+      "description": "Ordered operator-facing criticality. Higher values matter more.",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "type": "string"
+    },
+    "CriticalityTargetKind": {
+      "description": "Who a criticality assignment names.",
+      "enum": [
+        "environment",
+        "product"
+      ],
+      "type": "string"
+    },
+    "DeclaredCriticality": {
+      "description": "Operator-declared criticality, with who set it and why.",
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/CriticalityLevel"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "set_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "owner",
+        "reason",
+        "set_at",
+        "source"
+      ],
+      "type": "object"
+    },
     "DeliveryHold": {
       "description": "Durable evidence that delivery is paused for a scope.",
       "properties": {
@@ -1332,6 +1429,139 @@
       },
       "required": [
         "audit"
+      ],
+      "type": "object"
+    },
+    "DerivedAssignment": {
+      "additionalProperties": false,
+      "description": "One assignment inside a signed derived envelope.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/CriticalityTargetKind"
+        },
+        "level": {
+          "$ref": "#/$defs/CriticalityLevel"
+        },
+        "name": {
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "level",
+        "source"
+      ],
+      "type": "object"
+    },
+    "DerivedCriticality": {
+      "description": "Imported derived criticality. `stale` is computed at read time.",
+      "properties": {
+        "age_ms": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "generated_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "imported_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "level": {
+          "$ref": "#/$defs/CriticalityLevel"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "stale": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "level",
+        "source",
+        "reason",
+        "generated_at",
+        "imported_at",
+        "age_ms",
+        "stale"
+      ],
+      "type": "object"
+    },
+    "DerivedEnvelope": {
+      "additionalProperties": false,
+      "description": "Signed derived criticality from an external evidence source.",
+      "properties": {
+        "key_id": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "signature": {
+          "type": "string"
+        },
+        "statement": {
+          "$ref": "#/$defs/DerivedStatement"
+        }
+      },
+      "required": [
+        "schema",
+        "key_id",
+        "statement",
+        "signature"
+      ],
+      "type": "object"
+    },
+    "DerivedImportResult": {
+      "description": "Result of importing a signed derived envelope.",
+      "properties": {
+        "applied": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "applied"
+      ],
+      "type": "object"
+    },
+    "DerivedStatement": {
+      "additionalProperties": false,
+      "description": "Signed bytes of a derived-criticality envelope.",
+      "properties": {
+        "assignments": {
+          "items": {
+            "$ref": "#/$defs/DerivedAssignment"
+          },
+          "type": "array"
+        },
+        "generated_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "max_age_ms": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "generated_at",
+        "max_age_ms",
+        "assignments"
       ],
       "type": "object"
     },
@@ -1426,6 +1656,21 @@
         "configured",
         "mode"
       ],
+      "type": "object"
+    },
+    "EffectiveCriticality": {
+      "description": "Declared, derived, and the higher of the two that still counts.",
+      "properties": {
+        "declared": {
+          "$ref": "#/$defs/DeclaredCriticality"
+        },
+        "derived": {
+          "$ref": "#/$defs/DerivedCriticality"
+        },
+        "effective": {
+          "$ref": "#/$defs/CriticalityLevel"
+        }
+      },
       "type": "object"
     },
     "EligibleApprover": {
@@ -1709,7 +1954,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Require attested runner enrollment and renewal (#675) with evidence\nat most `max_age_ms` old.",
+          "description": "Require attested runner enrollment and renewal (#675) with evidence\nat most `max_age_ms` old. `require_hardware_key` (#785) refuses a\nfile runner key.",
           "properties": {
             "kind": {
               "const": "set_runner_attestation",
@@ -1719,6 +1964,9 @@
               "format": "uint64",
               "minimum": 0,
               "type": "integer"
+            },
+            "require_hardware_key": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -1732,6 +1980,45 @@
           "properties": {
             "kind": {
               "const": "clear_runner_attestation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Declared environment criticality (#694). Derived values are imported\nseparately and are not cleared here.",
+          "properties": {
+            "kind": {
+              "const": "set_criticality",
+              "type": "string"
+            },
+            "level": {
+              "$ref": "#/$defs/CriticalityLevel"
+            },
+            "owner": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "level",
+            "owner",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "clear_criticality",
               "type": "string"
             }
           },
@@ -1801,6 +2088,110 @@
       ],
       "type": "object"
     },
+    "EnvironmentCriticality": {
+      "description": "Inspect copy of declared/derived criticality. Lives here so this module\ndoes not import the criticality leaf (that cycle breaks `Send` on inspect).",
+      "properties": {
+        "declared": {
+          "$ref": "#/$defs/EnvironmentDeclaredCriticality"
+        },
+        "derived": {
+          "$ref": "#/$defs/EnvironmentDerivedCriticality"
+        },
+        "effective": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "EnvironmentDeclaredCriticality": {
+      "properties": {
+        "level": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "set_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "owner",
+        "reason",
+        "set_at",
+        "source"
+      ],
+      "type": "object"
+    },
+    "EnvironmentDerivedCriticality": {
+      "properties": {
+        "age_ms": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "generated_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "imported_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "level": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "stale": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "level",
+        "source",
+        "reason",
+        "generated_at",
+        "imported_at",
+        "age_ms",
+        "stale"
+      ],
+      "type": "object"
+    },
+    "EnvironmentExposure": {
+      "description": "One environment running a matching release.",
+      "properties": {
+        "criticality": {
+          "$ref": "#/$defs/CriticalityLevel"
+        },
+        "deployed_release": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "freshness": {
+          "$ref": "#/$defs/Freshness"
+        }
+      },
+      "required": [
+        "environment",
+        "deployed_release",
+        "freshness"
+      ],
+      "type": "object"
+    },
     "EnvironmentInspectReport": {
       "description": "Detailed inspect report for one environment (no credentials).",
       "properties": {
@@ -1815,6 +2206,10 @@
             "$ref": "#/$defs/EnvironmentConstraint"
           },
           "type": "array"
+        },
+        "criticality": {
+          "$ref": "#/$defs/EnvironmentCriticality",
+          "description": "Declared and derived criticality when either is set (#694)."
         },
         "delivery_hold": {
           "$ref": "#/$defs/DeliveryHold",
@@ -2485,6 +2880,16 @@
         "key_id": {
           "type": "string"
         },
+        "not_after": {
+          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "not_before": {
+          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
+          "format": "int64",
+          "type": "integer"
+        },
         "public_key": {
           "type": "string"
         }
@@ -2708,6 +3113,47 @@
       ],
       "type": "object"
     },
+    "ExposureQueryRequest": {
+      "description": "Query parameters for `GET /v1/exposures` and `tenkaictl exposure query`.",
+      "properties": {
+        "component": {
+          "default": "",
+          "type": "string"
+        },
+        "min_criticality": {
+          "$ref": "#/$defs/CriticalityLevel",
+          "description": "When set, keep only matches whose effective criticality is at least this."
+        },
+        "range": {
+          "default": "",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ExposureQueryResult": {
+      "description": "Result of an exposure query. Matching is local; it does not contact a network.",
+      "properties": {
+        "component": {
+          "type": "string"
+        },
+        "matches": {
+          "items": {
+            "$ref": "#/$defs/ReleaseExposure"
+          },
+          "type": "array"
+        },
+        "range": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "component",
+        "range",
+        "matches"
+      ],
+      "type": "object"
+    },
     "FirstAdministrator": {
       "description": "Whether a first administrator is configured: a `[grants]` rule that gives\nfleet management (#631). Without one, only the management token can\nadminister the server. Reported unauthenticated on `/healthz` (#815), so\nit is one coarse status and never names a rule or an identity.",
       "enum": [
@@ -2719,6 +3165,10 @@
     "FleetEnvironmentRow": {
       "description": "One environment's row in a fleet posture table (no credentials).",
       "properties": {
+        "criticality": {
+          "description": "Effective environment criticality when set (#694).",
+          "type": "string"
+        },
         "description": {
           "type": "string"
         },
@@ -2838,6 +3288,52 @@
         "environments_empty"
       ],
       "type": "object"
+    },
+    "Freshness": {
+      "description": "How current an environment's deployed release observation is.",
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "hub",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "imported_at": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "kind": {
+              "const": "as_of_last_bundle_import",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "imported_at"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "unknown",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "GrantRuleList": {
       "description": "`GET /v1/grant-rules`: the stored rules and their generation.",
@@ -3137,6 +3633,38 @@
         "version",
         "operation",
         "message"
+      ],
+      "type": "object"
+    },
+    "MatchedExposure": {
+      "description": "A release component that matches an advisory.",
+      "properties": {
+        "advisory_id": {
+          "type": "string"
+        },
+        "component": {
+          "type": "string"
+        },
+        "component_version": {
+          "type": "string"
+        },
+        "release": {
+          "type": "string"
+        },
+        "release_id": {
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        }
+      },
+      "required": [
+        "advisory_id",
+        "severity",
+        "component",
+        "component_version",
+        "release",
+        "release_id"
       ],
       "type": "object"
     },
@@ -3923,6 +4451,16 @@
         "key_id": {
           "type": "string"
         },
+        "not_after": {
+          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "not_before": {
+          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
+          "format": "int64",
+          "type": "integer"
+        },
         "providers": {
           "items": {
             "type": "string"
@@ -4045,11 +4583,11 @@
       "type": "object"
     },
     "PlanRunway": {
-      "description": "A plan waiting to apply and the first certificate that would lapse\nbefore it can (#811).",
+      "description": "A plan waiting to apply and the first certificate or trust-root signer\nthat would lapse before it can (#811, #812).",
       "properties": {
         "blocked_by": {
           "$ref": "#/$defs/CredentialRunway",
-          "description": "The first TLS certificate to lapse at or before that window. Absent\nwhen none does. Signers are not checked: trust roots record no\nsigner validity."
+          "description": "The first TLS certificate or trust-root signer to lapse at or before\nthat window. Absent when none does."
         },
         "environment": {
           "type": "string"
@@ -4229,6 +4767,10 @@
           },
           "type": "array"
         },
+        "min_criticality": {
+          "description": "When set, this rule applies only at this criticality or higher (#694).\n`low`, `medium`, `high`, or `critical`.",
+          "type": "string"
+        },
         "n": {
           "format": "uint32",
           "minimum": 0,
@@ -4337,6 +4879,58 @@
       ],
       "type": "object"
     },
+    "ReleaseExposure": {
+      "description": "One catalog release that contains the queried component.",
+      "properties": {
+        "channels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "component": {
+          "type": "string"
+        },
+        "component_version": {
+          "type": "string"
+        },
+        "criticality": {
+          "$ref": "#/$defs/CriticalityLevel"
+        },
+        "environments": {
+          "items": {
+            "$ref": "#/$defs/EnvironmentExposure"
+          },
+          "type": "array"
+        },
+        "product": {
+          "type": "string"
+        },
+        "product_criticality": {
+          "$ref": "#/$defs/CriticalityLevel"
+        },
+        "release": {
+          "type": "string"
+        },
+        "release_id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "release",
+        "product",
+        "version",
+        "release_id",
+        "component",
+        "component_version",
+        "channels",
+        "environments"
+      ],
+      "type": "object"
+    },
     "ReleaseListEntry": {
       "description": "Identifying fields and current digest/version for one published release.",
       "properties": {
@@ -4428,6 +5022,16 @@
         },
         "key_id": {
           "type": "string"
+        },
+        "not_after": {
+          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "not_before": {
+          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
+          "format": "int64",
+          "type": "integer"
         },
         "public_key": {
           "type": "string"
@@ -4869,6 +5473,38 @@
       ],
       "type": "object"
     },
+    "SetCriticalityRequest": {
+      "additionalProperties": false,
+      "description": "Body of `PUT` environment/product criticality.",
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/CriticalityLevel"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "owner",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "Severity": {
+      "description": "Ordered advisory severities. Higher values are more severe.",
+      "enum": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "type": "string"
+    },
     "SignatureEnvelope": {
       "additionalProperties": false,
       "properties": {
@@ -4898,7 +5534,12 @@
       "oneOf": [
         {
           "const": "not_recorded",
-          "description": "Trust-root format v1 has no `not_before` or `not_after` per signer.",
+          "description": "No signer on this root carries `not_before` or `not_after`.",
+          "type": "string"
+        },
+        {
+          "const": "recorded",
+          "description": "At least one signer carries a validity window (#812).",
           "type": "string"
         }
       ]
@@ -4918,7 +5559,7 @@
         "signer_validity": {
           "$ref": "#/$defs/SignerValidity",
           "default": "not_recorded",
-          "description": "Trust-root files carry no signer validity period, so a signer is\ntrusted until removed or revoked (#811)."
+          "description": "`not_recorded` when no signer on this root carries a window;\n`recorded` when at least one does (#812)."
         },
         "signers": {
           "items": {
@@ -5246,6 +5887,16 @@
         },
         "key_id": {
           "type": "string"
+        },
+        "not_after": {
+          "description": "Unix milliseconds. Absent when this signer has no window (#812).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "not_before": {
+          "description": "Unix milliseconds. Absent when this signer has no window (#812).",
+          "format": "int64",
+          "type": "integer"
         },
         "revoked": {
           "description": "Revoked by the key revocations this process enforces.",
@@ -5627,6 +6278,37 @@
     {
       "auth": "read",
       "method": "GET",
+      "path": "/v1/exposures",
+      "request": {
+        "$ref": "#/$defs/ExposureQueryRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ExposureQueryResult"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/advisory-feed",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/AdvisoryFeedStatus"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/criticality/derived",
+      "request": {
+        "$ref": "#/$defs/DerivedEnvelope"
+      },
+      "response": {
+        "$ref": "#/$defs/DerivedImportResult"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
       "path": "/v1/channels",
       "request": {
         "$ref": "#/$defs/PageQuery"
@@ -5718,6 +6400,57 @@
       },
       "response": {
         "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "PUT",
+      "path": "/v1/environments/{environment}/criticality",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "DELETE",
+      "path": "/v1/environments/{environment}/criticality",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/products/{product}/criticality",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/EffectiveCriticality"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "PUT",
+      "path": "/v1/products/{product}/criticality",
+      "request": {
+        "$ref": "#/$defs/SetCriticalityRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/EffectiveCriticality"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "DELETE",
+      "path": "/v1/products/{product}/criticality",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/EffectiveCriticality"
       }
     },
     {
