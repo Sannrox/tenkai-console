@@ -1,5 +1,6 @@
 {
   "name": "tenkai-console",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.10.0",
