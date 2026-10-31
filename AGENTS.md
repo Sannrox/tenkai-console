@@ -14,7 +14,8 @@ Tenkai ADR 0031 (`docs/decisions/0031-web-console.md` in Sannrox/tenkai).
 - `src/screens/`, `src/delivery/`, `src/management/`, `src/plan/`,
   `src/workflows/`, `src/ui/`: screens, management actions, and shared UI.
 - `scripts/`: API sync and drift (`api.mjs`), bundle budget, packaging
-  (`package.sh`), changelog draft.
+  (`package.sh`, `release-package.sh`), changelog draft, signed-tag and
+  family-manifest checks.
 - `perf/`: bundle baseline and browser load measurement.
 
 ## Dependencies and Ownership
@@ -165,22 +166,22 @@ lost reads as unknown, never as success, and is never retried silently.
 - tokens held in memory only; only the PKCE verifier and `state` survive the
   redirect;
 - the release contract Tenkai pins: `tenkai-console-vX.Y.Z.zip`, `SHA256SUMS`,
-  and the artifact attestation.
+  provenance and SBOM attestations, and the family release manifest.
 
 ### Verification matrix
 
 Rows beyond `## Testing Guidelines`:
 
-| Surface                               | Required evidence                                                                                     |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| TypeScript / React source             | focused tests, `pnpm typecheck`, `pnpm lint`                                                          |
-| Tenkai API client or response schemas | schema tests against recorded responses; `pnpm api:check`; compare with Tenkai's versioned public API |
-| routing, base URL, or asset paths     | `pnpm build`, then serve `dist/` under `/ui/` and `/<prefix>/ui/`                                     |
-| bundle size                           | `pnpm perf:bundle`                                                                                    |
-| fleet-scale table load                | `pnpm perf:load` after `pnpm build`                                                                   |
-| packaging or release workflow         | `VERSION=v0.0.0-dev pnpm package`, inspect the zip and `SHA256SUMS`                                   |
-| dependencies                          | `pnpm install --frozen-lockfile`, pinned versions, no new outbound origins                            |
-| any diff                              | no `dist/`, `release/`, or `*.tsbuildinfo` staged                                                     |
+| Surface                               | Required evidence                                                                                       |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| TypeScript / React source             | focused tests, `pnpm typecheck`, `pnpm lint`                                                            |
+| Tenkai API client or response schemas | schema tests against recorded responses; `pnpm api:check`; compare with Tenkai's versioned public API   |
+| routing, base URL, or asset paths     | `pnpm build`, then serve `dist/` under `/ui/` and `/<prefix>/ui/`                                       |
+| bundle size                           | `pnpm perf:bundle`                                                                                      |
+| fleet-scale table load                | `pnpm perf:load` after `pnpm build`                                                                     |
+| packaging or release workflow         | `VERSION=v0.0.0-dev pnpm package`, inspect the zip and `SHA256SUMS`; `bash scripts/validate-release.sh` |
+| dependencies                          | `pnpm install --frozen-lockfile`, pinned versions, no new outbound origins                              |
+| any diff                              | no `dist/`, `release/`, or `*.tsbuildinfo` staged                                                       |
 
 ### Release audit
 
@@ -193,6 +194,7 @@ Rows beyond `## Testing Guidelines`:
 - the `ui/console.pin` update Tenkai needs (URL and SHA-256);
 - `CHANGELOG.md` drafted from `scripts/changelog-draft.sh`, upgrade actions
   first; contributors credited through GitHub's generated notes;
-- after an authorized `vX.Y.Z` tag, the Release workflow attached
-  `tenkai-console-vX.Y.Z.zip` and `SHA256SUMS`, verified as `README.md`
-  describes. Do not rewrite existing Release notes when only uploading assets.
+- after an authorized signed `vX.Y.Z` tag equal to `package.json`, the Release
+  workflow attached `tenkai-console-vX.Y.Z.zip`, `SHA256SUMS`, SBOM, family
+  manifest, and CHANGELOG notes, verified as `README.md` describes. Do not
+  rewrite existing Release notes when only uploading assets.

@@ -8,10 +8,12 @@ The design is recorded in Tenkai
 
 ## How it ships
 
-Each tag `vX.Y.Z` publishes `tenkai-console-vX.Y.Z.zip`, `SHA256SUMS`, and a
-GitHub artifact attestation. Tenkai pins one release in `ui/console.pin` by
-tag and SHA-256 and serves it at `/ui/` on the API's origin behind a `ui`
-feature.
+Each signed annotated tag `vX.Y.Z` (equal to the `package.json` version)
+publishes `tenkai-console-vX.Y.Z.zip`, `SHA256SUMS`, an SBOM, provenance
+attestations, a family release manifest, and a GitHub Release whose notes
+come from CHANGELOG. Tenkai pins one release in `ui/console.pin` by tag and
+SHA-256 and serves it at `/ui/` on the API's origin behind a `ui` feature.
+This repository does not publish a container image. See [RELEASING.md](RELEASING.md).
 
 The build uses only relative URLs and finds the API two levels above its own
 entry module, so the same zip works at `/ui/` and at `/<prefix>/ui/` behind a
