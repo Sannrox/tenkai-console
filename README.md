@@ -58,12 +58,14 @@ a pasted bearer token instead, also held in memory.
 ## API types
 
 `api/tenkai-http-v1.schema.json` is Tenkai's published HTTP contract, vendored
-at the commit in `api/TENKAI_REF`. `src/api/tenkai.gen.ts` is generated from it.
+from a signed Tenkai release. `api/tenkai.pin` records the release tag and the
+schema's SHA-256 (`<vX.Y.Z> <sha256>`). `src/api/tenkai.gen.ts` is generated
+from it.
 
 ```sh
-pnpm api:sync <tenkai-commit-sha>   # update the vendored schema and regenerate
-pnpm api:check                      # CI: fail when generated types are stale
-pnpm api:drift                      # scheduled: fail when the schema is behind tenkai main
+pnpm api:sync <vX.Y.Z>   # fetch the release schema, check SHA256SUMS, pin and regenerate
+pnpm api:check           # CI: fail when the schema does not match the pin or types are stale
+pnpm api:drift           # scheduled: fail when the pin is behind tenkai's latest release
 ```
 
 At startup the console requires `/healthz` to list the contract it was built

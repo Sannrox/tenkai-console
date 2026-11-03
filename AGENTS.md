@@ -9,7 +9,7 @@ Tenkai ADR 0031 (`docs/decisions/0031-web-console.md` in Sannrox/tenkai).
 ## Project Structure & Module Organization
 
 - `src/api/`: HTTP client and `tenkai.gen.ts`, generated from the vendored
-  contract `api/tenkai-http-v1.schema.json` (pinned in `api/TENKAI_REF`).
+  contract `api/tenkai-http-v1.schema.json` (release tag and SHA-256 pinned in `api/tenkai.pin`).
 - `src/auth/`: OIDC sign-in, session renewal, and sign-out.
 - `src/screens/`, `src/delivery/`, `src/management/`, `src/plan/`,
   `src/workflows/`, `src/ui/`: screens, management actions, and shared UI.
@@ -51,8 +51,8 @@ bash scripts/validate-workflow-skills.sh
 ```
 
 `TENKAI_URL=http://127.0.0.1:8080 pnpm dev` proxies `/v1` and `/healthz` to a
-local `tenkai-server`. `pnpm api:sync <tenkai-commit-sha>` updates the vendored
-contract and regenerates the types.
+local `tenkai-server`. `pnpm api:sync <vX.Y.Z>` updates the vendored
+contract from that Tenkai release and regenerates the types.
 
 ## Testing Guidelines
 
