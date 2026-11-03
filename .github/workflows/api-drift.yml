@@ -1,9 +1,9 @@
 name: API drift
 
-# Freshness alarm: fails, notifying, when the vendored tenkai contract falls
-# behind tenkai main. Pull request CI does not check this, so a change in
-# tenkai never blocks unrelated pull requests here; a sync pull request
-# (`pnpm api:sync <sha>`) follows the alarm.
+# Freshness alarm: fails, notifying, when the pinned tenkai contract falls
+# behind tenkai's latest release. Pull request CI does not check this, so a
+# tenkai release never blocks unrelated pull requests here; a sync pull request
+# (`pnpm api:sync <tag>`) follows the alarm.
 on:
   schedule:
     - cron: "17 */6 * * *"

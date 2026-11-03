@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai api/tenkai-http-v1.schema.json at 4d518dea32bcf8b4b257f07b8317cd6c1d7f4822 (contract tenkai.http.v1).
+// Generated from Sannrox/tenkai release v0.6.0 tenkai-http-v1.schema.json (sha256 07693e28e37231157a67f2922bd9ae5563a2927e604d0cd37224265aaa1f7cc5, contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
