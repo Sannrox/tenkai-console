@@ -143,6 +143,23 @@ self_test() {
   git -C "$work" tag -s v0.3.0 -m "wrong version" "$first"
   (cd "$work" && expect_failure "does not match workspace version" v0.3.0 "$first")
 
+  # Release candidates: the rc tag equals an rc workspace version, and a
+  # final tag never releases an rc version.
+  printf '{"name":"tenkai-console","version":"0.4.0-rc.1"}\n' >"$pkg"
+  git -C "$work" commit -q -am rc
+  local rc
+  rc="$(git -C "$work" rev-parse HEAD)"
+  git -C "$work" tag -s v0.4.0-rc.1 -m "rc" "$rc"
+  (cd "$work" && bash "$SCRIPT_PATH" verify v0.4.0-rc.1 "$rc" >/dev/null)
+  git -C "$work" tag -s v0.4.0 -m "final on rc" "$rc"
+  (cd "$work" && expect_failure "does not match workspace version 0.4.0-rc.1" v0.4.0 "$rc")
+  git -C "$work" tag -s v0.4.0-beta.x -m "bad suffix" "$rc"
+  (cd "$work" && expect_failure "invalid release tag" v0.4.0-beta.x "$rc")
+
+  # The release workflow passes the commit it will build; a tag for another
+  # commit is refused.
+  (cd "$work" && expect_failure "resolves to ${first}, expected ${rc}" v0.2.0 "$rc")
+
   gpgconf --kill gpg-agent >/dev/null 2>&1 || true
   rm -rf "$tmp" || true
   printf 'self-test passed\n'

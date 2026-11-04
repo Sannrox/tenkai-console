@@ -186,7 +186,8 @@ Rows beyond `## Testing Guidelines`:
 ### Release audit
 
 - `package.json` version, `pnpm-lock.yaml` consistency, dependency changes, and
-  `.github/workflows/release.yml`;
+  `.github/workflows/release.yml` (run from main for a tag by
+  `.github/workflows/release-dispatch.yml`);
 - the minimum Tenkai API contract the bundle needs;
 - relative-URL behavior at `/ui/` and `/<prefix>/ui/`, and no requests outside
   the origin;
