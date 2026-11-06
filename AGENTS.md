@@ -69,7 +69,8 @@ Request body, which becomes the squash commit. Pull Requests call out Tenkai
 API compatibility, packaging, and security impact. Never put hostnames, FQDNs,
 home directories, absolute worktree paths, LAN or employer network names, or
 other private environment inventory on public Issues, Pull Requests, comments,
-or commit messages.
+or commit messages. Published postplan mock and gallery links are the one
+allowed exception (see UI proof).
 
 ### Verified commits on GitHub
 
@@ -116,6 +117,8 @@ The workflow Skills (`advance-issue-frontier`, `assess-change-impact`,
 `capture-project-decision`, `deliver-ready-issue`, `prepare-release`,
 `refactor-docs`, `shape-work-item`, `technical-documentation`, `verify-change`)
 are canonical in [Sannrox/agent-kit](https://github.com/Sannrox/agent-kit).
+The opt-in `ui-e2e` skill proves console UI work with mocks, a states gallery,
+browser tests, screenshots, and read-only live journeys.
 There is no pin: this repository always uses the latest `main`.
 `.agents/skills/<name>/` holds only a generated stub that points to the shared
 skill; read the installed skill under `~/.agents/agent-kit/` (or
@@ -182,6 +185,28 @@ Rows beyond `## Testing Guidelines`:
 | packaging or release workflow         | `VERSION=v0.0.0-dev pnpm package`, inspect the zip and `SHA256SUMS`; `bash scripts/validate-release.sh` |
 | dependencies                          | `pnpm install --frozen-lockfile`, pinned versions, no new outbound origins                              |
 | any diff                              | no `dist/`, `release/`, or `*.tsbuildinfo` staged                                                       |
+
+### UI proof
+
+- Browser tests: none against a mock backend yet. `playwright.config.ts` runs
+  only the `perf/` load budget. `perf/load.spec.ts` already serves `dist/` and
+  a mocked API on port 0; the first UI change extracts that into a shared mock
+  backend and an `e2e/` suite.
+- Live target: a running `tenkai-server`, read-only. No create, save, publish,
+  approve, or delete without explicit authorization for that write. Never
+  record its address in the repository.
+- Design constraints:
+  - dark mode on a true black `#000` background, white primary text;
+  - information-dense;
+  - no decorative card or pill chrome;
+  - no light-grey subtitle lines above sections;
+  - minimal copy, no em dashes;
+  - no continuously repainting animations (pulse, shimmer, spinners, blur).
+- Artifacts: screenshots, traces, and videos go to a per-process directory
+  outside the repository (system temp, process id plus a unique suffix).
+  Never commit them.
+- Mocks and states galleries: publish with postplan and link them from the
+  Issue and Pull Request. Re-upload the same file to keep the link stable.
 
 ### Release audit
 
