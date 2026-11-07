@@ -37,6 +37,7 @@ import {
 } from "../plan/requests";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { AddEnvironment, ConfigSections } from "./environment-config";
+import { EnvironmentDependencies } from "./environment-dependencies";
 import { FleetTable } from "./fleet-table";
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
@@ -379,6 +380,7 @@ const Detail = ({
           )}
         </Card>
       </div>
+      <EnvironmentDependencies environment={report.name} token={token} />
       <ConfigSections report={report} token={token} />
       <Runtime report={report} token={token} />
     </>
