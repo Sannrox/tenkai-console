@@ -13,7 +13,7 @@ const GRAPH = {
     {
       product: "reports",
       release_id: "reports@1.0.0",
-      held_at: 1,
+      held_at: 1_700_000_000_000,
       contracts: [{ contract: "analytics", minimum: "2.0.0" }],
     },
   ],
@@ -49,6 +49,17 @@ const GRAPH = {
       version: "1.0.0",
       state: "waiting",
       requirements: [
+        {
+          contract: "database",
+          minimum: "1.0.0",
+          optional: false,
+          provider: {
+            state: "unique" as const,
+            product: "postgres",
+            release: "16.2.0",
+            contract: "1.4.0",
+          },
+        },
         {
           contract: "analytics",
           minimum: "2.0.0",
@@ -113,6 +124,10 @@ describe("EnvironmentDependencies", () => {
     expect(container.textContent).toContain("1 waiting");
     expect(container.textContent).toContain("unmet");
     expect(container.textContent).toContain("waiting");
+    expect(container.textContent).toContain("reports@1.0.0");
+    expect(container.textContent).toContain("held at 2023-11-14T22:13:20.000Z");
+    expect(container.textContent).toContain("no known provider");
+    expect(container.textContent).toContain("analytics >= 2.0.0");
     const catalog = [...container.querySelectorAll("table tbody tr")].find(
       (row) => row.querySelector("td")?.textContent === "catalog",
     );
@@ -124,6 +139,51 @@ describe("EnvironmentDependencies", () => {
     expect(container.textContent).toContain("remove refused: shop requires catalog");
     expect(container.textContent).toContain("postgres@16.2.0");
     expect(container.textContent).not.toMatch(/HTTP \d{3}|\/v1\/|#\d+|—/);
+  });
+
+  it("lists two unmet contracts on one hold", async () => {
+    serve(200, {
+      environment: "prod",
+      holds: [
+        {
+          product: "shop",
+          release_id: "shop@2.2.0",
+          held_at: 1_700_000_000_000,
+          contracts: [
+            { contract: "catalog", minimum: "2.0.0" },
+            { contract: "inventory", minimum: "1.0.0" },
+          ],
+        },
+      ],
+      products: [
+        {
+          product: "shop",
+          version: "2.2.0",
+          state: "waiting",
+          requirements: [
+            {
+              contract: "catalog",
+              minimum: "2.0.0",
+              optional: false,
+              provider: { state: "absent" as const },
+            },
+            {
+              contract: "inventory",
+              minimum: "1.0.0",
+              optional: false,
+              provider: { state: "absent" as const },
+            },
+          ],
+          impact: {},
+        },
+      ],
+    });
+    await render(<EnvironmentDependencies environment="prod" token="token" />);
+    expect(container.textContent).toContain("shop@2.2.0");
+    expect(container.textContent).toContain("catalog >= 2.0.0");
+    expect(container.textContent).toContain("inventory >= 1.0.0");
+    expect(container.textContent).toContain("held at 2023-11-14T22:13:20.000Z");
+    expect(container.textContent).toMatch(/no known provider.*no known provider/s);
   });
 
   it("says none when the graph is empty", async () => {

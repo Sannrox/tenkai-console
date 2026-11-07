@@ -118,6 +118,77 @@ export const providerLine = (requirement: RequirementView): string => {
   return requirement.optional ? "absent" : "unmet";
 };
 
+export type DependencyHold = EnvironmentDependencies["holds"][number];
+export type HoldContract = DependencyHold["contracts"][number];
+
+/** Instant the API stored the hold, as ISO-8601. */
+export const heldAt = (ms: number): string => new Date(ms).toISOString();
+
+export const holdNeedLine = (contract: HoldContract): string =>
+  `${contract.contract} >= ${contract.minimum}`;
+
+/** Provider copy on the hold and the selected document. Graph cells keep `unmet`. */
+export const holdProviderLine = (requirement: RequirementView): string => {
+  const { provider } = requirement;
+  if (provider.state === "unique") {
+    return `${provider.product}@${provider.release}`;
+  }
+  if (provider.state === "ambiguous") {
+    return `ambiguous: ${provider.products.join(", ")}`;
+  }
+  return requirement.optional ? "absent" : "no known provider";
+};
+
+const requirementFor = (
+  hold: DependencyHold,
+  products: ProductDependencyView[],
+  contract: HoldContract,
+): RequirementView | undefined =>
+  products
+    .find((item) => item.product === hold.product)
+    ?.requirements.find((item) => item.contract === contract.contract);
+
+/** Named provider for one hold contract, or `no known provider` when the graph is silent. */
+export const holdContractProvider = (
+  hold: DependencyHold,
+  products: ProductDependencyView[],
+  contract: HoldContract,
+): string => {
+  const requirement = requirementFor(hold, products, contract);
+  return requirement ? holdProviderLine(requirement) : "no known provider";
+};
+
+export const holdContractTone = (
+  hold: DependencyHold,
+  products: ProductDependencyView[],
+  contract: HoldContract,
+): "ok" | "warn" | "bad" | "muted" | undefined => {
+  const requirement = requirementFor(hold, products, contract);
+  return requirement ? providerTone(requirement) : "bad";
+};
+
+export const waitingLine = (holds: DependencyHold[]): string =>
+  holds
+    .map((hold) => {
+      const needs = hold.contracts.map(holdNeedLine).join(" · ");
+      return needs ? `${hold.release_id}, ${needs}` : hold.release_id;
+    })
+    .join(" · ");
+
+export const heldAtLine = (holds: DependencyHold[]): string =>
+  [...new Set(holds.map((hold) => heldAt(hold.held_at)))].join(" · ");
+
+export const heldProducts = (holds: DependencyHold[]): ReadonlySet<string> =>
+  new Set(holds.map((hold) => hold.product));
+
+/** Running release stays visible; `waiting` only when nothing is deployed yet. */
+export const deployedLabel = (deployed: string | null | undefined, held: boolean): string => {
+  if (held && (deployed === null || deployed === undefined || deployed === "")) {
+    return "waiting";
+  }
+  return deployed ?? "none";
+};
+
 export const providerTone = (
   requirement: RequirementView,
 ): "ok" | "warn" | "bad" | "muted" | undefined => {

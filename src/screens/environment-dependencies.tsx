@@ -1,14 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   type EnvironmentDependencies as DependenciesReport,
   type ProductDependencyView,
   dependencyRows,
-  fetchDependencies,
+  heldAt,
+  holdContractProvider,
+  holdContractTone,
+  holdNeedLine,
+  holdProviderLine,
   impactLines,
-  providerLine,
   providerTone,
 } from "../delivery/dependencies";
+import { useEnvironmentDependencies } from "../delivery/use-delivery";
 import { Card } from "../ui/kit";
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
@@ -38,13 +41,23 @@ export const EnvironmentDependencies = ({
   environment: string;
   token: string;
 }) => {
-  const query = useQuery({
-    queryKey: ["dependencies", environment, token],
-    queryFn: () => fetchDependencies(environment, token),
-    retry: false,
-  });
+  const query = useEnvironmentDependencies(token, environment);
   const load = query.data;
   const waiting = load?.kind === "ok" ? load.value.holds.length : 0;
+  const body =
+    query.isPending || load === undefined ? (
+      <p className="m-0 px-3.5 py-3 text-xs text-muted">{COPY.loading}</p>
+    ) : load.kind === "unavailable" ? (
+      <p className="m-0 px-3.5 py-3 text-xs text-muted">{COPY.unavailable}</p>
+    ) : load.kind === "forbidden" ? (
+      <p className="m-0 px-3.5 py-3 text-xs text-muted">{COPY.forbidden}</p>
+    ) : load.kind === "error" ? (
+      <p role="alert" className="m-0 px-3.5 py-3 text-xs text-danger">
+        {load.message}
+      </p>
+    ) : load.value.products.length === 0 && load.value.holds.length === 0 ? (
+      <p className="m-0 px-3.5 py-3 text-xs text-muted">{COPY.empty}</p>
+    ) : null;
 
   return (
     <>
@@ -54,30 +67,61 @@ export const EnvironmentDependencies = ({
           <span className="text-[13px] font-medium text-muted">{waiting} waiting</span>
         )}
       </div>
-      <Card className="overflow-x-auto">
-        {query.isPending || load === undefined ? (
-          <p className="m-0 px-3.5 py-3 text-xs text-muted">{COPY.loading}</p>
-        ) : load.kind === "unavailable" ? (
-          <p className="m-0 px-3.5 py-3 text-xs text-muted">{COPY.unavailable}</p>
-        ) : load.kind === "forbidden" ? (
-          <p className="m-0 px-3.5 py-3 text-xs text-muted">{COPY.forbidden}</p>
-        ) : load.kind === "error" ? (
-          <p role="alert" className="m-0 px-3.5 py-3 text-xs text-danger">
-            {load.message}
-          </p>
-        ) : load.value.products.length === 0 ? (
-          <p className="m-0 px-3.5 py-3 text-xs text-muted">{COPY.empty}</p>
-        ) : (
-          <Graph report={load.value} />
-        )}
-      </Card>
+      {body ? (
+        <Card className="overflow-x-auto">{body}</Card>
+      ) : load?.kind === "ok" ? (
+        <>
+          {load.value.holds.length > 0 && <Holds report={load.value} />}
+          {load.value.products.length > 0 && (
+            <Card className="overflow-x-auto">
+              <Graph report={load.value} />
+            </Card>
+          )}
+        </>
+      ) : null}
     </>
   );
 };
 
+const Holds = ({ report }: { report: DependenciesReport }) => (
+  <Card className="mb-3 overflow-x-auto">
+    {report.holds.map((hold) => (
+      <div
+        key={`${hold.product}:${hold.release_id}:${hold.held_at}`}
+        className="border-b border-line px-3.5 py-3 last:border-b-0"
+      >
+        <div className="mb-1 font-mono text-[13px] font-semibold">{hold.release_id}</div>
+        <p className="mt-0 mb-2 text-xs text-muted">{`held at ${heldAt(hold.held_at)}`}</p>
+        <table className="w-full border-collapse text-xs">
+          <thead>
+            <tr>
+              <th className={th}>Need</th>
+              <th className={th}>Provider</th>
+            </tr>
+          </thead>
+          <tbody>
+            {hold.contracts.map((contract) => {
+              const tone = holdContractTone(hold, report.products, contract);
+              return (
+                <tr key={contract.contract} className="[&:last-child>td]:border-b-0">
+                  <td className={`${td} font-mono`}>{holdNeedLine(contract)}</td>
+                  <td className={`${td} font-mono ${tone ? TONE[tone] : ""}`}>
+                    {holdContractProvider(hold, report.products, contract)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    ))}
+  </Card>
+);
+
 const Graph = ({ report }: { report: DependenciesReport }) => {
   const rows = dependencyRows(report);
-  const [selected, setSelected] = useState(rows[0]?.product);
+  const initial = rows.find((row) => row.state === "waiting")?.product ?? rows[0]?.product;
+  const [selected, setSelected] = useState(initial);
   const product = report.products.find((item) => item.product === selected);
 
   return (
@@ -152,7 +196,7 @@ const Document = ({ product }: { product: ProductDependencyView }) => {
                     {`>= ${requirement.minimum}${requirement.optional ? " optional" : ""}`}
                   </td>
                   <td className={`${td} font-mono ${tone ? TONE[tone] : ""}`}>
-                    {providerLine(requirement)}
+                    {holdProviderLine(requirement)}
                   </td>
                 </tr>
               );

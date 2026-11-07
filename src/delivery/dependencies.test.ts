@@ -2,10 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 import {
   dependencyRows,
   fetchDependencies,
+  heldAt,
+  heldAtLine,
+  deployedLabel,
+  holdContractProvider,
+  holdNeedLine,
+  holdProviderLine,
   impactLines,
   parseDependencies,
   providerLine,
   requirementLine,
+  waitingLine,
 } from "./dependencies";
 
 const GRAPH = {
@@ -80,6 +87,17 @@ const GRAPH = {
       state: "waiting",
       requirements: [
         {
+          contract: "database",
+          minimum: "1.0.0",
+          optional: false,
+          provider: {
+            state: "unique" as const,
+            product: "postgres",
+            release: "16.2.0",
+            contract: "1.4.0",
+          },
+        },
+        {
           contract: "analytics",
           minimum: "2.0.0",
           optional: false,
@@ -108,7 +126,8 @@ describe("lines", () => {
     expect(requirementLine(shop[1]!)).toBe("payments >= 1.0.0 optional");
     expect(providerLine(shop[0]!)).toBe("catalog@1.4.0");
     expect(providerLine(shop[1]!)).toBe("absent");
-    expect(providerLine(GRAPH.products[3]!.requirements[0]!)).toBe("unmet");
+    expect(providerLine(GRAPH.products[3]!.requirements[1]!)).toBe("unmet");
+    expect(holdProviderLine(GRAPH.products[3]!.requirements[1]!)).toBe("no known provider");
     const rows = dependencyRows(GRAPH);
     expect(rows.map((row) => row.product)).toEqual(["postgres", "catalog", "shop", "reports"]);
     expect(rows[1]).toMatchObject({
@@ -119,7 +138,7 @@ describe("lines", () => {
     });
     expect(rows[3]).toMatchObject({
       state: "waiting",
-      providedBy: "unmet",
+      providedBy: "postgres@16.2.0 · unmet",
       providedTone: "bad",
       dependents: "none",
     });
@@ -134,6 +153,43 @@ describe("lines", () => {
       provider: { state: "ambiguous" as const, products: ["postgres", "postgres-read"] },
     };
     expect(providerLine(requirement)).toBe("ambiguous: postgres, postgres-read");
+    expect(holdProviderLine(requirement)).toBe("ambiguous: postgres, postgres-read");
+  });
+});
+
+describe("holds", () => {
+  it("names the unmet need and does not invent a provider", () => {
+    const hold = GRAPH.holds[0]!;
+    expect(heldAt(hold.held_at)).toBe("2023-11-14T22:13:20.000Z");
+    expect(holdNeedLine(hold.contracts[0]!)).toBe("analytics >= 2.0.0");
+    expect(holdContractProvider(hold, GRAPH.products, hold.contracts[0]!)).toBe(
+      "no known provider",
+    );
+    expect(waitingLine(GRAPH.holds)).toBe("reports@1.0.0, analytics >= 2.0.0");
+    expect(heldAtLine(GRAPH.holds)).toBe("2023-11-14T22:13:20.000Z");
+  });
+
+  it("keeps two contracts on one hold and one held_at", () => {
+    const hold = {
+      product: "shop",
+      release_id: "shop@2.2.0",
+      held_at: 1_700_000_000_000,
+      contracts: [
+        { contract: "catalog", minimum: "2.0.0" },
+        { contract: "inventory", minimum: "1.0.0" },
+      ],
+    };
+    expect(waitingLine([hold])).toBe("shop@2.2.0, catalog >= 2.0.0 · inventory >= 1.0.0");
+    expect(holdContractProvider(hold, GRAPH.products, hold.contracts[1]!)).toBe(
+      "no known provider",
+    );
+  });
+
+  it("keeps the running release when a hold has not undeployed it", () => {
+    expect(deployedLabel("0.9.0", true)).toBe("0.9.0");
+    expect(deployedLabel("1.0.0", false)).toBe("1.0.0");
+    expect(deployedLabel(null, true)).toBe("waiting");
+    expect(deployedLabel(undefined, false)).toBe("none");
   });
 });
 

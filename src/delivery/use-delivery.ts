@@ -7,6 +7,7 @@ import type {
   FleetStatusReport,
 } from "../api/tenkai.gen";
 import { collectChannelPages } from "./channels";
+import { fetchDependencies } from "./dependencies";
 
 const read = async <T>(path: string, token: string | undefined): Promise<T> => {
   try {
@@ -65,6 +66,15 @@ export const useEnvironmentInspect = (token: string | undefined, name: string | 
     queryKey: ["environment", name, token],
     queryFn: () =>
       read<EnvironmentInspectReport>(`v1/environments/${encodeURIComponent(name ?? "")}`, token),
+    enabled: token !== undefined && Boolean(name),
+    retry: false,
+  });
+
+/** Product graph and holds for the selected environment. */
+export const useEnvironmentDependencies = (token: string | undefined, name: string | undefined) =>
+  useQuery({
+    queryKey: ["dependencies", name, token],
+    queryFn: () => fetchDependencies(name ?? "", token ?? ""),
     enabled: token !== undefined && Boolean(name),
     retry: false,
   });
