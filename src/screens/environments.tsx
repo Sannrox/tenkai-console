@@ -10,6 +10,7 @@ import type {
 } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
 import { channelMatrix, fleetTableRows } from "../delivery/configuration";
+import { deployedLabel, heldAtLine, heldProducts, waitingLine } from "../delivery/dependencies";
 import {
   maintenanceDetail,
   maintenanceRefreshAt,
@@ -24,7 +25,11 @@ import {
   rollbackSummary,
 } from "../delivery/rollback";
 import { runtimeRows } from "../delivery/runtime";
-import { useDelivery, useEnvironmentInspect } from "../delivery/use-delivery";
+import {
+  useDelivery,
+  useEnvironmentDependencies,
+  useEnvironmentInspect,
+} from "../delivery/use-delivery";
 import { useManagementCall } from "../management/use-management";
 import {
   expectedGeneration,
@@ -129,6 +134,9 @@ const Detail = ({
     : (deployed[0]?.product ?? "");
   const previous = previousRelease(report, selectedProduct);
   const spec = `${product.trim()}=${channel.trim()}`;
+  const dependencies = useEnvironmentDependencies(token, report.name);
+  const holds = dependencies.data?.kind === "ok" ? dependencies.data.value.holds : [];
+  const waiting = heldProducts(holds);
 
   return (
     <>
@@ -157,35 +165,38 @@ const Detail = ({
               </tr>
             </thead>
             <tbody>
-              {report.subscriptions.map((subscription) => (
-                <tr key={subscription.product} className="[&:last-child>td]:border-b-0">
-                  <td className={td}>{subscription.product}</td>
-                  <td className={td}>{subscription.channel}</td>
-                  <td
-                    className={`${td} font-mono ${subscription.state === "current" ? "text-ok" : "text-warning"}`}
-                  >
-                    {subscription.deployed ?? "none"}
-                  </td>
-                  <td className={`${td} font-mono`}>{subscription.head}</td>
-                  <td className={`${td} font-mono text-muted`}>
-                    {previousRelease(report, subscription.product) ?? "none"}
-                  </td>
-                  <td className={td}>
-                    <SubscriptionHold
-                      report={report}
-                      product={subscription.product}
-                      channel={subscription.channel}
-                      hold={subscription.delivery_hold}
-                      failed={
-                        isHeldFailedTarget(subscription) &&
-                        !productHasActivePlan(report.latest_plan, subscription.product)
-                      }
-                      error={subscription.error}
-                      token={token}
-                    />
-                  </td>
-                </tr>
-              ))}
+              {report.subscriptions.map((subscription) => {
+                const held = waiting.has(subscription.product);
+                return (
+                  <tr key={subscription.product} className="[&:last-child>td]:border-b-0">
+                    <td className={td}>{subscription.product}</td>
+                    <td className={td}>{subscription.channel}</td>
+                    <td
+                      className={`${td} font-mono ${held || subscription.state !== "current" ? "text-warning" : "text-ok"}`}
+                    >
+                      {deployedLabel(subscription.deployed, held)}
+                    </td>
+                    <td className={`${td} font-mono`}>{subscription.head}</td>
+                    <td className={`${td} font-mono text-muted`}>
+                      {previousRelease(report, subscription.product) ?? "none"}
+                    </td>
+                    <td className={td}>
+                      <SubscriptionHold
+                        report={report}
+                        product={subscription.product}
+                        channel={subscription.channel}
+                        hold={subscription.delivery_hold}
+                        failed={
+                          isHeldFailedTarget(subscription) &&
+                          !productHasActivePlan(report.latest_plan, subscription.product)
+                        }
+                        error={subscription.error}
+                        token={token}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {subscribe.allowed && (
@@ -252,6 +263,14 @@ const Detail = ({
             <dd className={`m-0 ${report.delivery_hold ? "text-warning" : "text-muted"}`}>
               {report.delivery_hold ? holdLine(report.delivery_hold) : "none"}
             </dd>
+            {holds.length > 0 && (
+              <>
+                <dt className="text-muted">waiting</dt>
+                <dd className="m-0 text-warning">{waitingLine(holds)}</dd>
+                <dt className="text-muted">held at</dt>
+                <dd className="m-0 font-mono">{heldAtLine(holds)}</dd>
+              </>
+            )}
             {(timeline?.rows ?? maintenanceDetail(report)).map((row) => (
               <div key={`${row.label}:${row.value}`} className="contents">
                 <dt className="text-muted">{row.label}</dt>

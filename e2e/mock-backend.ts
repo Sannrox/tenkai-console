@@ -65,6 +65,7 @@ export const serveConsole = (routes: Routes, dist = "dist") =>
         sent,
         close: () =>
           new Promise((done) => {
+            server.closeAllConnections();
             server.close(() => done());
           }),
       });

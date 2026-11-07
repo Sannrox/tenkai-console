@@ -1,4 +1,4 @@
-// Environment dependency table against a mocked API (#102). Run with `pnpm build && pnpm e2e`.
+// Environment dependency holds against a mocked API. Run with `pnpm build && pnpm e2e`.
 import { expect, test } from "@playwright/test";
 import type { EnvironmentInspectReport, FleetStatusReport } from "../src/api/tenkai.gen";
 import {
@@ -49,7 +49,37 @@ const INSPECT = {
       state: "current",
     },
     { product: "catalog", channel: "stable", head: "1.4.0", deployed: "1.4.0", state: "current" },
-    { product: "reports", channel: "stable", head: "1.0.0", deployed: "1.0.0", state: "waiting" },
+    { product: "reports", channel: "stable", head: "1.0.0", deployed: "0.9.0", state: "waiting" },
+  ],
+} as unknown as EnvironmentInspectReport;
+
+const INSPECT_FRESH = {
+  ...INSPECT,
+  subscriptions: [
+    {
+      product: "postgres",
+      channel: "stable",
+      head: "16.2.0",
+      deployed: "16.2.0",
+      state: "current",
+    },
+    { product: "catalog", channel: "stable", head: "1.4.0", deployed: "1.4.0", state: "current" },
+    { product: "reports", channel: "stable", head: "1.0.0", deployed: null, state: "waiting" },
+  ],
+} as unknown as EnvironmentInspectReport;
+
+const INSPECT_RESUMED = {
+  ...INSPECT,
+  subscriptions: [
+    {
+      product: "postgres",
+      channel: "stable",
+      head: "16.2.0",
+      deployed: "16.2.0",
+      state: "current",
+    },
+    { product: "catalog", channel: "stable", head: "1.4.0", deployed: "1.4.0", state: "current" },
+    { product: "reports", channel: "stable", head: "1.0.0", deployed: "1.0.0", state: "current" },
   ],
 } as unknown as EnvironmentInspectReport;
 
@@ -59,7 +89,7 @@ const GRAPH = {
     {
       product: "reports",
       release_id: "reports@1.0.0",
-      held_at: 1,
+      held_at: 1_700_000_000_000,
       contracts: [{ contract: "analytics", minimum: "2.0.0" }],
     },
   ],
@@ -91,8 +121,78 @@ const GRAPH = {
       state: "waiting",
       requirements: [
         {
+          contract: "database",
+          minimum: "1.0.0",
+          optional: false,
+          provider: { state: "unique", product: "postgres", release: "16.2.0", contract: "1.4.0" },
+        },
+        {
           contract: "analytics",
           minimum: "2.0.0",
+          optional: false,
+          provider: { state: "absent" },
+        },
+      ],
+      impact: {},
+    },
+  ],
+};
+
+const GRAPH_RESUMED = {
+  environment: "prod",
+  holds: [],
+  products: GRAPH.products.map((product) =>
+    product.product === "reports"
+      ? {
+          ...product,
+          state: "current",
+          requirements: [
+            product.requirements[0],
+            {
+              contract: "analytics",
+              minimum: "2.0.0",
+              optional: false,
+              provider: {
+                state: "unique",
+                product: "warehouse",
+                release: "2.1.0",
+                contract: "2.1.0",
+              },
+            },
+          ],
+        }
+      : product,
+  ),
+};
+
+const GRAPH_MULTI = {
+  environment: "prod",
+  holds: [
+    {
+      product: "shop",
+      release_id: "shop@2.2.0",
+      held_at: 1_700_000_000_000,
+      contracts: [
+        { contract: "catalog", minimum: "2.0.0" },
+        { contract: "inventory", minimum: "1.0.0" },
+      ],
+    },
+  ],
+  products: [
+    {
+      product: "shop",
+      version: "2.2.0",
+      state: "waiting",
+      requirements: [
+        {
+          contract: "catalog",
+          minimum: "2.0.0",
+          optional: false,
+          provider: { state: "absent" },
+        },
+        {
+          contract: "inventory",
+          minimum: "1.0.0",
           optional: false,
           provider: { state: "absent" },
         },
@@ -111,16 +211,26 @@ const HOST_ME = {
   source: "host",
 };
 
+const HOST_OPERATOR = { ...HOST_ME, capabilities: ["read", "management"] };
+
 const ok = (body: unknown): Reply => ({ status: 200, body });
 
-const server =
-  (dependencies: Reply): Routes =>
-  (path) => {
+const server = (
+  dependencies: Reply,
+  options: {
+    me?: typeof HOST_ME;
+    inspect?: EnvironmentInspectReport;
+    reconcile?: Routes;
+  } = {},
+): Routes => {
+  const me = options.me ?? HOST_ME;
+  const inspect = options.inspect ?? INSPECT;
+  return (path, request) => {
     if (path === "/v1/auth/oidc") {
       return { status: 404, body: { error: "no oidc client" } };
     }
     if (path === "/v1/auth/me") {
-      return ok(HOST_ME);
+      return ok(me);
     }
     if (path === "/v1/fleet/status") {
       return ok(FLEET);
@@ -132,7 +242,7 @@ const server =
       return ok({ items: [] });
     }
     if (path === "/v1/environments/prod") {
-      return ok(INSPECT);
+      return ok(inspect);
     }
     if (path === "/v1/environments/prod/runtime") {
       return ok({ environment: "prod", components: [] });
@@ -140,8 +250,9 @@ const server =
     if (path === "/v1/environments/prod/dependencies") {
       return dependencies;
     }
-    return undefined;
+    return options.reconcile?.(path, request);
   };
+};
 
 // Signed-in screens run at desktop width: the top bar's tabs do not fit a phone yet.
 test.describe("environment dependencies", () => {
@@ -157,7 +268,20 @@ test.describe("environment dependencies", () => {
     await page.getByRole("link", { name: "Environments" }).click();
     await expect(page.getByRole("heading", { name: "Dependencies" })).toBeVisible();
     await expect(page.getByText("1 waiting")).toBeVisible();
+    await expect(page.getByText("reports@1.0.0").first()).toBeVisible();
+    await expect(page.getByText("held at 2023-11-14T22:13:20.000Z").first()).toBeVisible();
+    await expect(page.getByText("no known provider").first()).toBeVisible();
+    await expect(page.getByText("reports@1.0.0, analytics >= 2.0.0")).toBeVisible();
     await expect(page.getByRole("cell", { name: "unmet" })).toBeVisible();
+    const subscriptions = page
+      .locator("table")
+      .filter({ has: page.getByRole("columnheader", { name: "Deployed" }) });
+    await expect(
+      subscriptions
+        .getByRole("row")
+        .filter({ hasText: /^reports/ })
+        .getByRole("cell", { name: "0.9.0", exact: true }),
+    ).toBeVisible();
     const graph = page
       .locator("table")
       .filter({ has: page.getByRole("columnheader", { name: "Requires" }) });
@@ -166,7 +290,15 @@ test.describe("environment dependencies", () => {
       .filter({ hasText: /^catalog/ })
       .click();
     await expect(page.getByText("remove refused: shop requires catalog")).toBeVisible();
-    await expect(graph.getByRole("cell", { name: "postgres@16.2.0" })).toBeVisible();
+    await expect(
+      graph
+        .getByRole("row")
+        .filter({ hasText: /^catalog/ })
+        .getByRole("cell", {
+          name: "postgres@16.2.0",
+          exact: true,
+        }),
+    ).toBeVisible();
     await expectDesignRules(page);
     expect(
       app.sent.some(
@@ -178,6 +310,75 @@ test.describe("environment dependencies", () => {
         .filter((sent) => sent.path === "/v1/environments/prod/dependencies")
         .every((sent) => sent.authorization === undefined),
     ).toBe(true);
+  });
+
+  test("shows waiting when the held product has not deployed yet", async ({ page }) => {
+    app = await serveConsole(server(ok(GRAPH), { inspect: INSPECT_FRESH }));
+    await page.goto(app.url);
+    await page.getByRole("link", { name: "Environments" }).click();
+    const subscriptions = page
+      .locator("table")
+      .filter({ has: page.getByRole("columnheader", { name: "Deployed" }) });
+    await expect(
+      subscriptions
+        .getByRole("row")
+        .filter({ hasText: /^reports/ })
+        .getByRole("cell", { name: "waiting", exact: true }),
+    ).toBeVisible();
+    await expectDesignRules(page);
+  });
+
+  test("lists two unmet contracts on one hold", async ({ page }) => {
+    app = await serveConsole(server(ok(GRAPH_MULTI)));
+    await page.goto(app.url);
+    await page.getByRole("link", { name: "Environments" }).click();
+    await expect(page.getByText("shop@2.2.0").first()).toBeVisible();
+    await expect(page.getByRole("cell", { name: "catalog >= 2.0.0", exact: true })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "inventory >= 1.0.0", exact: true })).toBeVisible();
+    await expect(page.getByText("held at 2023-11-14T22:13:20.000Z").first()).toBeVisible();
+    await expect(page.getByText("no known provider").first()).toBeVisible();
+    await expectDesignRules(page);
+  });
+
+  test("clears the hold after reconcile without a reload", async ({ page }) => {
+    let held = true;
+    const routes: Routes = (path, request) => {
+      if (path === "/v1/reconcile") {
+        held = false;
+        return ok({ environments: [] });
+      }
+      return server(ok(held ? GRAPH : GRAPH_RESUMED), {
+        me: HOST_OPERATOR,
+        inspect: held ? INSPECT : INSPECT_RESUMED,
+      })(path, request);
+    };
+    app = await serveConsole(routes);
+    await page.goto(app.url);
+    await page.getByRole("link", { name: "Environments" }).click();
+    await expect(page.getByText("1 waiting")).toBeVisible();
+    await page.getByRole("link", { name: "Delivery" }).click();
+    await page.getByRole("button", { name: "Reconcile" }).click();
+    await page.getByRole("button", { name: "Run one reconcile tick" }).click();
+    await expect(page.getByText("Tick ran: 0 environments")).toBeVisible();
+    await page.getByRole("link", { name: "Environments" }).click();
+    await expect(page.getByText("1 waiting")).toHaveCount(0);
+    await expect(page.getByText("no known provider")).toHaveCount(0);
+    await expect(page.getByText("held at 2023-11-14T22:13:20.000Z")).toHaveCount(0);
+    const subscriptions = page
+      .locator("table")
+      .filter({ has: page.getByRole("columnheader", { name: "Deployed" }) });
+    await expect(
+      subscriptions
+        .getByRole("row")
+        .filter({ hasText: /^reports/ })
+        .getByRole("cell", { name: "1.0.0", exact: true })
+        .first(),
+    ).toBeVisible();
+    await expect(page.getByText("warehouse@2.1.0").first()).toBeVisible();
+    expect(app.sent.some((sent) => sent.method === "POST" && sent.path === "/v1/reconcile")).toBe(
+      true,
+    );
+    await expectDesignRules(page);
   });
 
   test("says none when the graph is empty", async ({ page }) => {
