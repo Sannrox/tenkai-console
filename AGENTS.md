@@ -46,6 +46,7 @@ pnpm build
 pnpm perf:bundle
 pnpm exec playwright install --with-deps chromium
 pnpm perf:load
+pnpm e2e
 VERSION=ci sh scripts/package.sh
 bash scripts/validate-workflow-skills.sh
 ```
@@ -188,10 +189,9 @@ Rows beyond `## Testing Guidelines`:
 
 ### UI proof
 
-- Browser tests: none against a mock backend yet. `playwright.config.ts` runs
-  only the `perf/` load budget. `perf/load.spec.ts` already serves `dist/` and
-  a mocked API on port 0; the first UI change extracts that into a shared mock
-  backend and an `e2e/` suite.
+- Browser tests: `pnpm build && pnpm e2e` runs `e2e/` in Playwright.
+  `e2e/mock-backend.ts` serves `dist/` and a mocked API on port 0 and holds
+  the shared design-rule assertions; `perf/` uses the same mock backend.
 - Live target: a running `tenkai-server`, read-only. No create, save, publish,
   approve, or delete without explicit authorization for that write. Never
   record its address in the repository.

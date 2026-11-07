@@ -75,7 +75,7 @@ export const Runners = () => {
   });
   const listRefused = refusesCredential(runners.error);
   useEffect(() => {
-    if (listRefused && token) {
+    if (listRefused && token !== undefined) {
       refuse(token, "fleet", "management");
     }
   }, [listRefused, token, refuse]);

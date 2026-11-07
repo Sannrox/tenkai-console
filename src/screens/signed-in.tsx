@@ -2,6 +2,7 @@ import { Outlet } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { ApiError } from "../api/http";
 import type { OidcClientDiscovery } from "../api/tenkai.gen";
+import { HOST_SIGN_OUT } from "../auth/identity";
 import { useSession } from "../auth/session";
 import { useSignOut } from "../auth/use-sign-out";
 import { useDelivery } from "../delivery/use-delivery";
@@ -37,9 +38,13 @@ export const SignedIn = ({ settings }: { settings: OidcClientDiscovery | null })
         <p className="m-0 text-xs text-warning">
           {session.subject ?? "This account"} has no Tenkai access. Ask the platform team.
         </p>
-        <Button className="mt-4" onClick={() => void leave()}>
-          Sign out
-        </Button>
+        {session.kind === "host" ? (
+          <p className="mt-4 mb-0 text-xs text-muted">{HOST_SIGN_OUT}</p>
+        ) : (
+          <Button className="mt-4" onClick={() => void leave()}>
+            Sign out
+          </Button>
+        )}
       </Centered>
     );
   }

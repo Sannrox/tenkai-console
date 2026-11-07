@@ -128,6 +128,24 @@ again. Only the PKCE verifier and
 `state` survive the redirect, in `sessionStorage`. Servers without OIDC accept
 a pasted bearer token instead, also held in memory.
 
+### Host account over SSH
+
+On a Linux server the default sign-in is the host account (Tenkai
+[ADR 0047](https://github.com/Sannrox/tenkai/blob/main/docs/decisions/0047-host-identity.md)).
+Forward Tenkai's Unix socket and open the console on loopback:
+
+```sh
+ssh -L 8080:/run/tenkai/tenkai.sock <server>
+# then open http://localhost:8080/ui/
+```
+
+At startup the console asks `GET /v1/auth/me` without a credential. When the
+server identifies the connection as a host account, the console is signed in as
+that user; the account menu and Access show the user, the OS groups that
+granted access, and the capabilities. The browser holds no credential, and
+closing the tunnel signs out. Without OIDC, the sign-in screen shows the
+forward command next to the token form.
+
 ## API types
 
 `api/tenkai-http-v1.schema.json` is Tenkai's published HTTP contract, vendored

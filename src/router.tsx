@@ -7,6 +7,7 @@ import {
   lazyRouteComponent,
 } from "@tanstack/react-router";
 import { checkServer, consoleRoot, fetchOidcSettings } from "./api/http";
+import { signInWithHost } from "./auth/identity";
 import { useSession } from "./auth/session";
 import { useSessionRefresh } from "./auth/use-session-refresh";
 import { Environments } from "./screens/environments";
@@ -33,9 +34,16 @@ const useServer = () =>
     queryKey: ["server"],
     queryFn: async () => {
       const check = await checkServer();
-      return check.kind === "ready"
-        ? { check, oidc: await fetchOidcSettings() }
-        : { check, oidc: null };
+      if (check.kind !== "ready") {
+        return { check, oidc: null };
+      }
+      // Over an SSH forward to Tenkai's socket the connection is the sign-in.
+      const { session, signIn } = useSession.getState();
+      const [oidc] = await Promise.all([
+        fetchOidcSettings(),
+        session ? null : signInWithHost(signIn).catch(() => false),
+      ]);
+      return { check, oidc };
     },
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
@@ -76,7 +84,7 @@ const planRoute = createRoute({
   component: function Plan() {
     const { environment } = planRoute.useParams();
     const token = useSession((state) => state.session?.accessToken);
-    return token ? <PlanPage environment={environment} token={token} /> : null;
+    return token !== undefined ? <PlanPage environment={environment} token={token} /> : null;
   },
 });
 

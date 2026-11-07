@@ -65,7 +65,8 @@ export const request = async <T>(
 };
 
 /**
- * Fetch a file with the bearer in the header, never in the URL, and hand it
+ * Fetch a file with the bearer in the header, never in the URL (none for a
+ * host-identity session), and hand it
  * to the browser as a download. The bytes live only in a short-lived object
  * URL, revoked once the download has started.
  */
@@ -76,7 +77,7 @@ export const download = async (
   fetcher: typeof fetch = fetch,
 ): Promise<void> => {
   const response = await fetcher(new URL(path, apiRoot), {
-    headers: { authorization: `Bearer ${token}` },
+    headers: token ? { authorization: `Bearer ${token}` } : {},
   });
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => undefined);

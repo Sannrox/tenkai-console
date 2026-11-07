@@ -1,11 +1,9 @@
-import { readFile } from "node:fs/promises";
 // Browser load measurement (#21, #45): sign-in to first table, and the
 // environments and releases screens at fleet scale, on a throttled mid-range
 // CPU, against a mocked API serving 1 000 environments and a 50 x 10 product
 // x channel matrix. Run with `pnpm build && pnpm perf:load`.
-import { type Server, createServer } from "node:http";
-import { extname, join, normalize } from "node:path";
 import { expect, test } from "@playwright/test";
+import { type MockBackend, type Routes, serveConsole } from "../e2e/mock-backend";
 import type {
   ChannelListEntry,
   EnvironmentInspectReport,
@@ -83,84 +81,52 @@ const channelItems = (): ChannelListEntry[] => {
   return items;
 };
 
-const contentTypes: Record<string, string> = {
-  ".html": "text/html",
-  ".js": "text/javascript",
-  ".css": "text/css",
+/** The fleet-scale API; everything else is the shared mock backend's default. */
+const routes: Routes = (path) => {
+  if (path === "/v1/auth/oidc") {
+    return { status: 404, body: { error: "no oidc client" } };
+  }
+  if (path === "/v1/fleet/status") {
+    const environments = Array.from({ length: ENVIRONMENTS }, (_, index) => fleetRow(index));
+    const behind = environments.filter((row) => row.posture === "behind").length;
+    return {
+      status: 200,
+      body: {
+        environments,
+        environment_count: ENVIRONMENTS,
+        environments_current: ENVIRONMENTS - behind,
+        environments_behind: behind,
+        environments_unhealthy: 0,
+        environments_empty: 0,
+      },
+    };
+  }
+  if (path === "/v1/channels") {
+    return { status: 200, body: { items: channelItems() } };
+  }
+  if (path === "/v1/environments") {
+    return {
+      status: 200,
+      body: Array.from({ length: ENVIRONMENTS }, (_, index) => listEntry(index)),
+    };
+  }
+  const runtime = path.match(/^\/v1\/environments\/env-(\d{4})\/runtime$/);
+  if (runtime) {
+    return { status: 200, body: { environment: name(Number(runtime[1])), components: [] } };
+  }
+  const environment = path.match(/^\/v1\/environments\/env-(\d{4})$/);
+  if (environment) {
+    return { status: 200, body: inspect(Number(environment[1])) };
+  }
+  return undefined;
 };
 
-/** Serves dist/ at /ui/ and the API at /, as tenkai-server does. */
-const serve = () =>
-  new Promise<{ server: Server; url: string }>((resolve) => {
-    const server = createServer((request, response) => {
-      const path = new URL(request.url ?? "/", "http://local").pathname;
-      const json = (status: number, body: unknown) => {
-        response.writeHead(status, { "content-type": "application/json" });
-        response.end(JSON.stringify(body));
-      };
-      if (path === "/healthz") {
-        return json(200, {
-          status: "ok",
-          profile: "fixture",
-          capabilities: [],
-          contracts: ["tenkai.http.v1"],
-        });
-      }
-      if (path === "/v1/auth/oidc") {
-        return json(404, { error: "no oidc client" });
-      }
-      if (path === "/v1/fleet/status") {
-        const environments = Array.from({ length: ENVIRONMENTS }, (_, index) => fleetRow(index));
-        const behind = environments.filter((row) => row.posture === "behind").length;
-        return json(200, {
-          environments,
-          environment_count: ENVIRONMENTS,
-          environments_current: ENVIRONMENTS - behind,
-          environments_behind: behind,
-          environments_unhealthy: 0,
-          environments_empty: 0,
-        });
-      }
-      if (path === "/v1/channels") {
-        return json(200, { items: channelItems() });
-      }
-      if (path === "/v1/environments") {
-        return json(
-          200,
-          Array.from({ length: ENVIRONMENTS }, (_, index) => listEntry(index)),
-        );
-      }
-      const runtime = path.match(/^\/v1\/environments\/env-(\d{4})\/runtime$/);
-      if (runtime) {
-        return json(200, { environment: name(Number(runtime[1])), components: [] });
-      }
-      const environment = path.match(/^\/v1\/environments\/env-(\d{4})$/);
-      if (environment) {
-        return json(200, inspect(Number(environment[1])));
-      }
-      const file = normalize(path.replace(/^\/ui\/?/, "") || "index.html");
-      readFile(join("dist", file.endsWith("/") || file === "." ? "index.html" : file))
-        .then((body) => {
-          response.writeHead(200, {
-            "content-type": contentTypes[extname(file)] ?? "text/html",
-          });
-          response.end(body);
-        })
-        .catch(() => readFile("dist/index.html").then((body) => response.end(body)));
-    });
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      const port = typeof address === "object" && address ? address.port : 0;
-      resolve({ server, url: `http://127.0.0.1:${port}/ui/` });
-    });
-  });
-
-let app: { server: Server; url: string };
+let app: MockBackend;
 test.beforeAll(async () => {
-  app = await serve();
+  app = await serveConsole(routes);
 });
-test.afterAll(() => {
-  app.server.close();
+test.afterAll(async () => {
+  await app.close();
 });
 
 test("fleet-scale screens stay within the load budget", async ({ page }) => {

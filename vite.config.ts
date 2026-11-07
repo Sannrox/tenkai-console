@@ -14,6 +14,6 @@ export default defineConfig({
   server: {
     proxy: { "/v1": tenkai, "/healthz": tenkai },
   },
-  // perf/ holds the Playwright load measurement (`pnpm perf:load`), not unit tests.
-  test: { exclude: [...configDefaults.exclude, "perf/**"] },
+  // perf/ and e2e/ hold Playwright suites (`pnpm perf:load`, `pnpm e2e`), not unit tests.
+  test: { exclude: [...configDefaults.exclude, "perf/**", "e2e/**"] },
 });
