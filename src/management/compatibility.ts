@@ -81,11 +81,73 @@ export const groupFailures = (
   })).filter((group) => group.failures.length > 0);
 
 /** A release's standing in one environment. */
-export type Standing = "compatible" | "incompatible" | "no-profile";
+export type Standing = "compatible" | "blocked" | "no-profile";
 
 /** `null` is a release without a compatibility profile: nothing to check. */
 export const standing = (report: CompatibilityReport | null): Standing =>
-  report === null ? "no-profile" : report.failures.length === 0 ? "compatible" : "incompatible";
+  report === null ? "no-profile" : report.failures.length === 0 ? "compatible" : "blocked";
+
+/** Operator copy: drop the `_contract` suffix and use spaces. */
+export const failureLabel = (reason: CompatibilityFailure["reason"]): string =>
+  reason.replace(/_contract$/, "").replaceAll("_", " ");
+
+/** One visible failure line, subject first when the API named one. */
+export const failureLines = (failures: CompatibilityFailure[]): string[] =>
+  failures.map((failure) => {
+    const subject = subjectOf(failure);
+    const label = failureLabel(failure.reason);
+    return subject ? `${subject} ${label}` : label;
+  });
+
+const SatisfiedBy = type("Record<string, string>");
+
+/**
+ * Additive `satisfied_by` from Tenkai #1005. The pinned contract omits it;
+ * a missing or malformed map reads as empty.
+ */
+export const satisfiedBy = (report: CompatibilityReport): Record<string, string> => {
+  const extra = (report as CompatibilityReport & { satisfied_by?: unknown }).satisfied_by;
+  if (extra === undefined) {
+    return {};
+  }
+  const value = SatisfiedBy(extra);
+  return value instanceof type.errors ? {} : value;
+};
+
+export const matchedLine = (report: CompatibilityReport): string =>
+  Object.values(satisfiedBy(report)).join(" · ") || "none";
+
+export type CompatibilityEdge = {
+  contract: string;
+  status: string;
+  statusTone: "ok" | "bad";
+  providedBy: string;
+};
+
+/** Required contracts: matched providers, then contract failures. */
+export const edgeRows = (report: CompatibilityReport): CompatibilityEdge[] => {
+  const rows = new Map<string, CompatibilityEdge>();
+  for (const [contract, provider] of Object.entries(satisfiedBy(report))) {
+    rows.set(contract, {
+      contract,
+      status: "matched",
+      statusTone: "ok",
+      providedBy: provider,
+    });
+  }
+  for (const item of report.failures) {
+    if (!("contract" in item)) {
+      continue;
+    }
+    rows.set(item.contract, {
+      contract: item.contract,
+      status: failureLabel(item.reason),
+      statusTone: "bad",
+      providedBy: "none",
+    });
+  }
+  return [...rows.values()];
+};
 
 const Observation = type({
   version: "number",
