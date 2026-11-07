@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { groupFailures, parseObservation, standing } from "./compatibility";
+import type { CompatibilityReport } from "../api/tenkai.gen";
+import {
+  edgeRows,
+  failureLabel,
+  failureLines,
+  groupFailures,
+  matchedLine,
+  parseObservation,
+  standing,
+} from "./compatibility";
 
 const observation = {
   version: 1,
@@ -42,7 +51,37 @@ describe("compatibility", () => {
     expect(standing({ version: 1, release_digest: "8f3a", failures: [] })).toBe("compatible");
     expect(
       standing({ version: 1, release_digest: "8f3a", failures: [{ reason: "missing_evidence" }] }),
-    ).toBe("incompatible");
+    ).toBe("blocked");
+  });
+
+  it("names matched providers and contract edges without raw reason suffixes", () => {
+    const report = {
+      version: 1,
+      release_digest: "8f3a",
+      failures: [
+        { reason: "missing_contract" as const, contract: "analytics" },
+        { reason: "incompatible_contract" as const, contract: "payments" },
+      ],
+      satisfied_by: { catalog: "catalog@1.4.0", database: "postgres@16.2.0" },
+    };
+    expect(matchedLine(report)).toBe("catalog@1.4.0 · postgres@16.2.0");
+    expect(failureLabel("incompatible_contract")).toBe("incompatible");
+    expect(failureLines(report.failures)).toEqual(["analytics missing", "payments incompatible"]);
+    expect(edgeRows(report)).toEqual([
+      { contract: "catalog", status: "matched", statusTone: "ok", providedBy: "catalog@1.4.0" },
+      { contract: "database", status: "matched", statusTone: "ok", providedBy: "postgres@16.2.0" },
+      { contract: "analytics", status: "missing", statusTone: "bad", providedBy: "none" },
+      { contract: "payments", status: "incompatible", statusTone: "bad", providedBy: "none" },
+    ]);
+    expect(matchedLine({ version: 1, release_digest: "8f3a", failures: [] })).toBe("none");
+    expect(
+      matchedLine({
+        version: 1,
+        release_digest: "8f3a",
+        failures: [],
+        satisfied_by: "postgres@16.2.0",
+      } as CompatibilityReport),
+    ).toBe("none");
   });
 
   it("sends an observation only for its own environment", () => {
