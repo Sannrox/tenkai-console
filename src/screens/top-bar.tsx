@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
 import type { OidcClientDiscovery } from "../api/tenkai.gen";
+import { HOST_SIGN_OUT, signInMethod } from "../auth/identity";
 import type { Session } from "../auth/session";
 import { useSignOut } from "../auth/use-sign-out";
 import { Button } from "../ui/kit";
@@ -64,16 +65,19 @@ export const TopBar = ({
         </Button>
         {open && (
           <div className="absolute right-0 z-10 mt-1 w-56 rounded-md border border-line bg-card p-2 text-xs">
-            <div className="truncate px-1.5 py-1 text-muted">
-              {session.subject ?? "bearer token"}
-            </div>
-            <button
-              type="button"
-              className="w-full cursor-pointer rounded px-1.5 py-1 text-left text-fg hover:bg-selected"
-              onClick={() => void leave()}
-            >
-              Sign out
-            </button>
+            <div className="truncate px-1.5 py-1">{session.subject ?? "bearer token"}</div>
+            <div className="truncate px-1.5 pb-1 text-muted">{signInMethod(session, settings)}</div>
+            {session.kind === "host" ? (
+              <p className="m-0 px-1.5 py-1 text-muted">{HOST_SIGN_OUT}</p>
+            ) : (
+              <button
+                type="button"
+                className="w-full cursor-pointer rounded px-1.5 py-1 text-left text-fg hover:bg-selected"
+                onClick={() => void leave()}
+              >
+                Sign out
+              </button>
+            )}
           </div>
         )}
       </div>

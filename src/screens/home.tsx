@@ -30,7 +30,7 @@ export const Home = () => {
                   ? `${rows.length} environments, ${delivery.fleet.environments_behind} behind`
                   : `${rows.length} environments, all current`}
         </span>
-        {token && <Reconcile token={token} />}
+        {token !== undefined && <Reconcile token={token} />}
       </div>
       {!delivery.loading && !delivery.error && (
         <Delivery rows={rows} items={items} fleet={delivery.fleet} />

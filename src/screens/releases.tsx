@@ -83,12 +83,12 @@ export const Releases = () => {
           </tbody>
         </table>
       </Card>
-      {token && <Compatibility token={token} environments={names} />}
-      {token && <Catalog token={token} channels={table.channels} />}
-      {token && (
+      {token !== undefined && <Compatibility token={token} environments={names} />}
+      {token !== undefined && <Catalog token={token} channels={table.channels} />}
+      {token !== undefined && (
         <RecallFollow token={token} fleet={fleetTableRows(delivery.fleet, delivery.list)} />
       )}
-      {token && <Migrations token={token} environments={names} />}
+      {token !== undefined && <Migrations token={token} environments={names} />}
     </>
   );
 };

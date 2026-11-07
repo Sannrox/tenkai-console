@@ -35,6 +35,7 @@ jobs:
       - run: pnpm perf:bundle
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm perf:load
+      - run: pnpm e2e
       - run: VERSION=ci sh scripts/package.sh
 
   workflow-skills:

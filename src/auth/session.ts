@@ -5,7 +5,9 @@ import { create } from "zustand";
  * so a reload signs in again.
  */
 export type Session = {
-  kind: "oidc" | "token";
+  /** `host`: the SSH login, read from peer credentials on Tenkai's Unix socket (Tenkai ADR 0047). */
+  kind: "oidc" | "token" | "host";
+  /** Empty for `host`: the forwarded socket authenticates every request, no bearer is sent. */
   accessToken: string;
   /** Display only; the server decides authorization. */
   subject: string | undefined;

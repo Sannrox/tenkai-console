@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { ApiError, consoleRoot, request } from "../api/http";
 import type { OidcClientDiscovery } from "../api/tenkai.gen";
+import { signInWithHost } from "../auth/identity";
 import { beginSignIn, providerLabel } from "../auth/oidc";
 import { useSession } from "../auth/session";
 import { Button, Centered } from "../ui/kit";
@@ -26,6 +27,11 @@ export const signInHeading = (
 /** Decision 5F: one button to the organisation's sign-in. */
 export const signInButtonLabel = (settings: OidcClientDiscovery): string =>
   `Sign in with ${providerLabel(settings)} SSO`;
+
+/** How a host account reaches the console: forward Tenkai's socket over SSH (Tenkai ADR 0047). */
+export const HOST_FORWARD = "ssh -L 8080:/run/tenkai/tenkai.sock <server>";
+export const HOST_OPEN = "Then open http://localhost:8080/ui/";
+export const HOST_REFUSED = "This connection is not a host account with Tenkai access.";
 
 /** 401 vs 403 on a pasted platform token. Other statuses stay the server text. */
 export const tokenRefusal = (status: number): string | undefined => {
@@ -83,6 +89,7 @@ export const SignIn = ({ settings }: { settings: OidcClientDiscovery | null }) =
           {error}
         </p>
       )}
+      {!settings && <HostSignIn />}
       {useToken ? (
         <TokenForm />
       ) : (
@@ -97,6 +104,41 @@ export const SignIn = ({ settings }: { settings: OidcClientDiscovery | null }) =
         </div>
       )}
     </Centered>
+  );
+};
+
+/**
+ * With no organisation sign-in, the host account is the way in (Tenkai ADR
+ * 0047). The console already probed the connection; this retries after the
+ * operator opens the tunnel.
+ */
+const HostSignIn = () => {
+  const signIn = useSession((state) => state.signIn);
+  const [refused, setRefused] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const retry = async () => {
+    setBusy(true);
+    setRefused(false);
+    const signedIn = await signInWithHost(signIn).catch(() => false);
+    setRefused(!signedIn);
+    setBusy(false);
+  };
+
+  return (
+    <div className="text-xs">
+      <p className="mt-0 mb-1 text-muted">Host account</p>
+      <code className="block font-mono break-words text-fg">{HOST_FORWARD}</code>
+      <p className="mt-1 mb-2 text-muted">{HOST_OPEN}</p>
+      <Button disabled={busy} onClick={() => void retry()}>
+        Check again
+      </Button>
+      {refused && (
+        <p role="alert" className="mt-2 mb-0 text-warning">
+          {HOST_REFUSED}
+        </p>
+      )}
+    </div>
   );
 };
 

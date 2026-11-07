@@ -20,7 +20,8 @@
     "api:drift": "node scripts/api.mjs drift",
     "perf:bundle": "node scripts/bundle-budget.mjs check",
     "perf:bundle:update": "node scripts/bundle-budget.mjs update",
-    "perf:load": "playwright test"
+    "perf:load": "playwright test perf",
+    "e2e": "playwright test e2e"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.0",

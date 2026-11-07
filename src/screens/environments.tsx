@@ -71,7 +71,7 @@ export const Environments = ({ focus }: { focus?: string }) => {
               ? "Loading"
               : `${rows.length} active`}
         </span>
-        {token && <AddEnvironment token={token} />}
+        {token !== undefined && <AddEnvironment token={token} />}
       </div>
       <FleetTable rows={rows} selected={shown} onSelect={select} label="Environments" />
       {inspect.error && (
@@ -82,7 +82,7 @@ export const Environments = ({ focus }: { focus?: string }) => {
         </div>
       )}
       {inspect.isLoading && <p className="mt-3 text-xs text-muted">Loading</p>}
-      {report && token && (
+      {report && token !== undefined && (
         <Detail
           key={report.name}
           report={report}
