@@ -1,15 +1,21 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
+  type AttemptCause,
   type DeploymentAttempt,
   attemptAction,
   attemptDetail,
   attemptPlan,
   attemptTime,
+  causeLine,
+  causeRaw,
+  causeSummary,
+  causeTruncated,
   detailNeedsExpand,
   detailPreview,
   fetchHistory,
   nextCursor,
+  restoreFailed,
   versionLine,
 } from "../delivery/history";
 import { Button, Card } from "../ui/kit";
@@ -108,7 +114,8 @@ export const EnvironmentHistory = ({
               <th className={th}>Action</th>
               <th className={th}>Status</th>
               <th className={th}>Plan</th>
-              <th className={th}>Detail</th>
+              <th className={th}>Cause</th>
+              <th className={th}>Restore</th>
             </tr>
           </thead>
           <tbody>
@@ -170,7 +177,6 @@ const AttemptRow = ({
   environment: string;
   attempt: DeploymentAttempt;
 }) => {
-  const detail = attemptDetail(attempt);
   const plan = attemptPlan(attempt);
   const status = attempt.status;
   return (
@@ -196,9 +202,53 @@ const AttemptRow = ({
         )}
       </td>
       <td className={td}>
-        <DetailCell detail={detail} />
+        <CauseCell attempt={attempt} />
+      </td>
+      <td className={td}>
+        <RestoreCell restore={attempt.restore} />
       </td>
     </tr>
+  );
+};
+
+const CauseCell = ({ attempt }: { attempt: DeploymentAttempt }) => {
+  if (attempt.cause === undefined) {
+    return <DetailCell detail={attemptDetail(attempt)} />;
+  }
+  return <CauseExpand cause={attempt.cause} />;
+};
+
+const RestoreCell = ({ restore }: { restore: AttemptCause | undefined }) => {
+  if (restore === undefined) {
+    return <span className="text-muted">none</span>;
+  }
+  return (
+    <div className={restoreFailed(restore) ? "text-danger" : undefined}>
+      <CauseExpand cause={restore} />
+    </div>
+  );
+};
+
+const CauseExpand = ({ cause }: { cause: AttemptCause }) => {
+  const preview = `${causeLine(cause)}: ${causeSummary(cause)}`;
+  const raw = causeRaw(cause);
+  const truncated = causeTruncated(cause) ? <span className="text-muted"> truncated</span> : null;
+  if (raw === "") {
+    return (
+      <>
+        {preview}
+        {truncated}
+      </>
+    );
+  }
+  return (
+    <details>
+      <summary className="cursor-pointer">
+        {preview}
+        {truncated}
+      </summary>
+      <div className="mt-1 whitespace-pre-wrap">{raw}</div>
+    </details>
   );
 };
 

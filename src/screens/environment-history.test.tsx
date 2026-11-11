@@ -140,6 +140,59 @@ describe("EnvironmentHistory", () => {
     expect(container.textContent).not.toMatch(/HTTP \d{3}|\/v1\/|#\d+|—/);
   });
 
+  it("shows a structured cause without raw until expand, and a failed restore", async () => {
+    serve(200, {
+      items: [
+        {
+          id: "dep:api:1",
+          created_at: 1_700_000_000_000,
+          instance: "api",
+          product: "api",
+          from_version: "1.0.0",
+          to_version: "1.1.0",
+          status: "rolled_back",
+          action: "upgrade",
+          plan_id: "tenkai:plan:prod:1",
+          detail: "probe failed; restored 1.0.0",
+          cause: {
+            phase: "health_probe",
+            kind: "probe_failed",
+            summary: "probe failed",
+            raw: "SECRET=should-stay-collapsed",
+            truncated: true,
+          },
+          restore: {
+            phase: "restore",
+            kind: "restore_failed",
+            summary: "restore failed",
+          },
+        },
+      ],
+    });
+    await render(
+      <EnvironmentHistory
+        environment="prod"
+        token="token"
+        instances={["api"]}
+        onInstance={() => undefined}
+      />,
+    );
+    expect(container.textContent).toContain("health_probe · probe_failed: probe failed");
+    expect(container.textContent).toContain("truncated");
+    expect(container.textContent).toContain("restore_failed: restore failed");
+    const details = container.querySelector("details");
+    expect(details?.open).toBe(false);
+    expect(details?.querySelector("summary")?.textContent).not.toContain(
+      "SECRET=should-stay-collapsed",
+    );
+    await act(async () => {
+      details?.querySelector("summary")?.click();
+    });
+    expect(details?.open).toBe(true);
+    expect(container.textContent).toContain("SECRET=should-stay-collapsed");
+    expect(container.querySelector(".text-danger")?.textContent).toContain("restore failed");
+  });
+
   it("says none when there are no attempts", async () => {
     serve(200, { items: [] });
     await render(

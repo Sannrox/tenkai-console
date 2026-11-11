@@ -5,12 +5,18 @@ import {
   attemptDetail,
   attemptPlan,
   attemptTime,
+  causeLine,
+  causeRaw,
+  causeSummary,
+  causeTruncated,
   detailNeedsExpand,
   detailPreview,
   fetchHistory,
   historyPath,
   nextCursor,
+  parseCause,
   parseHistory,
+  restoreFailed,
   versionLine,
 } from "./history";
 
@@ -54,7 +60,7 @@ describe("parseHistory", () => {
       items: [
         {
           ...PAGE.items[0],
-          cause: { phase: "health_probe", kind: "probe_failed", summary: "probe failed" },
+          extra: "ignored",
         },
       ],
     });
@@ -62,8 +68,73 @@ describe("parseHistory", () => {
     expect(parsed?.items[0]).toMatchObject({ id: "dep:web:2", status: "succeeded" });
   });
 
+  it("keeps a structured cause and restore on the attempt", () => {
+    const parsed = parseHistory({
+      items: [
+        {
+          ...PAGE.items[1],
+          cause: {
+            phase: "health_probe",
+            kind: "probe_failed",
+            summary: "probe failed",
+            raw: "stderr",
+            truncated: true,
+            extra: "ignored",
+          },
+          restore: {
+            phase: "restore",
+            kind: "restore_failed",
+            summary: "restore failed",
+          },
+        },
+      ],
+    });
+    expect(parsed?.items[0]?.cause).toEqual({
+      phase: "health_probe",
+      kind: "probe_failed",
+      summary: "probe failed",
+      raw: "stderr",
+      truncated: true,
+    });
+    expect(parsed?.items[0]?.restore).toEqual({
+      phase: "restore",
+      kind: "restore_failed",
+      summary: "restore failed",
+    });
+  });
+
+  it("drops a malformed cause and still lists the attempt", () => {
+    const parsed = parseHistory({
+      items: [{ ...PAGE.items[1], cause: { summary: "nope" } }],
+    });
+    expect(parsed?.items[0]).toMatchObject({ id: "dep:api:1", status: "failed" });
+    expect(parsed?.items[0]?.cause).toBeUndefined();
+  });
+
   it("rejects a body without items", () => {
     expect(parseHistory({ next_cursor: "x" })).toBeUndefined();
+  });
+});
+
+describe("cause fields", () => {
+  it("maps summary, raw, truncated, and restore failure", () => {
+    const cause = parseCause({
+      phase: "health_probe",
+      kind: "probe_failed",
+      summary: "probe failed",
+      raw: " stderr ",
+      truncated: true,
+    });
+    expect(causeLine(cause!)).toBe("health_probe · probe_failed");
+    expect(causeSummary(cause!)).toBe("probe failed");
+    expect(causeRaw(cause)).toBe("stderr");
+    expect(causeTruncated(cause)).toBe(true);
+    expect(restoreFailed(cause)).toBe(false);
+    expect(
+      restoreFailed({ phase: "restore", kind: "restore_failed", summary: "restore failed" }),
+    ).toBe(true);
+    expect(parseCause(null)).toBeUndefined();
+    expect(parseCause({ phase: "pull" })).toBeUndefined();
   });
 });
 
