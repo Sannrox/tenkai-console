@@ -8,7 +8,27 @@ import type {
   ManagementLifecycleResult,
   PlanApprovalsView,
 } from "../api/tenkai.gen";
+import {
+  APPLY_COPY,
+  type ApplyRow,
+  type ApplyView,
+  type PlanStepRef,
+  applyPath,
+  applyView,
+  applyViewFromError,
+  stepAttempt,
+  stepCut,
+  stepDetail,
+  stepRestored,
+} from "../delivery/apply-steps";
 import { overlayRefusal } from "../delivery/config-schema";
+import {
+  causeLine,
+  causeRaw,
+  causeSummary,
+  detailNeedsExpand,
+  detailPreview,
+} from "../delivery/history";
 import { planSummary } from "../delivery/model";
 import { approvalCopy, shownDigest } from "../plan/approval";
 import { quorumMatrix, quorumStatus } from "../plan/quorum";
@@ -29,7 +49,7 @@ const STRIP = ["computed", "running", "succeeded"] as const;
 export const PlanPage = ({ environment, token }: { environment: string; token: string }) => {
   const queryClient = useQueryClient();
   const [localDigest, setLocalDigest] = useState<{ planId: string; digest: string }>();
-  const [result, setResult] = useState<{ ok: boolean; text: string }>();
+  const [result, setResult] = useState<ApplyView>();
   const report = useQuery({
     queryKey: ["environment", environment, token],
     queryFn: () =>
@@ -63,22 +83,35 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
     retry: false,
   });
 
+  const refreshAfterRun = () => {
+    void queryClient.invalidateQueries({ queryKey: ["environment", environment] });
+    void queryClient.resetQueries({ queryKey: ["history"] });
+    void queryClient.invalidateQueries({ queryKey: ["plan-approvals"] });
+    void queryClient.invalidateQueries({ queryKey: ["environments"] });
+    void queryClient.invalidateQueries({ queryKey: ["fleet"] });
+  };
   const run = useMutation({
-    mutationFn: (call: { path: string; body: unknown }) =>
+    mutationFn: (call: { path: string; body: unknown; planSteps?: readonly PlanStepRef[] }) =>
       request<ManagementLifecycleResult>(call.path, { token, method: "POST", body: call.body }),
-    onSuccess: (response) => {
+    onSuccess: (response, call) => {
       if (response.operation === "plan" && response.digest && response.resource) {
         setLocalDigest({ planId: response.resource, digest: response.digest });
       }
-      setResult({ ok: true, text: response.message });
-      void queryClient.invalidateQueries({ queryKey: ["environment", environment] });
-      void queryClient.resetQueries({ queryKey: ["history"] });
-      void queryClient.invalidateQueries({ queryKey: ["plan-approvals"] });
-      void queryClient.invalidateQueries({ queryKey: ["environments"] });
-      void queryClient.invalidateQueries({ queryKey: ["fleet"] });
+      setResult(
+        /\/apply(\?|$)/.test(call.path)
+          ? applyView(true, response.message, response, call.planSteps)
+          : { ok: true, text: response.message },
+      );
+      refreshAfterRun();
     },
-    onError: (error) =>
-      setResult({ ok: false, text: error instanceof ApiError ? error.message : String(error) }),
+    onError: (error, call) => {
+      if (error instanceof ApiError && /\/apply(\?|$)/.test(call.path)) {
+        setResult(applyViewFromError(error, call.planSteps));
+        refreshAfterRun();
+        return;
+      }
+      setResult({ ok: false, text: error instanceof ApiError ? error.message : String(error) });
+    },
   });
 
   const data = report.data;
@@ -92,7 +125,10 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
     data?.subscriptions.filter((subscription) => subscription.state === "unhealthy") ?? [];
   const drift =
     data?.subscriptions.some((subscription) => subscription.state !== "current") ?? false;
-  const refusal = result && !result.ok ? overlayRefusal(result.text) : undefined;
+  const refusal =
+    result && !result.ok && result.rows === undefined && result.detail === undefined
+      ? overlayRefusal(result.text)
+      : undefined;
 
   return (
     <>
@@ -238,6 +274,7 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
                 approvals.data ? quorumStatus(quorumMatrix(approvals.data)).applyBlocked : false
               }
               planId={plan.id}
+              planSteps={plan.steps}
               environment={environment}
               digest={digestShown}
               generation={generation}
@@ -279,9 +316,15 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
           <EnvironmentOverlays report={data} {...(refusal === undefined ? {} : { refusal })} />
 
           {result && refusal === undefined && (
-            <p role="status" className={`mt-4 text-xs ${result.ok ? "text-ok" : "text-danger"}`}>
-              {result.text}
-            </p>
+            <>
+              <p role="status" className={`mt-4 text-xs ${result.ok ? "text-ok" : "text-danger"}`}>
+                {result.text}
+              </p>
+              {result.detail === "unavailable" && (
+                <p className="mt-1 text-xs text-muted">{APPLY_COPY.unavailable}</p>
+              )}
+              {result.rows && <ApplySteps environment={environment} rows={result.rows} />}
+            </>
           )}
         </>
       )}
@@ -293,6 +336,7 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
 const Approval = ({
   applyBlocked,
   planId,
+  planSteps,
   environment,
   digest,
   generation,
@@ -302,10 +346,11 @@ const Approval = ({
   /** The server reports more approvals missing than one paste can add. */
   applyBlocked: boolean;
   planId: string;
+  planSteps: readonly PlanStepRef[] | undefined;
   environment: string;
   digest: string | undefined;
   generation: number;
-  run: (call: { path: string; body: unknown }) => void;
+  run: (call: { path: string; body: unknown; planSteps?: readonly PlanStepRef[] }) => void;
   pending: boolean;
 }) => {
   const [envelope, setEnvelope] = useState("");
@@ -322,7 +367,11 @@ const Approval = ({
     const plan = encodeURIComponent(planId);
     run(
       operation === "apply"
-        ? { path: `v1/plans/${plan}/apply`, body: applyBody(environment, generation, evidence) }
+        ? {
+            path: applyPath(planId),
+            body: applyBody(environment, generation, evidence),
+            ...(planSteps === undefined ? {} : { planSteps }),
+          }
         : {
             path: `v1/plans/${plan}/approve`,
             body: approveBody(environment, generation, evidence),
@@ -381,6 +430,116 @@ const Approval = ({
 
 const th = "border-b border-line px-3 py-1.5 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3 py-1.5 whitespace-nowrap";
+
+const STEP_TONE: Record<string, string> = {
+  succeeded: "text-ok",
+  failed: "text-danger",
+  rolled_back: "text-warning",
+  blocked: "text-warning",
+  "not run": "text-muted",
+};
+
+const ApplySteps = ({ environment, rows }: { environment: string; rows: ApplyRow[] }) => (
+  <Card className="mt-3 max-w-full min-w-0 overflow-x-auto">
+    <table aria-label="Apply steps" className="w-full border-collapse text-xs">
+      <thead>
+        <tr>
+          <th className={th}>Product</th>
+          <th className={th}>Instance</th>
+          <th className={th}>Action</th>
+          <th className={th}>Status</th>
+          <th className={th}>To</th>
+          <th className={th}>Restored</th>
+          <th className={th}>Cause</th>
+          <th className={th}>History</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => {
+          const restored = stepRestored(row);
+          const attempt = stepAttempt(row);
+          return (
+            <tr
+              key={`${row.product}:${row.instance}:${row.action}:${row.to_version}:${row.status}:${attempt}`}
+              className="[&:last-child>td]:border-b-0"
+            >
+              <td className={`${td} font-mono`}>{row.product}</td>
+              <td className={`${td} font-mono`}>{row.instance}</td>
+              <td className={td}>{row.action}</td>
+              <td className={`${td} ${STEP_TONE[row.status] ?? ""}`}>{row.status}</td>
+              <td className={`${td} font-mono`}>{row.to_version}</td>
+              <td className={`${td} font-mono ${restored === APPLY_COPY.none ? "text-muted" : ""}`}>
+                {restored}
+              </td>
+              <td className={`${td} whitespace-normal`}>
+                <StepCause row={row} />
+              </td>
+              <td className={`${td} font-mono ${attempt === APPLY_COPY.none ? "text-muted" : ""}`}>
+                {attempt === APPLY_COPY.none ? (
+                  attempt
+                ) : (
+                  <Link
+                    to="/environments"
+                    search={{ environment, instance: row.instance }}
+                    className="font-medium text-muted"
+                  >
+                    {attempt}
+                  </Link>
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </Card>
+);
+
+const StepCause = ({ row }: { row: ApplyRow }) => {
+  const cut = stepCut(row) ? <span className="text-muted"> {APPLY_COPY.cut}</span> : null;
+  if (row.cause !== undefined) {
+    const preview = `${causeLine(row.cause)}: ${causeSummary(row.cause)}`;
+    const raw = causeRaw(row.cause);
+    if (raw === "") {
+      return (
+        <>
+          {preview}
+          {cut}
+        </>
+      );
+    }
+    return (
+      <details>
+        <summary className="cursor-pointer">
+          {preview}
+          {cut}
+        </summary>
+        <div className="mt-1 whitespace-pre-wrap">{raw}</div>
+      </details>
+    );
+  }
+  const detail = stepDetail(row);
+  if (detail === "") {
+    return cut ?? <span className="text-muted">{APPLY_COPY.none}</span>;
+  }
+  if (!detailNeedsExpand(detail)) {
+    return (
+      <>
+        {detail}
+        {cut}
+      </>
+    );
+  }
+  return (
+    <details>
+      <summary className="cursor-pointer">
+        {detailPreview(detail)}
+        {cut}
+      </summary>
+      <div className="mt-1 whitespace-pre-wrap">{detail}</div>
+    </details>
+  );
+};
 
 /**
  * Pick B (#38): approvers by policy group, each cell signed (when), pending

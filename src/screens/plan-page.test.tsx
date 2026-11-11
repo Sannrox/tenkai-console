@@ -234,3 +234,188 @@ describe("PlanPage overlay schema", () => {
     expect(container.textContent).not.toContain("release config schema");
   });
 });
+
+const ENVELOPE = JSON.stringify({
+  schema: "tenkai.plan-approval.v1",
+  key_id: "ops-1",
+  signature: "c2ln",
+  statement: {
+    environment: "prod",
+    expires_at: 2,
+    issued_at: 1,
+    plan_digest: "sha256:abc",
+    policy_digest: "sha256:def",
+    policy_evidence_id: "ev-1",
+    policy_provider: "tenkai",
+    purpose: "apply",
+    skip_gates: false,
+  },
+});
+const ROOTS = JSON.stringify({
+  version: 1,
+  signers: [{ identity: "ops", key_id: "ops-1", public_key: "k" }],
+});
+
+const READY = { ...APPROVALS, required: 1, missing: 0, exclude_requester: false };
+
+const STEPS_REPORT = {
+  ...REPORT,
+  latest_plan: {
+    ...REPORT.latest_plan,
+    step_count: 2,
+    steps: [
+      {
+        id: "s1",
+        order: 1,
+        product: "api",
+        action: "upgrade",
+        release_id: "rel:1",
+        to: "1.1.0",
+        instance: "api",
+      },
+      {
+        id: "s2",
+        order: 2,
+        product: "web",
+        action: "upgrade",
+        release_id: "rel:2",
+        to: "2.0.0",
+        instance: "web",
+      },
+    ],
+  },
+};
+
+const settle = async () => {
+  for (let round = 0; round < 8; round += 1) {
+    await act(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+  }
+};
+
+const serveApply = (inspect: unknown, reply: (url: string) => Response) =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>(async (input, init) => {
+      const url = input instanceof Request ? input.url : input instanceof URL ? input.href : input;
+      const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+      if (typeof url === "string" && url.includes("/apply") && method === "POST") {
+        return reply(url);
+      }
+      if (typeof url === "string" && url.includes("/approvals")) {
+        return new Response(JSON.stringify(READY));
+      }
+      if (typeof url === "string" && url.endsWith("/approval-policy")) {
+        return new Response(JSON.stringify({ configured: true, mode: "human" }));
+      }
+      return new Response(JSON.stringify(inspect));
+    }),
+  );
+
+const submitApply = async () => {
+  await type("Approval envelope", ENVELOPE);
+  await type("Approval trust roots", ROOTS);
+  await act(async () => {
+    apply()?.click();
+  });
+  await settle();
+};
+
+describe("PlanPage apply steps", () => {
+  it("asks for steps and lists every outcome including not run", async () => {
+    const posted: string[] = [];
+    serveApply(STEPS_REPORT, (url) => {
+      posted.push(url);
+      return new Response(
+        JSON.stringify({
+          version: 1,
+          operation: "apply",
+          message: "applied",
+          steps: [
+            {
+              product: "api",
+              instance: "api",
+              action: "upgrade",
+              status: "succeeded",
+              to_version: "1.1.0",
+              attempt_id: "dep:api:1",
+            },
+          ],
+        }),
+      );
+    });
+    await render();
+    await submitApply();
+    expect(posted.some((url) => url.includes("/apply?steps=true"))).toBe(true);
+    const table = container.querySelector('table[aria-label="Apply steps"]');
+    expect(table?.textContent).toContain("succeeded");
+    expect(table?.textContent).toContain("not run");
+    expect(table?.textContent).toContain("dep:api:1");
+    expect(container.querySelector('[role="status"]')?.textContent).toBe("applied");
+  });
+
+  it("lists failed and restored steps from a 422 body", async () => {
+    serveApply(
+      STEPS_REPORT,
+      () =>
+        new Response(
+          JSON.stringify({
+            error: "apply failed",
+            steps: [
+              {
+                product: "api",
+                instance: "api",
+                action: "upgrade",
+                status: "failed",
+                to_version: "1.1.0",
+                restored_version: "1.0.0",
+                detail: "probe failed",
+                detail_truncated: true,
+                attempt_id: "dep:api:1",
+              },
+            ],
+          }),
+          { status: 422 },
+        ),
+    );
+    await render();
+    await submitApply();
+    const table = container.querySelector('table[aria-label="Apply steps"]');
+    expect(table?.textContent).toContain("failed");
+    expect(table?.textContent).toContain("1.0.0");
+    expect(table?.textContent).toContain("cut");
+    expect(table?.textContent).toContain("not run");
+    expect(container.querySelector('[role="status"]')?.textContent).toBe("apply failed");
+  });
+
+  it("keeps the message and says detail is unavailable on an older server", async () => {
+    serveApply(
+      STEPS_REPORT,
+      () =>
+        new Response(JSON.stringify({ version: 1, operation: "apply", message: "applied 1 step" })),
+    );
+    await render();
+    await submitApply();
+    expect(container.querySelector('[role="status"]')?.textContent).toBe("applied 1 step");
+    expect(container.textContent).toContain("detail is unavailable");
+    expect(container.querySelector('table[aria-label="Apply steps"]')).toBeNull();
+  });
+
+  it("shows no access when apply is forbidden", async () => {
+    serveApply(
+      STEPS_REPORT,
+      () =>
+        new Response(JSON.stringify({ error: "insufficient delivery capability" }), {
+          status: 403,
+        }),
+    );
+    await render();
+    await submitApply();
+    expect(container.querySelector('[role="status"]')?.textContent).toBe("No access");
+    expect(container.textContent).not.toContain("insufficient delivery capability");
+    expect(container.querySelector('table[aria-label="Apply steps"]')).toBeNull();
+  });
+});

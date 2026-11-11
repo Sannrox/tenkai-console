@@ -31,7 +31,11 @@ describe("request", () => {
     }).catch((caught: unknown) => caught);
     expect(auth).toBe("Bearer t-1");
     expect(error).toBeInstanceOf(ApiError);
-    expect(error).toMatchObject({ status: 403, message: "invalid management credential" });
+    expect(error).toMatchObject({
+      status: 403,
+      message: "invalid management credential",
+      body: { error: "invalid management credential" },
+    });
   });
 });
 

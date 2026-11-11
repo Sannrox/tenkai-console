@@ -21,6 +21,7 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly body?: unknown,
   ) {
     super(message);
   }
@@ -59,7 +60,7 @@ export const request = async <T>(
       typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
         ? body.error
         : `HTTP ${response.status}`;
-    throw new ApiError(response.status, message);
+    throw new ApiError(response.status, message, body);
   }
   return (await response.json()) as T;
 };
@@ -86,6 +87,7 @@ export const download = async (
       typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
         ? body.error
         : `HTTP ${response.status}`,
+      body,
     );
   }
   const url = URL.createObjectURL(await response.blob());
