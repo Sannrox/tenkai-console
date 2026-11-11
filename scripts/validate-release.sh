@@ -115,10 +115,13 @@ grep -F 'in_range[$1] { print $2 }' scripts/release-package.sh >/dev/null \
 grep -F -- "--exclude '*-*' origin/main" scripts/changelog-draft.sh >/dev/null \
   || fail "scripts/changelog-draft.sh must start at the last final tag, not a release candidate"
 
+version="$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+tag="v${version}"
+
 tmp="$(mktemp -d /tmp/tcrp.XXXXXX)"
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "${tmp}/release"
-printf 'fake\n' >"${tmp}/release/tenkai-console-v0.2.0.zip"
+printf 'fake\n' >"${tmp}/release/tenkai-console-${tag}.zip"
 ROOT_PATH="$ROOT_PATH" bash scripts/release-package.sh --out "${tmp}/release" --skip-build --skip-test --skip-github --git-sha "$(git rev-parse HEAD)"
 [[ -f "${tmp}/release/tenkai-console-release.json" ]] || fail "dry-run package did not write a manifest"
 [[ -f "${tmp}/release/tenkai-console.cdx.json" ]] || fail "dry-run package did not write an SBOM"
@@ -127,9 +130,11 @@ python3 -c "import json,sys; m=json.loads(open(sys.argv[1]).read()); assert m['s
 
 notes_out="${tmp}/notes"
 mkdir -p "$notes_out"
-ROOT_PATH="$ROOT_PATH" bash scripts/release-package.sh --out "$notes_out" --skip-build --skip-test --skip-github --tag v0.2.0 --git-sha "$(git rev-parse HEAD)"
+ROOT_PATH="$ROOT_PATH" bash scripts/release-package.sh --out "$notes_out" --skip-build --skip-test --skip-github --tag "$tag" --git-sha "$(git rev-parse HEAD)"
 [[ -s "${notes_out}/RELEASE_NOTES.md" ]] || fail "tag dry-run did not write CHANGELOG notes"
-grep -F "request one tick from Delivery" "${notes_out}/RELEASE_NOTES.md" >/dev/null || fail "CHANGELOG notes missing expected 0.2.0 body"
-python3 -c "import json,sys; m=json.loads(open(sys.argv[1]).read()); assert m['version']=='0.2.0'; assert m['tag']=='v0.2.0'; assert m['schema']=='tenkai.family-release-manifest.v1'" "${notes_out}/tenkai-console-release.json"
+python3 scripts/changelog-notes.py "$version" >"${tmp}/expected-notes.md"
+diff -u "${tmp}/expected-notes.md" "${notes_out}/RELEASE_NOTES.md" >/dev/null \
+  || fail "CHANGELOG notes do not match the ${version} section"
+python3 -c "import json,sys; m=json.loads(open(sys.argv[1]).read()); assert m['version']==sys.argv[2]; assert m['tag']==sys.argv[3]; assert m['schema']=='tenkai.family-release-manifest.v1'" "${notes_out}/tenkai-console-release.json" "$version" "$tag"
 
 printf 'validate-release passed\n'
