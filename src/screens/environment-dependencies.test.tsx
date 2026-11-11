@@ -304,7 +304,48 @@ describe("EnvironmentDependencies", () => {
     expect(container.textContent).toContain("db-b");
     expect(container.textContent).toContain("unbound: db-a, db-b");
     expect(container.textContent).toMatch(/error/);
+    expect(container.textContent).toContain("Grants");
+    expect(container.querySelector("table[aria-label='Grants']")).toBeNull();
+    expect(container.textContent).not.toContain("enforced");
+    expect(container.querySelector("button")).toBeNull();
     expect(container.textContent).not.toMatch(/HTTP \d{3}|\/v1\/|#\d+|—/);
+  });
+
+  it("shows granted identities and callers, never enforced", async () => {
+    serve(200, {
+      environment: "prod",
+      holds: [],
+      products: [
+        {
+          product: "shop",
+          version: "2.1.0",
+          state: "current",
+          requirements: [
+            {
+              contract: "database",
+              minimum: "1.0.0",
+              optional: false,
+              provider: {
+                state: "unique" as const,
+                product: "postgres",
+                release: "16.2.0",
+                contract: "16.2.0",
+                instance: "db-a",
+                granted: true,
+              },
+            },
+          ],
+          impact: {},
+        },
+      ],
+    });
+    await render(<EnvironmentDependencies environment="prod" token="token" />);
+    expect(container.textContent).toContain("granted");
+    expect(container.textContent).toContain("tenkai://prod/db-a");
+    expect(container.textContent).toContain("tenkai://prod/shop");
+    expect(container.textContent).toContain("shop → db-a");
+    expect(container.textContent).not.toContain("enforced");
+    expect(container.querySelector("button")).toBeNull();
   });
 
   it("says could not load when fetch throws", async () => {

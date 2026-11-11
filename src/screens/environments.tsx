@@ -43,10 +43,10 @@ import {
 } from "../plan/requests";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { AddEnvironment, ConfigSections } from "./environment-config";
-import { EnvironmentDependencies } from "./environment-dependencies";
 import { SubscriptionHold } from "./environment-hold";
 import { FleetTable } from "./fleet-table";
 
+const EnvironmentDependencies = lazy(() => import("./environment-dependencies"));
 const EnvironmentHistory = lazy(() => import("./environment-history"));
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
@@ -454,11 +454,13 @@ const Detail = ({
           )}
         </Card>
       </div>
-      <EnvironmentDependencies
-        environment={report.name}
-        token={token}
-        subscriptions={report.subscriptions}
-      />
+      <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
+        <EnvironmentDependencies
+          environment={report.name}
+          token={token}
+          subscriptions={report.subscriptions}
+        />
+      </Suspense>
       <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
         <EnvironmentHistory
           environment={report.name}

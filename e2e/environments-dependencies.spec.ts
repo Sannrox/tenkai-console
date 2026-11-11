@@ -521,6 +521,82 @@ test.describe("environment dependencies", () => {
     await expectDesignRules(page);
   });
 
+  test("shows granted identities and callers, never enforced", async ({ page }) => {
+    const inspect = {
+      ...INSPECT,
+      subscriptions: [
+        {
+          product: "postgres",
+          instance: "db-a",
+          channel: "stable",
+          head: "16.2.0",
+          deployed: "16.2.0",
+          state: "current",
+          health: "ok",
+        },
+        {
+          product: "shop",
+          channel: "stable",
+          head: "2.1.0",
+          deployed: "2.1.0",
+          state: "current",
+          health: "ok",
+        },
+      ],
+    } as unknown as EnvironmentInspectReport;
+    app = await serveConsole(
+      server(
+        ok({
+          environment: "prod",
+          holds: [],
+          products: [
+            {
+              product: "shop",
+              version: "2.1.0",
+              state: "current",
+              requirements: [
+                {
+                  contract: "database",
+                  minimum: "1.0.0",
+                  optional: false,
+                  provider: {
+                    state: "unique",
+                    product: "postgres",
+                    release: "16.2.0",
+                    contract: "16.2.0",
+                    instance: "db-a",
+                    granted: true,
+                  },
+                },
+              ],
+              impact: {},
+            },
+          ],
+        }),
+        { inspect },
+      ),
+    );
+    await page.goto(app.url);
+    await page.getByRole("link", { name: "Environments" }).click();
+    const bindings = page
+      .locator("table")
+      .filter({ has: page.getByRole("columnheader", { name: "Bound to" }) });
+    await expect(bindings.getByRole("cell", { name: "granted", exact: true })).toBeVisible();
+    await expect(
+      bindings.getByRole("cell", { name: "tenkai://prod/db-a", exact: true }),
+    ).toBeVisible();
+    await expect(
+      bindings.getByRole("cell", { name: "tenkai://prod/shop", exact: true }),
+    ).toBeVisible();
+    const grants = page
+      .locator("table")
+      .filter({ has: page.getByRole("columnheader", { name: "Caller" }) });
+    await expect(grants.getByRole("cell", { name: "shop → db-a", exact: true })).toBeVisible();
+    await expect(page.getByText("enforced")).toHaveCount(0);
+    await expect(bindings.getByRole("button")).toHaveCount(0);
+    await expectDesignRules(page);
+  });
+
   test("says none when there are no instances", async ({ page }) => {
     const inspect = { ...INSPECT, subscriptions: [] } as unknown as EnvironmentInspectReport;
     app = await serveConsole(

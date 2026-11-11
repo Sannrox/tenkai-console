@@ -157,6 +157,44 @@ describe("parseDependencies", () => {
       instance: "db-a",
     });
   });
+
+  it("keeps granted and drops unknown provider keys", () => {
+    const parsed = parseDependencies({
+      environment: "prod",
+      holds: [],
+      products: [
+        {
+          product: "shop",
+          state: "current",
+          requirements: [
+            {
+              contract: "database",
+              minimum: "1.0.0",
+              optional: false,
+              provider: {
+                state: "unique",
+                product: "postgres",
+                release: "16.2.0",
+                contract: "16.2.0",
+                instance: "db-a",
+                granted: true,
+                extra: true,
+              },
+            },
+          ],
+          impact: {},
+        },
+      ],
+    });
+    expect(parsed?.products[0]?.requirements[0]?.provider).toEqual({
+      state: "unique",
+      product: "postgres",
+      release: "16.2.0",
+      contract: "16.2.0",
+      instance: "db-a",
+      granted: true,
+    });
+  });
 });
 
 describe("lines", () => {
@@ -200,6 +238,24 @@ describe("lines", () => {
         },
       }),
     ).toBe("db-a postgres@16.2.0");
+  });
+
+  it("labels a granted unique provider without claiming enforcement", () => {
+    expect(
+      providerLine({
+        contract: "database",
+        minimum: "1.0.0",
+        optional: false,
+        provider: {
+          state: "unique",
+          product: "postgres",
+          release: "16.2.0",
+          contract: "16.2.0",
+          instance: "db-a",
+          granted: true,
+        },
+      }),
+    ).toBe("db-a postgres@16.2.0 granted");
   });
 
   it("names ambiguous providers from the API state", () => {

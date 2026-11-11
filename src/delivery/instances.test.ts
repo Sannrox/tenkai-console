@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { bindingRows, healthByInstance, instanceHealth, instanceName } from "./instances";
+import {
+  bindingRows,
+  grantRows,
+  healthByInstance,
+  instanceHealth,
+  instanceName,
+} from "./instances";
 
 const GRAPH = {
   environment: "prod",
@@ -160,6 +166,9 @@ describe("bindingRows", () => {
         boundTone: "ok",
         health: "ok",
         healthTone: "ok",
+        grant: "none",
+        providerIdentity: "none",
+        callerIdentity: "none",
       },
       {
         dependent: "reports",
@@ -168,6 +177,9 @@ describe("bindingRows", () => {
         boundTone: "ok",
         health: "error",
         healthTone: "bad",
+        grant: "none",
+        providerIdentity: "none",
+        callerIdentity: "none",
       },
       {
         dependent: "reports",
@@ -176,6 +188,58 @@ describe("bindingRows", () => {
         boundTone: "bad",
         health: "n/a",
         healthTone: "muted",
+        grant: "none",
+        providerIdentity: "none",
+        callerIdentity: "none",
+      },
+    ]);
+  });
+
+  it("labels a unique edge granted and names both identities", () => {
+    const granted = {
+      environment: "prod",
+      holds: GRAPH.holds,
+      products: [
+        GRAPH.products[0]!,
+        GRAPH.products[1]!,
+        {
+          product: "shop",
+          version: "2.1.0",
+          state: "current",
+          requirements: [
+            {
+              contract: "database",
+              minimum: "1.0.0",
+              optional: false,
+              provider: {
+                state: "unique" as const,
+                product: "postgres",
+                release: "16.2.0",
+                contract: "16.2.0",
+                instance: "db-a",
+                granted: true,
+              },
+            },
+          ],
+          impact: {},
+        },
+        GRAPH.products[3]!,
+      ],
+    };
+    const rows = bindingRows(granted, new Map());
+    expect(rows[0]).toMatchObject({
+      dependent: "shop",
+      grant: "granted",
+      providerIdentity: "tenkai://prod/db-a",
+      callerIdentity: "tenkai://prod/shop",
+    });
+    expect(rows[1]?.grant).toBe("none");
+    expect(grantRows(granted)).toEqual([
+      {
+        instance: "db-a",
+        caller: "tenkai://prod/shop",
+        contract: "database",
+        binding: "shop → db-a",
       },
     ]);
   });
