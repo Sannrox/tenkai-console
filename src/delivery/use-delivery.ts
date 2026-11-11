@@ -78,3 +78,13 @@ export const useEnvironmentDependencies = (token: string | undefined, name: stri
     enabled: token !== undefined && Boolean(name),
     retry: false,
   });
+
+/** Instance status, including workload certificates when the server reports them. */
+export const useEnvironmentStatus = (token: string | undefined, name: string | undefined) =>
+  useQuery({
+    queryKey: ["status", name, token],
+    queryFn: () =>
+      import("./identity-status").then((mod) => mod.fetchStatus(name ?? "", token ?? "")),
+    enabled: token !== undefined && Boolean(name),
+    retry: false,
+  });

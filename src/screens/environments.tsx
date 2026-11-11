@@ -11,6 +11,7 @@ import type {
 import { useSession } from "../auth/session";
 import { channelMatrix, fleetTableRows } from "../delivery/configuration";
 import { deployedLabel, heldAtLine, heldProducts, waitingLine } from "../delivery/dependencies";
+import type { StatusLoad } from "../delivery/identity";
 import { instanceHealth, instanceName } from "../delivery/instances";
 import {
   maintenanceDetail,
@@ -30,6 +31,7 @@ import {
   useDelivery,
   useEnvironmentDependencies,
   useEnvironmentInspect,
+  useEnvironmentStatus,
 } from "../delivery/use-delivery";
 import { useManagementCall } from "../management/use-management";
 import {
@@ -158,8 +160,24 @@ const Detail = ({
   const previous = previousRelease(report, selectedProduct);
   const spec = `${product.trim()}=${channel.trim()}`;
   const dependencies = useEnvironmentDependencies(token, report.name);
+  const status = useEnvironmentStatus(token, report.name);
   const holds = dependencies.data?.kind === "ok" ? dependencies.data.value.holds : [];
   const waiting = heldProducts(holds);
+  const nowSecs = Math.floor(now / 1000);
+  let identityRefreshAt: number | undefined;
+  if (status.data?.kind === "ok") {
+    for (const row of status.data.value) {
+      const expires = row.certificate?.expires_at;
+      if (expires === undefined) {
+        continue;
+      }
+      const ms = expires * 1000;
+      if (identityRefreshAt === undefined || ms < identityRefreshAt) {
+        identityRefreshAt = ms;
+      }
+    }
+  }
+  useRefreshAt(identityRefreshAt, now, ["status", report.name, token]);
 
   return (
     <>
@@ -188,6 +206,7 @@ const Detail = ({
                   <th className={th}>Deployed</th>
                   <th className={th}>Head</th>
                   <th className={th}>Health</th>
+                  <th className={th}>Identity</th>
                   <th className={th}>Previous</th>
                   <th className={th}>Hold</th>
                 </tr>
@@ -196,6 +215,7 @@ const Detail = ({
                 {report.subscriptions.map((subscription) => {
                   const instance = instanceName(subscription);
                   const health = instanceHealth(subscription);
+                  const identity = identityLabel(status.data, instance, nowSecs);
                   const held = waiting.has(instance) || waiting.has(subscription.product);
                   return (
                     <tr key={instance} className="[&:last-child>td]:border-b-0">
@@ -209,6 +229,7 @@ const Detail = ({
                       </td>
                       <td className={`${td} font-mono`}>{subscription.head}</td>
                       <td className={`${td} ${HEALTH_TONE[health.tone]}`}>{health.label}</td>
+                      <td className={`${td} ${HEALTH_TONE[identity.tone]}`}>{identity.label}</td>
                       <td className={`${td} font-mono text-muted`}>
                         {previousRelease(report, subscription.product) ?? "none"}
                       </td>
@@ -443,9 +464,11 @@ const Detail = ({
           environment={report.name}
           report={report}
           token={token}
+          now={now}
           instances={[
             ...new Set(report.subscriptions.map((subscription) => instanceName(subscription))),
           ]}
+          {...(status.data === undefined ? {} : { identity: status.data })}
           {...(historyInstance === undefined ? {} : { instance: historyInstance })}
           onInstance={onInstance}
         />
@@ -462,6 +485,35 @@ const HEALTH_TONE = {
   bad: "text-danger",
   muted: "text-muted",
 } as const;
+
+/** Status `certificate` on the instance list; kept here so identity GET stays lazy. */
+const identityLabel = (
+  load: StatusLoad | undefined,
+  instance: string,
+  nowSecs: number,
+): { label: string; tone: keyof typeof HEALTH_TONE } => {
+  if (load?.kind !== "ok") {
+    return { label: "n/a", tone: "muted" };
+  }
+  const row = load.value.find((item) => {
+    const name = item.instance?.trim() ?? "";
+    return (name === "" ? item.product : name) === instance;
+  });
+  const certificate = row?.certificate;
+  if (certificate === null || certificate === undefined) {
+    return { label: "none", tone: "muted" };
+  }
+  if (certificate.expires_at <= nowSecs) {
+    return { label: "expired", tone: "bad" };
+  }
+  if (certificate.near_expiry) {
+    return { label: "near expiry", tone: "warn" };
+  }
+  if ((certificate.renewal_failure ?? "").trim() !== "") {
+    return { label: "renewing", tone: "warn" };
+  }
+  return { label: "valid", tone: "ok" };
+};
 
 /** Observed Docker and model runtime for the selected environment only. */
 const Runtime = ({ report, token }: { report: EnvironmentInspectReport; token: string }) => {
