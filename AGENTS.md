@@ -15,7 +15,8 @@ Tenkai ADR 0031 (`docs/decisions/0031-web-console.md` in Sannrox/tenkai).
   `src/workflows/`, `src/ui/`: screens, management actions, and shared UI.
 - `scripts/`: API sync and drift (`api.mjs`), bundle budget, packaging
   (`package.sh`, `release-package.sh`), changelog draft, signed-tag and
-  family-manifest checks.
+  family-manifest checks, Playwright Chromium install retry
+  (`playwright-install.sh`).
 - `perf/`: bundle baseline and browser load measurement.
 
 ## Dependencies and Ownership
@@ -44,7 +45,8 @@ pnpm format:check
 pnpm test
 pnpm build
 pnpm perf:bundle
-pnpm exec playwright install --with-deps chromium
+sh scripts/playwright-install.sh self-test
+sh scripts/playwright-install.sh
 pnpm perf:load
 pnpm e2e
 VERSION=ci sh scripts/package.sh
