@@ -20,6 +20,7 @@ import {
 } from "../delivery/history";
 import { Button, Card } from "../ui/kit";
 import EnvironmentDrift from "./environment-drift";
+import EnvironmentIssuer from "./environment-issuer";
 import EnvironmentOverlays from "./environment-overlays";
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
@@ -43,7 +44,7 @@ const STATUS_TONE: Record<string, string> = {
 /**
  * Newest-first attempt list for the selected environment.
  * GET `/v1/environments/{environment}/history`.
- * Overlays and drift share this lazy chunk so the initial bundle stays on budget.
+ * Overlays, drift, and the identity issuer share this lazy chunk so the initial bundle stays on budget.
  */
 export const EnvironmentHistory = ({
   environment,
@@ -144,6 +145,7 @@ export const EnvironmentHistory = ({
     <>
       {report !== undefined && <EnvironmentOverlays report={report} />}
       {report !== undefined && <EnvironmentDrift report={report} />}
+      {report !== undefined && <EnvironmentIssuer report={report} />}
       <div className="mt-[18px] mb-2 flex flex-wrap items-baseline gap-2">
         <h2 className="m-0 text-[13px] font-semibold">History</h2>
         <label className="ml-auto flex items-center gap-2 text-xs font-medium text-muted">
