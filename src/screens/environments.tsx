@@ -174,8 +174,8 @@ const Detail = ({
           Open plan
         </Link>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <Card>
+      <div className="grid min-w-0 gap-3 md:grid-cols-2">
+        <Card className="min-w-0 overflow-x-auto">
           {report.subscriptions.length === 0 ? (
             <p className="m-0 px-3.5 py-3 text-xs text-muted">none</p>
           ) : (
@@ -280,7 +280,7 @@ const Detail = ({
             </div>
           )}
         </Card>
-        <Card>
+        <Card className="min-w-0 overflow-x-auto">
           {timeline && <TimelineStrip timeline={timeline} />}
           <dl className="m-0 grid grid-cols-[120px_1fr] gap-x-3 gap-y-1 px-3.5 py-3 text-xs">
             {Object.entries(report.facts).map(([key, value]) => (

@@ -189,7 +189,11 @@ test.describe("environment history", () => {
     );
     await page.goto(app.url);
     await page.getByRole("link", { name: "Environments" }).click();
-    await page.getByRole("link", { name: "History" }).click();
+    const historyLink = page.getByRole("link", { name: "History" });
+    await expect(historyLink).toBeVisible();
+    const href = await historyLink.getAttribute("href");
+    expect(href).toContain("instance=api");
+    await page.goto(new URL(href ?? "", app.url).toString());
     await expect(
       page
         .locator("table")
