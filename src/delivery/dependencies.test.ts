@@ -117,6 +117,46 @@ describe("parseDependencies", () => {
     expect(parseDependencies(GRAPH)?.environment).toBe("prod");
     expect(parseDependencies({ environment: "prod" })).toBeUndefined();
   });
+
+  it("keeps named provider instances and hold candidates", () => {
+    const parsed = parseDependencies({
+      environment: "prod",
+      holds: [
+        {
+          product: "reports",
+          release_id: "reports@1.0.0",
+          held_at: 1,
+          contracts: [{ contract: "cache", minimum: "1.0.0", candidates: ["db-a", "db-b"] }],
+        },
+      ],
+      products: [
+        {
+          product: "shop",
+          state: "current",
+          requirements: [
+            {
+              contract: "database",
+              minimum: "1.0.0",
+              optional: false,
+              provider: {
+                state: "unique",
+                product: "postgres",
+                release: "16.2.0",
+                contract: "16.2.0",
+                instance: "db-a",
+              },
+            },
+          ],
+          impact: {},
+        },
+      ],
+    });
+    expect(parsed?.holds[0]?.contracts[0]?.candidates).toEqual(["db-a", "db-b"]);
+    expect(parsed?.products[0]?.requirements[0]?.provider).toMatchObject({
+      state: "unique",
+      instance: "db-a",
+    });
+  });
 });
 
 describe("lines", () => {
@@ -145,6 +185,23 @@ describe("lines", () => {
     expect(impactLines(GRAPH.products[1]!)).toEqual(["remove refused: shop requires catalog"]);
   });
 
+  it("names a provider instance when it differs from the product", () => {
+    expect(
+      providerLine({
+        contract: "database",
+        minimum: "1.0.0",
+        optional: false,
+        provider: {
+          state: "unique",
+          product: "postgres",
+          release: "16.2.0",
+          contract: "16.2.0",
+          instance: "db-a",
+        },
+      }),
+    ).toBe("db-a postgres@16.2.0");
+  });
+
   it("names ambiguous providers from the API state", () => {
     const requirement = {
       contract: "database",
@@ -152,8 +209,8 @@ describe("lines", () => {
       optional: false,
       provider: { state: "ambiguous" as const, products: ["postgres", "postgres-read"] },
     };
-    expect(providerLine(requirement)).toBe("ambiguous: postgres, postgres-read");
-    expect(holdProviderLine(requirement)).toBe("ambiguous: postgres, postgres-read");
+    expect(providerLine(requirement)).toBe("unbound: postgres, postgres-read");
+    expect(holdProviderLine(requirement)).toBe("unbound: postgres, postgres-read");
   });
 });
 

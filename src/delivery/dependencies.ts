@@ -15,6 +15,7 @@ const ProviderView = type({
   product: "string",
   release: "string",
   contract: "string",
+  "instance?": "string",
 })
   .or({ state: "'absent'" })
   .or({
@@ -47,7 +48,11 @@ const EnvironmentDependencies = type({
     product: "string",
     release_id: "string",
     held_at: "number",
-    contracts: type({ contract: "string", minimum: "string" }).array(),
+    contracts: type({
+      contract: "string",
+      minimum: "string",
+      "candidates?": "string[]",
+    }).array(),
   }).array(),
   products: ProductDependencyView.array(),
 });
@@ -107,13 +112,25 @@ export const fetchDependencies = async (
 export const requirementLine = (requirement: RequirementView): string =>
   `${requirement.contract} >= ${requirement.minimum}${requirement.optional ? " optional" : ""}`;
 
+const uniqueProviderName = (provider: {
+  product: string;
+  release: string;
+  instance?: string;
+}): string => {
+  const instance = provider.instance?.trim() ?? "";
+  if (instance === "" || instance === provider.product) {
+    return `${provider.product}@${provider.release}`;
+  }
+  return `${instance} ${provider.product}@${provider.release}`;
+};
+
 export const providerLine = (requirement: RequirementView): string => {
   const { provider } = requirement;
   if (provider.state === "unique") {
-    return `${provider.product}@${provider.release}`;
+    return uniqueProviderName(provider);
   }
   if (provider.state === "ambiguous") {
-    return `ambiguous: ${provider.products.join(", ")}`;
+    return `unbound: ${provider.products.join(", ")}`;
   }
   return requirement.optional ? "absent" : "unmet";
 };
@@ -131,10 +148,10 @@ export const holdNeedLine = (contract: HoldContract): string =>
 export const holdProviderLine = (requirement: RequirementView): string => {
   const { provider } = requirement;
   if (provider.state === "unique") {
-    return `${provider.product}@${provider.release}`;
+    return uniqueProviderName(provider);
   }
   if (provider.state === "ambiguous") {
-    return `ambiguous: ${provider.products.join(", ")}`;
+    return `unbound: ${provider.products.join(", ")}`;
   }
   return requirement.optional ? "absent" : "no known provider";
 };
@@ -216,7 +233,8 @@ export const stateTone = (state: string): "ok" | "warn" | "bad" | "muted" => {
 
 const names = (requirement: RequirementView): string[] => {
   if (requirement.provider.state === "unique") {
-    return [requirement.provider.product];
+    const instance = requirement.provider.instance?.trim() ?? "";
+    return [instance === "" ? requirement.provider.product : instance];
   }
   if (requirement.provider.state === "ambiguous") {
     return requirement.provider.products;

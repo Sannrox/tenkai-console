@@ -11,6 +11,12 @@ import {
   impactLines,
   providerTone,
 } from "../delivery/dependencies";
+import {
+  type BindingRow,
+  bindingRows,
+  healthByInstance,
+  type InstanceSubscription,
+} from "../delivery/instances";
 import { useEnvironmentDependencies } from "../delivery/use-delivery";
 import { Card } from "../ui/kit";
 
@@ -30,6 +36,8 @@ const COPY = {
   loading: "Loading",
 } as const;
 
+const NO_SUBSCRIPTIONS: InstanceSubscription[] = [];
+
 /**
  * Plan-order requires table for the selected environment.
  * GET `/v1/environments/{environment}/dependencies`.
@@ -37,13 +45,17 @@ const COPY = {
 export const EnvironmentDependencies = ({
   environment,
   token,
+  subscriptions = NO_SUBSCRIPTIONS,
 }: {
   environment: string;
   token: string;
+  subscriptions?: InstanceSubscription[];
 }) => {
   const query = useEnvironmentDependencies(token, environment);
   const load = query.data;
   const waiting = load?.kind === "ok" ? load.value.holds.length : 0;
+  const health = healthByInstance(subscriptions);
+  const bindings = load?.kind === "ok" ? bindingRows(load.value, health) : [];
   const body =
     query.isPending || load === undefined ? (
       <p className="m-0 px-3.5 py-3 text-xs text-muted">{COPY.loading}</p>
@@ -77,6 +89,7 @@ export const EnvironmentDependencies = ({
               <Graph report={load.value} />
             </Card>
           )}
+          {bindings.length > 0 && <Bindings rows={bindings} />}
         </>
       ) : null}
     </>
@@ -212,3 +225,35 @@ const Document = ({ product }: { product: ProductDependencyView }) => {
     </div>
   );
 };
+
+const Bindings = ({ rows }: { rows: BindingRow[] }) => (
+  <>
+    <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Bindings</h2>
+    <Card className="overflow-x-auto">
+      <table className="w-full border-collapse text-xs">
+        <thead>
+          <tr>
+            <th className={th}>Dependent</th>
+            <th className={th}>Contract</th>
+            <th className={th}>Bound to</th>
+            <th className={th}>Health</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={`${row.dependent}:${row.contract}`} className="[&:last-child>td]:border-b-0">
+              <td className={`${td} font-mono`}>{row.dependent}</td>
+              <td className={`${td} font-mono`}>{row.contract}</td>
+              <td
+                className={`${td} font-mono ${row.boundTone !== "ok" ? TONE[row.boundTone] : ""}`}
+              >
+                {row.boundTo}
+              </td>
+              <td className={`${td} ${TONE[row.healthTone]}`}>{row.health}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  </>
+);

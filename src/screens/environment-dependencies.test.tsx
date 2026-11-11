@@ -206,6 +206,107 @@ describe("EnvironmentDependencies", () => {
     expect(container.textContent).not.toContain("denied");
   });
 
+  it("renders a binding matrix for two instances and two dependents", async () => {
+    serve(200, {
+      environment: "prod",
+      holds: [],
+      products: [
+        {
+          product: "db-a",
+          version: "16.2.0",
+          state: "current",
+          requirements: [],
+          impact: {},
+        },
+        {
+          product: "db-b",
+          version: "16.2.0",
+          state: "unhealthy",
+          requirements: [],
+          impact: {},
+        },
+        {
+          product: "shop",
+          version: "2.1.0",
+          state: "current",
+          requirements: [
+            {
+              contract: "database",
+              minimum: "1.0.0",
+              optional: false,
+              provider: {
+                state: "unique" as const,
+                product: "postgres",
+                release: "16.2.0",
+                contract: "16.2.0",
+                instance: "db-a",
+              },
+            },
+          ],
+          impact: {},
+        },
+        {
+          product: "reports",
+          version: "1.0.0",
+          state: "waiting",
+          requirements: [
+            {
+              contract: "database",
+              minimum: "1.0.0",
+              optional: false,
+              provider: {
+                state: "unique" as const,
+                product: "postgres",
+                release: "16.2.0",
+                contract: "16.2.0",
+                instance: "db-b",
+              },
+            },
+            {
+              contract: "cache",
+              minimum: "1.0.0",
+              optional: false,
+              provider: { state: "ambiguous" as const, products: ["db-a", "db-b"] },
+            },
+          ],
+          impact: {},
+        },
+      ],
+    });
+    await render(
+      <EnvironmentDependencies
+        environment="prod"
+        token="token"
+        subscriptions={[
+          {
+            product: "postgres",
+            instance: "db-a",
+            channel: "stable",
+            head: "16.2.0",
+            deployed: "16.2.0",
+            state: "current",
+            health: "ok",
+          },
+          {
+            product: "postgres",
+            instance: "db-b",
+            channel: "stable",
+            head: "16.2.0",
+            deployed: "16.2.0",
+            state: "unhealthy",
+            health: "error",
+          },
+        ]}
+      />,
+    );
+    expect(container.textContent).toContain("Bindings");
+    expect(container.textContent).toContain("db-a");
+    expect(container.textContent).toContain("db-b");
+    expect(container.textContent).toContain("unbound: db-a, db-b");
+    expect(container.textContent).toMatch(/error/);
+    expect(container.textContent).not.toMatch(/HTTP \d{3}|\/v1\/|#\d+|—/);
+  });
+
   it("says could not load when fetch throws", async () => {
     vi.stubGlobal(
       "fetch",
