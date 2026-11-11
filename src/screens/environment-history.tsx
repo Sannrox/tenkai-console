@@ -13,6 +13,7 @@ import {
   versionLine,
 } from "../delivery/history";
 import { Button, Card } from "../ui/kit";
+import EnvironmentOverlays from "./environment-overlays";
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2 align-top";
@@ -35,6 +36,7 @@ const STATUS_TONE: Record<string, string> = {
 /**
  * Newest-first attempt list for the selected environment.
  * GET `/v1/environments/{environment}/history`.
+ * Overlays share this lazy chunk so the initial bundle stays on budget.
  */
 export const EnvironmentHistory = ({
   environment,
@@ -42,12 +44,14 @@ export const EnvironmentHistory = ({
   instances,
   instance,
   onInstance,
+  report,
 }: {
   environment: string;
   token: string;
   instances: string[];
   instance?: string;
   onInstance: (instance: string | undefined) => void;
+  report?: unknown;
 }) => {
   const query = useInfiniteQuery({
     queryKey: ["history", environment, instance, token],
@@ -130,6 +134,7 @@ export const EnvironmentHistory = ({
 
   return (
     <>
+      {report !== undefined && <EnvironmentOverlays report={report} />}
       <div className="mt-[18px] mb-2 flex flex-wrap items-baseline gap-2">
         <h2 className="m-0 text-[13px] font-semibold">History</h2>
         <label className="ml-auto flex items-center gap-2 text-xs font-medium text-muted">

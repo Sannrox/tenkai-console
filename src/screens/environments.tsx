@@ -441,6 +441,7 @@ const Detail = ({
       <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
         <EnvironmentHistory
           environment={report.name}
+          report={report}
           token={token}
           instances={[
             ...new Set(report.subscriptions.map((subscription) => instanceName(subscription))),
