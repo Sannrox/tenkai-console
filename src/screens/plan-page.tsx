@@ -70,6 +70,7 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
       }
       setResult({ ok: true, text: response.message });
       void queryClient.invalidateQueries({ queryKey: ["environment", environment] });
+      void queryClient.resetQueries({ queryKey: ["history"] });
       void queryClient.invalidateQueries({ queryKey: ["plan-approvals"] });
       void queryClient.invalidateQueries({ queryKey: ["environments"] });
       void queryClient.invalidateQueries({ queryKey: ["fleet"] });

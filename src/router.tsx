@@ -91,13 +91,24 @@ const planRoute = createRoute({
 const environmentsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/environments",
-  validateSearch: (search: Record<string, unknown>): { environment?: string } => {
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { environment?: string; instance?: string } => {
     const environment = typeof search.environment === "string" ? search.environment : undefined;
-    return environment === undefined ? {} : { environment };
+    const instance = typeof search.instance === "string" ? search.instance : undefined;
+    return {
+      ...(environment === undefined ? {} : { environment }),
+      ...(instance === undefined ? {} : { instance }),
+    };
   },
   component: function EnvironmentsPage() {
-    const { environment } = environmentsRoute.useSearch();
-    return environment === undefined ? <Environments /> : <Environments focus={environment} />;
+    const { environment, instance } = environmentsRoute.useSearch();
+    return (
+      <Environments
+        {...(environment === undefined ? {} : { focus: environment })}
+        {...(instance === undefined ? {} : { instance })}
+      />
+    );
   },
 });
 

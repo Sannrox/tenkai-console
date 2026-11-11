@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { request } from "../api/http";
 import type {
   EnvironmentInspectReport,
@@ -35,16 +35,17 @@ import { useManagementCall } from "../management/use-management";
 import {
   expectedGeneration,
   holdBody,
-  releaseChannelHoldBody,
   releaseHoldBody,
-  retryFailedTargetBody,
   rollbackBody,
   subscribeBody,
 } from "../plan/requests";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { AddEnvironment, ConfigSections } from "./environment-config";
 import { EnvironmentDependencies } from "./environment-dependencies";
+import { SubscriptionHold } from "./environment-hold";
 import { FleetTable } from "./fleet-table";
+
+const EnvironmentHistory = lazy(() => import("./environment-history"));
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2 align-top";
@@ -54,7 +55,13 @@ const td = "border-b border-line px-3.5 py-2 align-top";
  * below. The detail shows observed runtime, subscribes a product channel,
  * rolls back, and retires.
  */
-export const Environments = ({ focus }: { focus?: string }) => {
+export const Environments = ({
+  focus,
+  instance: historyInstance,
+}: {
+  focus?: string;
+  instance?: string;
+}) => {
   const token = useSession((state) => state.session?.accessToken);
   const navigate = useNavigate({ from: "/environments" });
   const delivery = useDelivery(token);
@@ -65,6 +72,15 @@ export const Environments = ({ focus }: { focus?: string }) => {
   const known = channelMatrix(delivery.channels);
   const select = (name: string) => {
     void navigate({ search: { environment: name }, replace: true });
+  };
+  const selectInstance = (value: string | undefined) => {
+    void navigate({
+      search: {
+        ...(shown === undefined ? {} : { environment: shown }),
+        ...(value === undefined ? {} : { instance: value }),
+      },
+      replace: true,
+    });
   };
 
   return (
@@ -95,6 +111,8 @@ export const Environments = ({ focus }: { focus?: string }) => {
           report={report}
           token={token}
           known={{ products: known.products, channels: known.channels }}
+          {...(historyInstance === undefined ? {} : { historyInstance })}
+          onInstance={selectInstance}
         />
       )}
     </>
@@ -109,10 +127,14 @@ const Detail = ({
   report,
   token,
   known,
+  historyInstance,
+  onInstance,
 }: {
   report: EnvironmentInspectReport;
   token: string;
   known: { products: string[]; channels: string[] };
+  historyInstance?: string;
+  onInstance: (instance: string | undefined) => void;
 }) => {
   const scope = `environment:${report.name}` as const;
   const path = `v1/environments/${encodeURIComponent(report.name)}`;
@@ -152,8 +174,8 @@ const Detail = ({
           Open plan
         </Link>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <Card>
+      <div className="grid min-w-0 gap-3 md:grid-cols-2">
+        <Card className="min-w-0 overflow-x-auto">
           {report.subscriptions.length === 0 ? (
             <p className="m-0 px-3.5 py-3 text-xs text-muted">none</p>
           ) : (
@@ -193,6 +215,7 @@ const Detail = ({
                       <td className={td}>
                         <SubscriptionHold
                           report={report}
+                          instance={instanceName(subscription)}
                           product={subscription.product}
                           channel={subscription.channel}
                           hold={subscription.delivery_hold}
@@ -257,7 +280,7 @@ const Detail = ({
             </div>
           )}
         </Card>
-        <Card>
+        <Card className="min-w-0 overflow-x-auto">
           {timeline && <TimelineStrip timeline={timeline} />}
           <dl className="m-0 grid grid-cols-[120px_1fr] gap-x-3 gap-y-1 px-3.5 py-3 text-xs">
             {Object.entries(report.facts).map(([key, value]) => (
@@ -415,6 +438,17 @@ const Detail = ({
         token={token}
         subscriptions={report.subscriptions}
       />
+      <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
+        <EnvironmentHistory
+          environment={report.name}
+          token={token}
+          instances={[
+            ...new Set(report.subscriptions.map((subscription) => instanceName(subscription))),
+          ]}
+          {...(historyInstance === undefined ? {} : { instance: historyInstance })}
+          onInstance={onInstance}
+        />
+      </Suspense>
       <ConfigSections report={report} token={token} />
       <Runtime report={report} token={token} />
     </>
@@ -485,89 +519,6 @@ const Runtime = ({ report, token }: { report: EnvironmentInspectReport; token: s
         )}
       </Card>
     </>
-  );
-};
-
-const SubscriptionHold = ({
-  report,
-  product,
-  channel,
-  hold,
-  failed,
-  error,
-  token,
-}: {
-  report: EnvironmentInspectReport;
-  product: string;
-  channel: string;
-  hold: { actor: string; held_at: number; reason: string } | undefined;
-  failed: boolean;
-  error: string | null | undefined;
-  token: string;
-}) => {
-  const envScope = `environment:${report.name}` as const;
-  const release = useManagementCall(token, "fleet", "management", message);
-  const retry = useManagementCall(token, envScope, "management", message);
-  const generation = expectedGeneration(report.lease);
-  const [retryReason, setRetryReason] = useState("");
-  if (!hold && !failed) {
-    return <span className="text-muted">none</span>;
-  }
-  return (
-    <div className="flex flex-col gap-1">
-      {hold && (
-        <>
-          <span className="text-warning">{holdLine(hold)}</span>
-          {release.allowed && (
-            <ConfirmButton
-              label="Release hold"
-              confirm={`Release hold on ${product}/${channel}`}
-              disabled={release.isPending}
-              onConfirm={() =>
-                release.mutate({
-                  path: `v1/products/${encodeURIComponent(product)}/channels/${encodeURIComponent(channel)}/hold/release`,
-                  body: releaseChannelHoldBody(),
-                })
-              }
-            />
-          )}
-          {release.outcome && <Notice tone={release.outcome.tone}>{release.outcome.text}</Notice>}
-        </>
-      )}
-      {failed && (
-        <>
-          <span className="text-danger">{error ?? "retry held"}</span>
-          {retry.allowed && (
-            <>
-              <input
-                aria-label={`Retry reason for ${product}`}
-                placeholder="Reason to retry"
-                value={retryReason}
-                onChange={(event) => setRetryReason(event.target.value)}
-                className={field}
-              />
-              <ConfirmButton
-                label="Retry"
-                confirm={`Retry ${product} on ${report.name}`}
-                disabled={!retryReason.trim() || retry.isPending}
-                onConfirm={() =>
-                  retry.mutate({
-                    path: `v1/environments/${encodeURIComponent(report.name)}/failed-targets/${encodeURIComponent(product)}/retry`,
-                    body: retryFailedTargetBody(
-                      report.name,
-                      generation,
-                      product,
-                      retryReason.trim(),
-                    ),
-                  })
-                }
-              />
-            </>
-          )}
-          {retry.outcome && <Notice tone={retry.outcome.tone}>{retry.outcome.text}</Notice>}
-        </>
-      )}
-    </div>
   );
 };
 
