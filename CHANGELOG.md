@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-11
+
+### Upgrade
+
+Tenkai pins the console in `ui/console.pin`. To serve this release, pin `v0.3.1` with the SHA-256 of `tenkai-console-v0.3.1.zip` from `SHA256SUMS`. Rollback is pinning the previous zip.
+
+The bundle still requires `/healthz` to list contract `tenkai.http.v1`. Types are generated from the signed Tenkai `v0.6.0` schema. Same contract as 0.3.0.
+
+### Fixed
+
+- CycloneDX SBOM includes `serialNumber`, which GitHub SBOM attestation requires.
+
 ## [0.3.0] - 2026-11-11
 
 ### Upgrade
