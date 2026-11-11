@@ -272,7 +272,7 @@ test.describe("environment dependencies", () => {
     await expect(page.getByText("held at 2023-11-14T22:13:20.000Z").first()).toBeVisible();
     await expect(page.getByText("no known provider").first()).toBeVisible();
     await expect(page.getByText("reports@1.0.0, analytics >= 2.0.0")).toBeVisible();
-    await expect(page.getByRole("cell", { name: "unmet" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "unmet", exact: true })).toBeVisible();
     const subscriptions = page
       .locator("table")
       .filter({ has: page.getByRole("columnheader", { name: "Deployed" }) });
@@ -389,6 +389,148 @@ test.describe("environment dependencies", () => {
       0,
     );
     await expect(page.getByText("none").first()).toBeVisible();
+    await expectDesignRules(page);
+  });
+
+  test("shows instances and the binding matrix", async ({ page }) => {
+    const inspect = {
+      ...INSPECT,
+      subscriptions: [
+        {
+          product: "postgres",
+          instance: "db-a",
+          channel: "stable",
+          head: "16.2.0",
+          deployed: "16.2.0",
+          state: "current",
+          health: "ok",
+        },
+        {
+          product: "postgres",
+          instance: "db-b",
+          channel: "stable",
+          head: "16.2.0",
+          deployed: "16.2.0",
+          state: "unhealthy",
+          health: "error",
+        },
+        {
+          product: "shop",
+          channel: "stable",
+          head: "2.1.0",
+          deployed: "2.1.0",
+          state: "current",
+          health: "ok",
+        },
+        {
+          product: "reports",
+          channel: "stable",
+          head: "1.0.0",
+          deployed: "0.9.0",
+          state: "waiting",
+        },
+      ],
+    } as unknown as EnvironmentInspectReport;
+    const graph = {
+      environment: "prod",
+      holds: [],
+      products: [
+        {
+          product: "db-a",
+          version: "16.2.0",
+          state: "current",
+          requirements: [],
+          impact: {},
+        },
+        {
+          product: "db-b",
+          version: "16.2.0",
+          state: "unhealthy",
+          requirements: [],
+          impact: {},
+        },
+        {
+          product: "shop",
+          version: "2.1.0",
+          state: "current",
+          requirements: [
+            {
+              contract: "database",
+              minimum: "1.0.0",
+              optional: false,
+              provider: {
+                state: "unique",
+                product: "postgres",
+                release: "16.2.0",
+                contract: "16.2.0",
+                instance: "db-a",
+              },
+            },
+          ],
+          impact: {},
+        },
+        {
+          product: "reports",
+          version: "1.0.0",
+          state: "waiting",
+          requirements: [
+            {
+              contract: "database",
+              minimum: "1.0.0",
+              optional: false,
+              provider: {
+                state: "unique",
+                product: "postgres",
+                release: "16.2.0",
+                contract: "16.2.0",
+                instance: "db-b",
+              },
+            },
+            {
+              contract: "cache",
+              minimum: "1.0.0",
+              optional: false,
+              provider: { state: "ambiguous", products: ["db-a", "db-b"] },
+            },
+          ],
+          impact: {},
+        },
+      ],
+    };
+    app = await serveConsole(server(ok(graph), { inspect }));
+    await page.goto(app.url);
+    await page.getByRole("link", { name: "Environments" }).click();
+    const instances = page
+      .locator("table")
+      .filter({ has: page.getByRole("columnheader", { name: "Instance" }) });
+    await expect(instances.getByRole("cell", { name: "db-a", exact: true })).toBeVisible();
+    await expect(instances.getByRole("cell", { name: "db-b", exact: true })).toBeVisible();
+    await expect(instances.getByRole("cell", { name: "error", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bindings" })).toBeVisible();
+    const bindings = page
+      .locator("table")
+      .filter({ has: page.getByRole("columnheader", { name: "Bound to" }) });
+    await expect(bindings.getByRole("cell", { name: "shop", exact: true })).toBeVisible();
+    await expect(bindings.getByRole("cell", { name: "unbound: db-a, db-b" })).toBeVisible();
+    await expect(
+      bindings
+        .getByRole("row")
+        .filter({ hasText: /^reports/ })
+        .filter({ hasText: "database" }),
+    ).toContainText("error");
+    await expectDesignRules(page);
+  });
+
+  test("says none when there are no instances", async ({ page }) => {
+    const inspect = { ...INSPECT, subscriptions: [] } as unknown as EnvironmentInspectReport;
+    app = await serveConsole(
+      server(ok({ environment: "prod", holds: [], products: [] }), { inspect }),
+    );
+    await page.goto(app.url);
+    await page.getByRole("link", { name: "Environments" }).click();
+    await expect(page.getByText("none").first()).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Instance" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Bindings" })).toHaveCount(0);
     await expectDesignRules(page);
   });
 

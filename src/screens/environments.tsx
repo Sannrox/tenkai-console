@@ -11,6 +11,7 @@ import type {
 import { useSession } from "../auth/session";
 import { channelMatrix, fleetTableRows } from "../delivery/configuration";
 import { deployedLabel, heldAtLine, heldProducts, waitingLine } from "../delivery/dependencies";
+import { instanceHealth, instanceName } from "../delivery/instances";
 import {
   maintenanceDetail,
   maintenanceRefreshAt,
@@ -153,52 +154,62 @@ const Detail = ({
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <Card>
-          <table className="w-full border-collapse text-xs">
-            <thead>
-              <tr>
-                <th className={th}>Product</th>
-                <th className={th}>Channel</th>
-                <th className={th}>Deployed</th>
-                <th className={th}>Head</th>
-                <th className={th}>Previous</th>
-                <th className={th}>Hold</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.subscriptions.map((subscription) => {
-                const held = waiting.has(subscription.product);
-                return (
-                  <tr key={subscription.product} className="[&:last-child>td]:border-b-0">
-                    <td className={td}>{subscription.product}</td>
-                    <td className={td}>{subscription.channel}</td>
-                    <td
-                      className={`${td} font-mono ${held || subscription.state !== "current" ? "text-warning" : "text-ok"}`}
-                    >
-                      {deployedLabel(subscription.deployed, held)}
-                    </td>
-                    <td className={`${td} font-mono`}>{subscription.head}</td>
-                    <td className={`${td} font-mono text-muted`}>
-                      {previousRelease(report, subscription.product) ?? "none"}
-                    </td>
-                    <td className={td}>
-                      <SubscriptionHold
-                        report={report}
-                        product={subscription.product}
-                        channel={subscription.channel}
-                        hold={subscription.delivery_hold}
-                        failed={
-                          isHeldFailedTarget(subscription) &&
-                          !productHasActivePlan(report.latest_plan, subscription.product)
-                        }
-                        error={subscription.error}
-                        token={token}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {report.subscriptions.length === 0 ? (
+            <p className="m-0 px-3.5 py-3 text-xs text-muted">none</p>
+          ) : (
+            <table className="w-full border-collapse text-xs">
+              <thead>
+                <tr>
+                  <th className={th}>Instance</th>
+                  <th className={th}>Product</th>
+                  <th className={th}>Channel</th>
+                  <th className={th}>Deployed</th>
+                  <th className={th}>Head</th>
+                  <th className={th}>Health</th>
+                  <th className={th}>Previous</th>
+                  <th className={th}>Hold</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.subscriptions.map((subscription) => {
+                  const instance = instanceName(subscription);
+                  const health = instanceHealth(subscription);
+                  const held = waiting.has(instance) || waiting.has(subscription.product);
+                  return (
+                    <tr key={instance} className="[&:last-child>td]:border-b-0">
+                      <td className={`${td} font-mono`}>{instance}</td>
+                      <td className={td}>{subscription.product}</td>
+                      <td className={td}>{subscription.channel}</td>
+                      <td
+                        className={`${td} font-mono ${held || subscription.state !== "current" ? "text-warning" : "text-ok"}`}
+                      >
+                        {deployedLabel(subscription.deployed, held)}
+                      </td>
+                      <td className={`${td} font-mono`}>{subscription.head}</td>
+                      <td className={`${td} ${HEALTH_TONE[health.tone]}`}>{health.label}</td>
+                      <td className={`${td} font-mono text-muted`}>
+                        {previousRelease(report, subscription.product) ?? "none"}
+                      </td>
+                      <td className={td}>
+                        <SubscriptionHold
+                          report={report}
+                          product={subscription.product}
+                          channel={subscription.channel}
+                          hold={subscription.delivery_hold}
+                          failed={
+                            isHeldFailedTarget(subscription) &&
+                            !productHasActivePlan(report.latest_plan, subscription.product)
+                          }
+                          error={subscription.error}
+                          token={token}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
           {subscribe.allowed && (
             <div className="flex flex-wrap gap-2 border-t border-line px-3.5 py-3">
               <input
@@ -399,14 +410,23 @@ const Detail = ({
           )}
         </Card>
       </div>
-      <EnvironmentDependencies environment={report.name} token={token} />
+      <EnvironmentDependencies
+        environment={report.name}
+        token={token}
+        subscriptions={report.subscriptions}
+      />
       <ConfigSections report={report} token={token} />
       <Runtime report={report} token={token} />
     </>
   );
 };
 
-const HEALTH_TONE = { ok: "text-ok", warn: "text-warning", muted: "text-muted" } as const;
+const HEALTH_TONE = {
+  ok: "text-ok",
+  warn: "text-warning",
+  bad: "text-danger",
+  muted: "text-muted",
+} as const;
 
 /** Observed Docker and model runtime for the selected environment only. */
 const Runtime = ({ report, token }: { report: EnvironmentInspectReport; token: string }) => {
