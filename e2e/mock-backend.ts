@@ -8,7 +8,12 @@ export type Reply = { status: number; body: unknown };
 export type Routes = (path: string, request: IncomingMessage) => Reply | undefined;
 
 /** What the console sent, for asserting the requests a scenario made. */
-export type Sent = { method: string; path: string; authorization: string | undefined };
+export type Sent = {
+  method: string;
+  path: string;
+  search: string;
+  authorization: string | undefined;
+};
 
 export type MockBackend = { url: string; sent: Sent[]; close: () => Promise<void> };
 
@@ -32,7 +37,8 @@ export const serveConsole = (routes: Routes, dist = "dist") =>
   new Promise<MockBackend>((resolve) => {
     const sent: Sent[] = [];
     const server: Server = createServer((request, response) => {
-      const path = new URL(request.url ?? "/", "http://local").pathname;
+      const url = new URL(request.url ?? "/", "http://local");
+      const path = url.pathname;
       const json = ({ status, body }: Reply) => {
         response.writeHead(status, { "content-type": "application/json" });
         response.end(JSON.stringify(body));
@@ -41,6 +47,7 @@ export const serveConsole = (routes: Routes, dist = "dist") =>
         sent.push({
           method: request.method ?? "GET",
           path,
+          search: url.search,
           authorization: request.headers.authorization,
         });
         json(
