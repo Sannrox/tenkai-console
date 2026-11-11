@@ -8,6 +8,7 @@ import type {
   ManagementLifecycleResult,
   PlanApprovalsView,
 } from "../api/tenkai.gen";
+import { overlayRefusal } from "../delivery/config-schema";
 import { planSummary } from "../delivery/model";
 import { approvalCopy, shownDigest } from "../plan/approval";
 import { quorumMatrix, quorumStatus } from "../plan/quorum";
@@ -20,6 +21,7 @@ import {
   signCommand,
 } from "../plan/requests";
 import { Button, Card } from "../ui/kit";
+import { EnvironmentOverlays } from "./environment-overlays";
 
 const STRIP = ["computed", "running", "succeeded"] as const;
 
@@ -90,6 +92,7 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
     data?.subscriptions.filter((subscription) => subscription.state === "unhealthy") ?? [];
   const drift =
     data?.subscriptions.some((subscription) => subscription.state !== "current") ?? false;
+  const refusal = result && !result.ok ? overlayRefusal(result.text) : undefined;
 
   return (
     <>
@@ -273,7 +276,9 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
             </>
           )}
 
-          {result && (
+          <EnvironmentOverlays report={data} {...(refusal === undefined ? {} : { refusal })} />
+
+          {result && refusal === undefined && (
             <p role="status" className={`mt-4 text-xs ${result.ok ? "text-ok" : "text-danger"}`}>
               {result.text}
             </p>

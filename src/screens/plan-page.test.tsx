@@ -184,3 +184,53 @@ describe("PlanPage approvals", () => {
     ]);
   });
 });
+
+describe("PlanPage overlay schema", () => {
+  it("shows the failing key and reason instead of the server sentence", async () => {
+    const inspect = {
+      ...REPORT,
+      subscriptions: [{ product: "api", channel: "stable", head: "2.0.0", state: "behind" }],
+      config: [{ product: "api", overlay: { region: "eu" }, secrets: ["db-password"] }],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async (input, init) => {
+        const url =
+          input instanceof Request ? input.url : input instanceof URL ? input.href : input;
+        const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+        if (typeof url === "string" && url.includes("/plans") && method === "POST") {
+          return new Response(
+            JSON.stringify({ error: "overlay replicas is required by the release config schema" }),
+            { status: 409 },
+          );
+        }
+        if (typeof url === "string" && url.includes("/approvals")) {
+          return new Response(JSON.stringify(APPROVALS));
+        }
+        if (typeof url === "string" && url.endsWith("/approval-policy")) {
+          return new Response(JSON.stringify({ configured: true, mode: "human" }));
+        }
+        return new Response(JSON.stringify(inspect));
+      }),
+    );
+    await render();
+    const plan = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Plan again",
+    );
+    await act(async () => {
+      plan?.click();
+    });
+    for (let round = 0; round < 5; round += 1) {
+      await act(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
+      });
+    }
+    const overlays = container.querySelector('table[aria-label="Overlays"]');
+    expect(overlays?.textContent).toContain("replicas");
+    expect(overlays?.textContent).toContain("required");
+    expect(overlays?.textContent).toContain("2.0.0");
+    expect(container.textContent).not.toContain("release config schema");
+  });
+});
