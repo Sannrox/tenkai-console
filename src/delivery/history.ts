@@ -1,20 +1,32 @@
 import { type } from "arktype";
 import { ApiError, request } from "../api/http";
 
-// `GET /v1/environments/{environment}/history` (Tenkai #1054).
-// The pinned contract predates the route, so the response is validated here
-// rather than trusted as a generated type.
+// `GET /v1/environments/{environment}/history` (Tenkai #1054 / #1055).
+// The pinned contract predates the route and cause fields, so the response
+// is validated here rather than trusted as a generated type.
 //
 // Reuse decision
 // Job: list recorded deployment attempts for one environment, newest first,
-// with an optional instance filter and cursor paging.
+// with structured failure cause when present and detail as the legacy fallback.
 // Verdict: Generalize
 // Concept: the GET-and-arktype load used by `dependencies.ts`; environment
-// inspect stays the selected-row owner; cursor paging follows `v1/channels`.
-// Edge: 404/405 is an older server (unavailable); paging uses only
-// `next_cursor` so a later attempt does not reshuffle a page already shown.
-// Searched: environment inspect, dependencies fetch, channel pages, failed-
-// target hold, plan page. Rejected: pin bump; structured cause (#113).
+// inspect stays the selected-row owner; cursor paging follows `v1/channels`;
+// cause/restore overlay the same attempt row as extra inspect fields do.
+// Edge: 404/405 is an older server (unavailable); omitted cause is a legacy
+// attempt; malformed cause is dropped, detail remains; raw stays off the
+// collapsed row; pin stays.
+// Searched: spec_drift overlay parse, DeploymentAttemptView.cause/restore,
+// inspect latest_failures, detail expand. Rejected: pin bump; parsing
+// detail prose; a second history table.
+
+const DeploymentCause = type({
+  phase: "string",
+  kind: "string",
+  summary: "string",
+  "raw?": "string",
+  "truncated?": "boolean",
+  "+": "delete",
+});
 
 const DeploymentAttempt = type({
   id: "string",
@@ -27,6 +39,7 @@ const DeploymentAttempt = type({
   "detail?": "string",
   "from_version?": "string | null",
   "plan_id?": "string",
+  "+": "delete",
 });
 
 const DeploymentHistoryPage = type({
@@ -34,8 +47,15 @@ const DeploymentHistoryPage = type({
   "next_cursor?": "string",
 });
 
-export type DeploymentAttempt = typeof DeploymentAttempt.infer;
-export type DeploymentHistoryPage = typeof DeploymentHistoryPage.infer;
+export type AttemptCause = typeof DeploymentCause.infer;
+export type DeploymentAttempt = typeof DeploymentAttempt.infer & {
+  cause?: AttemptCause;
+  restore?: AttemptCause;
+};
+export type DeploymentHistoryPage = {
+  items: DeploymentAttempt[];
+  next_cursor?: string;
+};
 
 export type HistoryLoad =
   | { kind: "ok"; value: DeploymentHistoryPage }
@@ -45,10 +65,45 @@ export type HistoryLoad =
 
 export const PAGE_SIZE = 50;
 
+/** Parse a recorded cause; `undefined` when omitted or not this contract. */
+export const parseCause = (raw: unknown): AttemptCause | undefined => {
+  if (raw === undefined || raw === null) {
+    return undefined;
+  }
+  const value = DeploymentCause(raw);
+  return value instanceof type.errors ? undefined : value;
+};
+
+const withCauses = (page: DeploymentHistoryPage, raw: unknown): DeploymentHistoryPage => {
+  if (typeof raw !== "object" || raw === null || !("items" in raw)) {
+    return page;
+  }
+  const sources = raw.items;
+  if (!Array.isArray(sources)) {
+    return page;
+  }
+  return {
+    ...page,
+    items: page.items.map((item, index) => {
+      const source = sources[index];
+      if (typeof source !== "object" || source === null) {
+        return item;
+      }
+      const cause = "cause" in source ? parseCause(source.cause) : undefined;
+      const restore = "restore" in source ? parseCause(source.restore) : undefined;
+      return {
+        ...item,
+        ...(cause === undefined ? {} : { cause }),
+        ...(restore === undefined ? {} : { restore }),
+      };
+    }),
+  };
+};
+
 /** Parse a recorded or live page; `undefined` when it is not this contract. */
 export const parseHistory = (raw: unknown): DeploymentHistoryPage | undefined => {
   const value = DeploymentHistoryPage(raw);
-  return value instanceof type.errors ? undefined : value;
+  return value instanceof type.errors ? undefined : withCauses(value, raw);
 };
 
 export type HistoryQuery = {
@@ -130,6 +185,37 @@ export const attemptPlan = (attempt: DeploymentAttempt): string => {
 };
 
 export const attemptDetail = (attempt: DeploymentAttempt): string => attempt.detail ?? "";
+
+/** Phase and kind for the collapsed row; empty parts drop out. */
+export const causeLine = (cause: AttemptCause): string => {
+  const phase = cause.phase.trim();
+  const kind = cause.kind.trim();
+  if (phase === "" && kind === "") {
+    return "·";
+  }
+  if (phase === "") {
+    return kind;
+  }
+  if (kind === "") {
+    return phase;
+  }
+  return `${phase} · ${kind}`;
+};
+
+export const causeSummary = (cause: AttemptCause): string => {
+  const summary = cause.summary.trim();
+  return summary === "" ? "none" : summary;
+};
+
+export const causeRaw = (cause: AttemptCause | undefined): string => cause?.raw?.trim() ?? "";
+
+export const causeTruncated = (cause: AttemptCause | undefined): boolean =>
+  cause?.truncated === true;
+
+/** Restore that did not put the previous release back. */
+export const restoreFailed = (restore: AttemptCause | undefined): boolean =>
+  restore !== undefined &&
+  (restore.kind === "restore_failed" || restore.kind === "host_not_restored");
 
 const PREVIEW = 80;
 

@@ -242,6 +242,54 @@ test.describe("environment history", () => {
     await expectDesignRules(page);
   });
 
+  test("shows cause summary, truncated, and restore failed without raw", async ({ page }) => {
+    app = await serveConsole(
+      server(
+        ok({
+          items: [
+            {
+              id: "dep:api:1",
+              created_at: 1_700_000_000_000,
+              instance: "api",
+              product: "api",
+              from_version: "1.0.0",
+              to_version: "1.1.0",
+              status: "rolled_back",
+              action: "upgrade",
+              plan_id: "tenkai:plan:prod:1",
+              detail: "probe failed; restored 1.0.0",
+              cause: {
+                phase: "health_probe",
+                kind: "probe_failed",
+                summary: "probe failed",
+                raw: "SECRET=should-stay-collapsed",
+                truncated: true,
+              },
+              restore: {
+                phase: "restore",
+                kind: "restore_failed",
+                summary: "restore failed",
+              },
+            },
+          ],
+        }),
+      ),
+    );
+    await page.goto(app.url);
+    await page.getByRole("link", { name: "Environments" }).click();
+    const history = page
+      .locator("table")
+      .filter({ has: page.getByRole("columnheader", { name: "Cause" }) });
+    await expect(history.getByRole("columnheader", { name: "Restore" })).toBeVisible();
+    await expect(history.getByText("health_probe · probe_failed: probe failed")).toBeVisible();
+    await expect(history.getByText("truncated")).toBeVisible();
+    await expect(history.getByText("restore · restore_failed: restore failed")).toBeVisible();
+    await expect(page.getByText("SECRET=should-stay-collapsed")).toBeHidden();
+    await page.getByText("health_probe · probe_failed: probe failed").click();
+    await expect(page.getByText("SECRET=should-stay-collapsed")).toBeVisible();
+    await expectDesignRules(page);
+  });
+
   test("says the route is missing without a status code", async ({ page }) => {
     app = await serveConsole(server({ status: 404, body: { error: "not found" } }));
     await page.goto(app.url);
