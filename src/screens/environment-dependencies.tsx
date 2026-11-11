@@ -13,7 +13,9 @@ import {
 } from "../delivery/dependencies";
 import {
   type BindingRow,
+  type GrantRow,
   bindingRows,
+  grantRows,
   healthByInstance,
   type InstanceSubscription,
 } from "../delivery/instances";
@@ -56,6 +58,7 @@ export const EnvironmentDependencies = ({
   const waiting = load?.kind === "ok" ? load.value.holds.length : 0;
   const health = healthByInstance(subscriptions);
   const bindings = load?.kind === "ok" ? bindingRows(load.value, health) : [];
+  const grants = load?.kind === "ok" ? grantRows(load.value) : [];
   const body =
     query.isPending || load === undefined ? (
       <p className="m-0 px-3.5 py-3 text-xs text-muted">{COPY.loading}</p>
@@ -90,6 +93,7 @@ export const EnvironmentDependencies = ({
             </Card>
           )}
           {bindings.length > 0 && <Bindings rows={bindings} />}
+          {bindings.length > 0 && <Grants rows={grants} />}
         </>
       ) : null}
     </>
@@ -237,6 +241,9 @@ const Bindings = ({ rows }: { rows: BindingRow[] }) => (
             <th className={th}>Contract</th>
             <th className={th}>Bound to</th>
             <th className={th}>Health</th>
+            <th className={th}>Grant</th>
+            <th className={th}>Provider</th>
+            <th className={th}>Caller</th>
           </tr>
         </thead>
         <tbody>
@@ -250,6 +257,17 @@ const Bindings = ({ rows }: { rows: BindingRow[] }) => (
                 {row.boundTo}
               </td>
               <td className={`${td} ${TONE[row.healthTone]}`}>{row.health}</td>
+              <td className={`${td} ${row.grant === "none" ? "text-muted" : ""}`}>{row.grant}</td>
+              <td
+                className={`${td} font-mono ${row.providerIdentity === "none" ? "text-muted" : ""}`}
+              >
+                {row.providerIdentity}
+              </td>
+              <td
+                className={`${td} font-mono ${row.callerIdentity === "none" ? "text-muted" : ""}`}
+              >
+                {row.callerIdentity}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -257,3 +275,40 @@ const Bindings = ({ rows }: { rows: BindingRow[] }) => (
     </Card>
   </>
 );
+
+const Grants = ({ rows }: { rows: GrantRow[] }) => (
+  <>
+    <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Grants</h2>
+    <Card className="overflow-x-auto">
+      {rows.length === 0 ? (
+        <p className="m-0 px-3.5 py-3 text-xs text-muted">{COPY.empty}</p>
+      ) : (
+        <table className="w-full border-collapse text-xs" aria-label="Grants">
+          <thead>
+            <tr>
+              <th className={th}>Instance</th>
+              <th className={th}>Caller</th>
+              <th className={th}>Contract</th>
+              <th className={th}>Binding</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={`${row.instance}:${row.contract}:${row.caller}`}
+                className="[&:last-child>td]:border-b-0"
+              >
+                <td className={`${td} font-mono`}>{row.instance}</td>
+                <td className={`${td} font-mono`}>{row.caller}</td>
+                <td className={`${td} font-mono`}>{row.contract}</td>
+                <td className={`${td} font-mono`}>{row.binding}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Card>
+  </>
+);
+
+export default EnvironmentDependencies;

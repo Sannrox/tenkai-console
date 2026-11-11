@@ -61,7 +61,20 @@ export type BindingRow = {
   boundTone: HealthTone;
   health: string;
   healthTone: HealthTone;
+  grant: "granted" | "none";
+  providerIdentity: string;
+  callerIdentity: string;
 };
+
+export type GrantRow = {
+  instance: string;
+  caller: string;
+  contract: string;
+  binding: string;
+};
+
+const identityUri = (environment: string, instance: string): string =>
+  `tenkai://${environment}/${instance}`;
 
 const unboundLabel = (requirement: RequirementView): string => {
   const { provider } = requirement;
@@ -69,6 +82,22 @@ const unboundLabel = (requirement: RequirementView): string => {
     return `unbound: ${provider.products.join(", ")}`;
   }
   return requirement.optional ? "absent" : "unmet";
+};
+
+const grantFields = (
+  environment: string,
+  dependent: string,
+  instance: string | undefined,
+  granted: boolean,
+): Pick<BindingRow, "grant" | "providerIdentity" | "callerIdentity"> => {
+  if (!granted || instance === undefined) {
+    return { grant: "none", providerIdentity: "none", callerIdentity: "none" };
+  }
+  return {
+    grant: "granted",
+    providerIdentity: identityUri(environment, instance),
+    callerIdentity: identityUri(environment, dependent),
+  };
 };
 
 /** One row per required or optional contract: who is bound, and that instance's health. */
@@ -79,6 +108,9 @@ export const bindingRows = (
   report.products.flatMap((product) =>
     product.requirements.map((requirement) => {
       const instance = boundInstance(requirement);
+      const granted =
+        requirement.provider.state === "unique" && requirement.provider.granted === true;
+      const grant = grantFields(report.environment, product.product, instance, granted);
       if (instance === undefined) {
         return {
           dependent: product.product,
@@ -88,6 +120,7 @@ export const bindingRows = (
             requirement.provider.state === "ambiguous" || !requirement.optional ? "bad" : "muted",
           health: "n/a",
           healthTone: "muted" as const,
+          ...grant,
         };
       }
       const reported = health.get(instance);
@@ -98,6 +131,30 @@ export const bindingRows = (
         boundTone: "ok" as const,
         health: reported?.label ?? "n/a",
         healthTone: reported?.tone ?? "muted",
+        ...grant,
       };
     }),
   );
+
+/** Granted callers per provider instance, each tied to the binding that names them. */
+export const grantRows = (report: EnvironmentDependencies): GrantRow[] => {
+  const rows: GrantRow[] = [];
+  for (const product of report.products) {
+    for (const requirement of product.requirements) {
+      if (requirement.provider.state !== "unique" || requirement.provider.granted !== true) {
+        continue;
+      }
+      const instance = boundInstance(requirement);
+      if (instance === undefined) {
+        continue;
+      }
+      rows.push({
+        instance,
+        caller: identityUri(report.environment, product.product),
+        contract: requirement.contract,
+        binding: `${product.product} → ${instance}`,
+      });
+    }
+  }
+  return rows;
+};

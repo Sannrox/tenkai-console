@@ -4,6 +4,19 @@ import { ApiError, request } from "../api/http";
 // `GET /v1/environments/{environment}/dependencies` (Tenkai ADR 0043 / #1010).
 // The pinned contract predates the route, so the response is validated here
 // rather than trusted as a generated type.
+//
+// Reuse decision
+// Job: show which peer identities an approved binding allows to call each
+// instance, labelled granted, with no actions.
+// Verdict: Reuse
+// Concept: extra `ProviderView.granted` as in `drift.ts`; arktype GET as
+// in this module; Bindings table from #104.
+// Edge: omitted granted is no identity; URI is tenkai://env/instance only
+// when granted; the console never claims the product enforces it; pin
+// stays. Plan add/withdraw fields are not on EnvironmentPlanStepSummary.
+// Searched: ProviderView.granted, StatusRow.certificate, plan steps,
+// identity_issuer. Rejected: pin bump; inventing plan grant diffs;
+// "enforced".
 
 const ImpactRefusal = type({
   dependent: "string",
@@ -16,11 +29,14 @@ const ProviderView = type({
   release: "string",
   contract: "string",
   "instance?": "string",
+  "granted?": "boolean",
+  "+": "delete",
 })
-  .or({ state: "'absent'" })
+  .or({ state: "'absent'", "+": "delete" })
   .or({
     state: "'ambiguous'",
     products: "string[]",
+    "+": "delete",
   });
 
 const RequirementView = type({
@@ -116,12 +132,14 @@ const uniqueProviderName = (provider: {
   product: string;
   release: string;
   instance?: string;
+  granted?: boolean;
 }): string => {
   const instance = provider.instance?.trim() ?? "";
-  if (instance === "" || instance === provider.product) {
-    return `${provider.product}@${provider.release}`;
-  }
-  return `${instance} ${provider.product}@${provider.release}`;
+  const name =
+    instance === "" || instance === provider.product
+      ? `${provider.product}@${provider.release}`
+      : `${instance} ${provider.product}@${provider.release}`;
+  return provider.granted === true ? `${name} granted` : name;
 };
 
 export const providerLine = (requirement: RequirementView): string => {
