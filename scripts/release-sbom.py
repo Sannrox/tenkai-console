@@ -6,10 +6,17 @@ from __future__ import annotations
 import json
 import re
 import sys
+import uuid
 from pathlib import Path
 
 COMPONENT = "tenkai-console"
 PACKAGE_HEAD = re.compile(r"^ {2}(?:'([^']+)'|([^:\s]+)):$")
+# GitHub actions/attest-sbom treats CycloneDX as valid only when bomFormat,
+# specVersion, and serialNumber are all present. CycloneDX wants a unique
+# urn:uuid even when the BOM contents have not changed.
+SERIAL_NUMBER = re.compile(
+    r"^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+)
 
 
 def workspace_version(root: Path) -> str:
@@ -80,9 +87,11 @@ def bom_from_packages(packages: list[tuple[str, str]], version: str) -> dict:
             }
         )
     root_purl = f"pkg:npm/{COMPONENT}@{version}"
+    serial = uuid.uuid4().urn
     return {
         "bomFormat": "CycloneDX",
         "specVersion": "1.5",
+        "serialNumber": serial,
         "version": 1,
         "metadata": {
             "component": {
@@ -129,6 +138,10 @@ def self_test() -> None:
     ], packages
     bom = bom_from_packages(packages, "0.2.0")
     assert bom["bomFormat"] == "CycloneDX"
+    assert bom["specVersion"] == "1.5"
+    assert SERIAL_NUMBER.fullmatch(bom["serialNumber"]), bom["serialNumber"]
+    other = bom_from_packages(packages, "0.2.0")
+    assert other["serialNumber"] != bom["serialNumber"]
     assert bom["metadata"]["component"]["name"] == "tenkai-console"
     assert bom["metadata"]["component"]["version"] == "0.2.0"
     assert bom["metadata"]["component"]["type"] == "application"

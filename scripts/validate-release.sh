@@ -125,6 +125,17 @@ printf 'fake\n' >"${tmp}/release/tenkai-console-${tag}.zip"
 ROOT_PATH="$ROOT_PATH" bash scripts/release-package.sh --out "${tmp}/release" --skip-build --skip-test --skip-github --git-sha "$(git rev-parse HEAD)"
 [[ -f "${tmp}/release/tenkai-console-release.json" ]] || fail "dry-run package did not write a manifest"
 [[ -f "${tmp}/release/tenkai-console.cdx.json" ]] || fail "dry-run package did not write an SBOM"
+python3 -c "
+import json, re, sys
+bom = json.loads(open(sys.argv[1]).read())
+serial = bom.get('serialNumber')
+assert bom.get('bomFormat') == 'CycloneDX', bom.get('bomFormat')
+assert bom.get('specVersion') == '1.5', bom.get('specVersion')
+assert isinstance(serial, str) and re.fullmatch(
+    r'urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', serial
+), serial
+" "${tmp}/release/tenkai-console.cdx.json" \
+  || fail "SBOM missing CycloneDX serialNumber"
 python3 -c "import json,sys; m=json.loads(open(sys.argv[1]).read()); assert m['schema']=='tenkai.family-release-manifest.v1'; assert m['component']=='tenkai-console'; assert m['images']==[]; assert 'latest' not in json.dumps(m)" "${tmp}/release/tenkai-console-release.json"
 [[ ! -f "${tmp}/release/published" ]] || fail "dry-run must not publish"
 
