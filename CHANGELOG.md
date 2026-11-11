@@ -10,6 +10,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-11
+
+### Upgrade
+
+Tenkai pins the console in `ui/console.pin`. To serve this release, pin `v0.3.0` with the SHA-256 of `tenkai-console-v0.3.0.zip` from `SHA256SUMS`. Rollback is pinning the previous zip.
+
+The bundle still requires `/healthz` to list contract `tenkai.http.v1`. Types are generated from the signed Tenkai `v0.6.0` schema. Newer inspect and status fields (instances, drift, history, issuer, identity, grants, apply steps) are parsed at runtime; a server that omits them shows unavailable or none. A tagged Tenkai 0.8.0 is not required.
+
+### Added
+
+- **Host account sign-in** over an SSH forward, with the groups that granted access (#109).
+- **Organisation SSO** on the sign-in screen, with a token fallback (#68, #62).
+- **First administrator** banner and grant form (#88).
+- **Instances and bindings** on the environment, including health and a read-only binding matrix (#140).
+- **Peer grants** from bindings, labeled granted (#147).
+- **Workload identity** per instance: expiry and renewal state, report-only (#146).
+- **Environment identity issuer** and rotation, with waiting instances by name (#145).
+- **Deployment attempt history** with filter, paging, and structured failure cause (#141, #144).
+- **Live-spec drift** on the environment, report-only (#143).
+- **Overlay schema checks** on plans and environments; secrets as names only (#142).
+- **Product dependencies** and **dependency holds** with resume state (#110, #139).
+- **Compatibility profile v2** on the release panel (#129).
+- **Per-step apply results**, including restored, cut, and not-run steps (#148).
+- **Exposure** screen and recall follow-through (#90).
+- **Runners** enroll, list, and revoke (#71).
+- **Server** tab: transport, runner identity, mTLS, CA fingerprint (#72, #73).
+- **Trust** tab: signing trust, revocation list, TLS certificates (#74, #75).
+- **Imports** tab: jobs, per-entry progress, archive digest match, content inventory (#81, #85, #87).
+- **Operations** tab: backups, exports, export history, restore drills, ranged audit exports (#79, #84, #86).
+- Create and edit environments: facts, constraints, maintenance windows, webhooks, approval policy (#80, #82).
+- Plan approval progress, eligible approvers, digest, human rule, and staleness (#78, #83, #59).
+- Guarded rollback that asks for the environment name (#67).
+- Maintenance windows as a 7-day strip; observed Docker and model runtime (#66, #63).
+- Delivery holds and retry of held failed targets (#58).
+- Package migrations on Releases; compatibility evidence submission (#64, #65).
+- Fleet tables from bulk routes, with an initial-JS budget and fleet-scale load check (#89, #46).
+
+### Changed
+
+- API types are generated from the vendored Tenkai `v0.6.0` contract; CI fails on pin or type drift (#94, #44).
+- Signed `v*` tags are verified, then released from `main`. `-rc.N` publishes as a GitHub pre-release. The zip, `SHA256SUMS`, SBOM, provenance attestations, and family manifest attach to the GitHub Release (#93, #96).
+
+### Fixed
+
+- Catalog publish and promote honor the publish capability (#32).
+- Release gate flags count only pull requests in the release range (#97).
+- CI retries Playwright `--with-deps` when a GitHub runner cannot reach Ubuntu apt mirrors (#150).
+
 ## [0.2.0] - 2026-10-07
 
 ### Upgrade
