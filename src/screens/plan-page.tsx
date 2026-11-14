@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { ApiError, request } from "../api/http";
@@ -8,6 +8,7 @@ import type {
   ManagementLifecycleResult,
   PlanApprovalsView,
 } from "../api/tenkai.gen";
+import { liveGeneration } from "../delivery/apply-cancel";
 import {
   APPLY_COPY,
   type ApplyRow,
@@ -41,15 +42,19 @@ import {
   signCommand,
 } from "../plan/requests";
 import { Button, Card } from "../ui/kit";
+import { ApplyCancel } from "./apply-cancel";
 import { EnvironmentOverlays } from "./environment-overlays";
 
 const STRIP = ["computed", "running", "succeeded"] as const;
+/** Inspect refresh while an apply holds the lease or this page is sending one. */
+const LIVE_REFRESH_MS = 2000;
 
 /** Decision 3B: one plan per environment, its steps, state, and the one next action. */
 export const PlanPage = ({ environment, token }: { environment: string; token: string }) => {
   const queryClient = useQueryClient();
   const [localDigest, setLocalDigest] = useState<{ planId: string; digest: string }>();
   const [result, setResult] = useState<ApplyView>();
+  const sending = useIsMutating({ mutationKey: ["plan-run", environment] }) > 0;
   const report = useQuery({
     queryKey: ["environment", environment, token],
     queryFn: () =>
@@ -57,6 +62,8 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
         token,
       }),
     retry: false,
+    refetchInterval: (query) =>
+      sending || liveGeneration(query.state.data?.lease) !== undefined ? LIVE_REFRESH_MS : false,
   });
   const policy = useQuery({
     queryKey: ["approval-policy", environment, token],
@@ -91,6 +98,7 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
     void queryClient.invalidateQueries({ queryKey: ["fleet"] });
   };
   const run = useMutation({
+    mutationKey: ["plan-run", environment],
     mutationFn: (call: { path: string; body: unknown; planSteps?: readonly PlanStepRef[] }) =>
       request<ManagementLifecycleResult>(call.path, { token, method: "POST", body: call.body }),
     onSuccess: (response, call) => {
@@ -282,6 +290,8 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
               pending={run.isPending}
             />
           )}
+
+          <ApplyCancel report={data} token={token} />
 
           {unhealthy.length > 0 && (
             <>

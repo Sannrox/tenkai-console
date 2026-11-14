@@ -73,6 +73,22 @@ export const holdBody = (
   reason,
 });
 
+/** `POST /v1/environments/{environment}/apply/cancel`; a blank reason lets the server default it. */
+export const cancelApplyBody = (
+  environment: string,
+  generation: number,
+  reason: string,
+): DeliveryHoldRequest => {
+  const trimmed = reason.trim();
+  return {
+    version: VERSION,
+    operation: "cancel",
+    environment,
+    expected_generation: generation,
+    ...(trimmed === "" ? {} : { reason: trimmed }),
+  };
+};
+
 export const releaseHoldBody = (environment: string, generation: number): DeliveryHoldRequest => ({
   version: VERSION,
   operation: "release",
