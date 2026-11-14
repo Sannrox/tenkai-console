@@ -155,6 +155,7 @@ test.describe("plan apply cancel", () => {
         version: 1,
         operation: "cancel",
         message: "asked apply generation 7 to stop after the current step and held prod",
+        cancel: { outcome: "matched", live_generation: 7, hold_set: true },
       }),
     };
     app = await serve(world);
@@ -174,6 +175,9 @@ test.describe("plan apply cancel", () => {
       reason: "bad canary",
     });
     await expect(section(page)).toContainText("Cancelling generation 7");
+    await expect(section(page).getByRole("status")).toHaveText(
+      "Cancel accepted for generation 7. prod is held.",
+    );
     await expect(section(page).getByRole("button", { name: "Cancel apply" })).toHaveCount(0);
     await expectDesignRules(page);
 
@@ -184,6 +188,31 @@ test.describe("plan apply cancel", () => {
     await expect(section(page)).toContainText("Generation 7 ended.");
     await expect(page.getByRole("button", { name: "Cancel apply" })).toHaveCount(0);
     expect(cancelPosts(app)).toHaveLength(1);
+  });
+
+  test("reports a stale cancel with the live generation and does not retry", async ({ page }) => {
+    app = await serve({
+      lease: HELD,
+      cancel: ok({
+        version: 1,
+        operation: "cancel",
+        message: "apply generation 7 is not the live apply",
+        cancel: { outcome: "stale", live_generation: 8, hold_set: false },
+      }),
+      leaseAfterCancel: { ...HELD, generation: 8 },
+    });
+    await openPlan(page, app);
+    await confirmCancel(page);
+    await expect(section(page).getByRole("status")).toHaveText(
+      "Not cancelled. Generation 7 is not the live apply; generation 8 is.",
+    );
+    // Nothing was cancelled: the live apply stays on offer, never sent for it.
+    await expect(section(page)).toContainText("Generation 8 is applying");
+    await expect(section(page)).not.toContainText("Cancelling");
+    await expect(section(page).getByRole("button", { name: "Cancel apply" })).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    expect(cancelPosts(app)).toHaveLength(1);
+    await expectDesignRules(page);
   });
 
   test("offers no cancel when the apply already ended", async ({ page }) => {

@@ -32,6 +32,7 @@ import {
   detailPreview,
 } from "../delivery/history";
 import { planSummary } from "../delivery/model";
+import { failure } from "../management/use-management";
 import { approvalCopy, shownDigest } from "../plan/approval";
 import { quorumMatrix, quorumStatus } from "../plan/quorum";
 import {
@@ -42,9 +43,11 @@ import {
   planBody,
   signCommand,
 } from "../plan/requests";
+import { rollbackHoldChoice, rollbackOnly } from "../plan/rollback-hold";
 import { Button, Card } from "../ui/kit";
 import { ApplyCancel } from "./apply-cancel";
 import { EnvironmentOverlays } from "./environment-overlays";
+import { RollbackHold } from "./rollback-hold";
 import { TargetChanges } from "./target-changes";
 
 const STRIP = ["computed", "running", "succeeded"] as const;
@@ -120,7 +123,8 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
         refreshAfterRun();
         return;
       }
-      setResult({ ok: false, text: error instanceof ApiError ? error.message : String(error) });
+      // No answer reads as unknown; the mutation is never retried.
+      setResult({ ok: false, text: failure(error).text });
     },
   });
 
@@ -287,6 +291,7 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
               }
               planId={plan.id}
               planSteps={plan.steps}
+              rollback={rollbackOnly(plan)}
               environment={environment}
               digest={digestShown}
               generation={generation}
@@ -351,6 +356,7 @@ const Approval = ({
   applyBlocked,
   planId,
   planSteps,
+  rollback,
   environment,
   digest,
   generation,
@@ -361,6 +367,8 @@ const Approval = ({
   applyBlocked: boolean;
   planId: string;
   planSteps: readonly PlanStepRef[] | undefined;
+  /** Rollback-only plan: apply offers the hold opt-out. */
+  rollback: boolean;
   environment: string;
   digest: string | undefined;
   generation: number;
@@ -370,6 +378,9 @@ const Approval = ({
   const [envelope, setEnvelope] = useState("");
   const [roots, setRoots] = useState("");
   const [problem, setProblem] = useState<string>();
+  const [hold, setHold] = useState(true);
+  const [noHoldReason, setNoHoldReason] = useState("");
+  const holdChoice = rollback ? rollbackHoldChoice(hold, noHoldReason) : {};
   const command = signCommand(environment, digest);
   const submit = (operation: "approve" | "apply") => {
     const evidence = parseEvidence(environment, envelope, roots);
@@ -383,7 +394,7 @@ const Approval = ({
       operation === "apply"
         ? {
             path: applyPath(planId),
-            body: applyBody(environment, generation, evidence),
+            body: applyBody(environment, generation, evidence, holdChoice?.noHoldReason),
             ...(planSteps === undefined ? {} : { planSteps }),
           }
         : {
@@ -421,10 +432,19 @@ const Approval = ({
           className={field}
         />
       </div>
+      {rollback && (
+        <RollbackHold
+          environment={environment}
+          hold={hold}
+          reason={noHoldReason}
+          onHold={setHold}
+          onReason={setNoHoldReason}
+        />
+      )}
       <div className="mt-2 flex gap-2">
         <Button
           variant="primary"
-          disabled={pending || !envelope || !roots || applyBlocked}
+          disabled={pending || !envelope || !roots || applyBlocked || holdChoice === undefined}
           onClick={() => submit("apply")}
         >
           Apply
@@ -451,6 +471,7 @@ const STEP_TONE: Record<string, string> = {
   rolled_back: "text-warning",
   blocked: "text-warning",
   "not run": "text-muted",
+  skipped: "text-muted",
 };
 
 const ApplySteps = ({ environment, rows }: { environment: string; rows: ApplyRow[] }) => (

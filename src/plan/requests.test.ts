@@ -64,6 +64,10 @@ describe("lifecycle requests", () => {
     expect(body).toMatchObject({ operation: "apply", expected_generation: 3 });
     expect(body).not.toHaveProperty("skip_gates");
     expect(body).not.toHaveProperty("emergency_reason");
+    expect(body).not.toHaveProperty("no_hold_reason");
+    expect(applyBody("prod-eu", 3, evidence, "planned outage")).toMatchObject({
+      no_hold_reason: "planned outage",
+    });
     expect(holdBody("prod-eu", 41, "freeze")).toEqual({
       version: 1,
       operation: "hold",

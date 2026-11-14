@@ -275,6 +275,35 @@ test.describe("plan apply steps", () => {
     await expectDesignRules(page);
   });
 
+  test("reads steps a cancel stopped as skipped, not failed", async ({ page }) => {
+    app = await serveConsole(
+      server({
+        status: 422,
+        body: {
+          error: "apply cancelled",
+          steps: [
+            SUCCEEDED,
+            {
+              product: "web",
+              instance: "web",
+              action: "upgrade",
+              status: "skipped",
+              to_version: "2.0.0",
+              detail: "skipped: apply cancelled",
+            },
+          ],
+        },
+      }),
+    );
+    await openPlan(page, app);
+    await pasteAndApply(page);
+    const table = steps(page);
+    await expect(table.getByRole("cell", { name: "skipped", exact: true })).toBeVisible();
+    await expect(table.getByRole("cell", { name: "failed", exact: true })).toHaveCount(0);
+    await expect(table.getByRole("cell", { name: "not run", exact: true })).toHaveCount(0);
+    await expectDesignRules(page);
+  });
+
   test("says detail is unavailable on an older server", async ({ page }) => {
     app = await serveConsole(
       server(ok({ version: 1, operation: "apply", message: "applied 1 step" })),

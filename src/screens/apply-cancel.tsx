@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { EnvironmentInspectReport, ManagementLifecycleResult } from "../api/tenkai.gen";
-import { cancelState } from "../delivery/apply-cancel";
+import { cancelNotice, cancelOutcome, cancelState } from "../delivery/apply-cancel";
 import { useManagementCall } from "../management/use-management";
 import { cancelApplyBody } from "../plan/requests";
 import { Card, ConfirmButton, Notice } from "../ui/kit";
@@ -21,11 +21,19 @@ export const ApplyCancel = ({
   const call = useManagementCall(token, `environment:${environment}`, "management", message);
   const [reason, setReason] = useState("");
   const [sent, setSent] = useState<number>();
+  const outcome = call.isSuccess ? cancelOutcome(call.data) : undefined;
+  // A stale cancel stopped nothing: the live apply stays on offer, never resent.
+  const notice =
+    outcome !== undefined && sent !== undefined
+      ? cancelNotice(outcome, sent, environment, call.data?.message ?? "")
+      : call.outcome;
   const state = cancelState(
     report.lease,
-    sent === undefined ? undefined : { generation: sent, accepted: call.isSuccess },
+    sent === undefined
+      ? undefined
+      : { generation: sent, accepted: outcome !== undefined && outcome.kind !== "stale" },
   );
-  if (state.kind === "none" && !call.outcome) {
+  if (state.kind === "none" && !notice) {
     return null;
   }
   return (
@@ -72,7 +80,7 @@ export const ApplyCancel = ({
           ) : (
             <p className="m-0 text-muted">No permission to cancel this apply.</p>
           ))}
-        {call.outcome && <Notice tone={call.outcome.tone}>{call.outcome.text}</Notice>}
+        {notice && <Notice tone={notice.tone}>{notice.text}</Notice>}
       </Card>
     </section>
   );
