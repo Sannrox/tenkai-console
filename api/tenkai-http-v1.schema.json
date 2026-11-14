@@ -40,6 +40,45 @@
       ],
       "type": "object"
     },
+    "ApplyCancelMatch": {
+      "description": "Whether a cancel named the live apply.",
+      "oneOf": [
+        {
+          "const": "matched",
+          "description": "The live apply stops after its current step.",
+          "type": "string"
+        },
+        {
+          "const": "stale",
+          "description": "`expected_generation` was not the live apply; nothing changed.",
+          "type": "string"
+        }
+      ]
+    },
+    "ApplyCancelResult": {
+      "description": "Typed outcome of `POST /v1/environments/{environment}/apply/cancel`.",
+      "properties": {
+        "hold_set": {
+          "description": "True when this cancel set the environment hold.",
+          "type": "boolean"
+        },
+        "live_generation": {
+          "description": "Generation of the live apply lease.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outcome": {
+          "$ref": "#/$defs/ApplyCancelMatch"
+        }
+      },
+      "required": [
+        "outcome",
+        "live_generation",
+        "hold_set"
+      ],
+      "type": "object"
+    },
     "ApplyRequest": {
       "additionalProperties": false,
       "properties": {
@@ -65,6 +104,13 @@
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
+        },
+        "no_hold_reason": {
+          "description": "Skip the hold a rollback-only plan sets when it succeeds (#1274), as\nembedded `rollback --no-hold` does. Refused on other plans.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "operation": {
           "type": "string"
@@ -122,8 +168,12 @@
           "description": "The version running after a restore: the previous version of a step\nrolled back on failure, or the target of a rollback step.",
           "type": "string"
         },
+        "stale_target": {
+          "$ref": "#/$defs/StaleTarget",
+          "description": "The live object that moved since planning, when apply refused the step."
+        },
         "status": {
-          "description": "`succeeded`, `blocked`, `failed` or `rolled_back`.",
+          "description": "`succeeded`, `blocked`, `failed`, `rolled_back`, or `skipped` for a\nstep a cancel stopped before it ran (#1274).",
           "type": "string"
         },
         "to_version": {
@@ -3570,6 +3620,13 @@
         "release_id": {
           "type": "string"
         },
+        "target_changes": {
+          "description": "Desired-versus-live changes recorded on the step (#1077, #1272).",
+          "items": {
+            "$ref": "#/$defs/TargetChange"
+          },
+          "type": "array"
+        },
         "to": {
           "type": "string"
         }
@@ -5191,6 +5248,10 @@
     "ManagementLifecycleResult": {
       "description": "Versioned result shared by catalog lifecycle routes. A client ignores\nfields it does not know, so a newer server can add one (#1172);\nrequests stay strict.",
       "properties": {
+        "cancel": {
+          "$ref": "#/$defs/ApplyCancelResult",
+          "description": "What a cancel did (#1274). Present only on a cancel result."
+        },
         "digest": {
           "type": "string"
         },
@@ -7730,6 +7791,22 @@
       ],
       "type": "object"
     },
+    "StaleTarget": {
+      "description": "Object whose live digest moved since planning.",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name"
+      ],
+      "type": "object"
+    },
     "StatusDependencyHold": {
       "description": "Dependency hold carried on a status row (no product; the row already names it).",
       "properties": {
@@ -7865,6 +7942,58 @@
         "environment",
         "expected_generation",
         "spec"
+      ],
+      "type": "object"
+    },
+    "TargetChange": {
+      "description": "Desired-versus-live change for one object, stored on a Plan step (#1077).",
+      "properties": {
+        "field_count": {
+          "description": "Count of changed fields. HTTP projections set this so inspect can omit\n`fields` and still return per-object counts. Planning leaves it absent.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fields": {
+          "description": "Operator-owned fields that differ. Empty when live already matches.",
+          "items": {
+            "$ref": "#/$defs/TargetFieldChange"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "live_digest": {
+          "description": "Digest of the live object as planning saw it. `absent` when none.",
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "live_digest"
+      ],
+      "type": "object"
+    },
+    "TargetFieldChange": {
+      "description": "One named field of a [`TargetChange`]. Secret values are never stored.",
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field"
       ],
       "type": "object"
     },
@@ -9564,6 +9693,15 @@
       },
       "response": {
         "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/plans/{plan_id}",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/EnvironmentPlanSummary"
       }
     },
     {

@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai commit 693cef8fe7c3322d130c4e17b7d43bbcf0a7470c tenkai-http-v1.schema.json (sha256 2a374ee49ea33d70254df6e7fcc7f4f8bf0bc874583070193bb0880844d64839, contract tenkai.http.v1).
+// Generated from Sannrox/tenkai commit 818aad60aaf9b47e2a3c8dda0da4e265f0e87f7b tenkai-http-v1.schema.json (sha256 28dd61753a68c8b245e402796318b14a49271405fb92b224b159a0c544fe5f1a, contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -22,6 +22,13 @@ export type WaiverCategory = ("false_positive" | "mitigated" | "upstream_depende
  * via the `definition` "WaiverScopeKind".
  */
 export type WaiverScopeKind = ("global" | "product" | "component" | "release")
+/**
+ * Whether a cancel named the live apply.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ApplyCancelMatch".
+ */
+export type ApplyCancelMatch = ("matched" | "stale")
 /**
  * Closed deploy-failure kind the executor already distinguishes (#1055).
  * 
@@ -417,6 +424,8 @@ export type TrustStatus = ("ok" | "warning" | "critical" | "expired")
 
 export interface TenkaiHttpV1 {
 AdvisoryFeedStatus?: AdvisoryFeedStatus
+ApplyCancelMatch?: ApplyCancelMatch
+ApplyCancelResult?: ApplyCancelResult
 ApplyRequest?: ApplyRequest
 ApplyStepResult?: ApplyStepResult
 ApprovalBrief?: ApprovalBrief
@@ -639,9 +648,12 @@ SigningRoot?: SigningRoot
 SpecDriftObject?: SpecDriftObject
 SpecDriftView?: SpecDriftView1
 StagedBundle?: StagedBundle
+StaleTarget?: StaleTarget1
 StatusDependencyHold?: StatusDependencyHold
 StatusRow?: StatusRow
 SubscribeRequest?: SubscribeRequest
+TargetChange?: TargetChange
+TargetFieldChange?: TargetFieldChange
 TerminalOutcomeProjection?: TerminalOutcomeProjection
 TickReport?: TickReport
 TrustPosture?: TrustPosture
@@ -706,6 +718,23 @@ release_id?: string
 scope: WaiverScopeKind
 }
 /**
+ * Typed outcome of `POST /v1/environments/{environment}/apply/cancel`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ApplyCancelResult".
+ */
+export interface ApplyCancelResult {
+/**
+ * True when this cancel set the environment hold.
+ */
+hold_set: boolean
+/**
+ * Generation of the live apply lease.
+ */
+live_generation: number
+outcome: ApplyCancelMatch
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "ApplyRequest".
  */
@@ -715,6 +744,11 @@ approvals?: ApprovalStatementEnvelope[]
 emergency_reason?: (string | null)
 environment: string
 expected_generation: number
+/**
+ * Skip the hold a rollback-only plan sets when it succeeds (#1274), as
+ * embedded `rollback --no-hold` does. Refused on other plans.
+ */
+no_hold_reason?: (string | null)
 operation: string
 skip_gates?: boolean
 trust_roots: TrustRoots
@@ -827,8 +861,10 @@ product: string
  * rolled back on failure, or the target of a rollback step.
  */
 restored_version?: string
+stale_target?: StaleTarget
 /**
- * `succeeded`, `blocked`, `failed` or `rolled_back`.
+ * `succeeded`, `blocked`, `failed`, `rolled_back`, or `skipped` for a
+ * step a cancel stopped before it ran (#1274).
  */
 status: string
 to_version: string
@@ -848,6 +884,13 @@ raw?: string
 resources?: string[]
 summary: string
 truncated?: boolean
+}
+/**
+ * The live object that moved since planning, when apply refused the step.
+ */
+export interface StaleTarget {
+kind: string
+name: string
 }
 /**
  * Bounded facts an approver reads before the full step list.
@@ -2366,7 +2409,45 @@ instance?: string
 order: number
 product: string
 release_id: string
+/**
+ * Desired-versus-live changes recorded on the step (#1077, #1272).
+ */
+target_changes?: TargetChange[]
 to: string
+}
+/**
+ * Desired-versus-live change for one object, stored on a Plan step (#1077).
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "TargetChange".
+ */
+export interface TargetChange {
+/**
+ * Count of changed fields. HTTP projections set this so inspect can omit
+ * `fields` and still return per-object counts. Planning leaves it absent.
+ */
+field_count?: number
+/**
+ * Operator-owned fields that differ. Empty when live already matches.
+ */
+fields?: TargetFieldChange[]
+kind: string
+/**
+ * Digest of the live object as planning saw it. `absent` when none.
+ */
+live_digest: string
+name: string
+}
+/**
+ * One named field of a [`TargetChange`]. Secret values are never stored.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "TargetFieldChange".
+ */
+export interface TargetFieldChange {
+field: string
+from?: string
+to?: string
 }
 /**
  * Operator-facing lease/fence summary. Never includes credentials.
@@ -3328,6 +3409,7 @@ requested?: (number | null)
  * via the `definition` "ManagementLifecycleResult".
  */
 export interface ManagementLifecycleResult {
+cancel?: ApplyCancelResult1
 digest?: string
 message: string
 operation: string
@@ -3345,6 +3427,20 @@ resource?: string
  */
 steps?: ApplyStepResult[]
 version: number
+}
+/**
+ * Typed outcome of `POST /v1/environments/{environment}/apply/cancel`.
+ */
+export interface ApplyCancelResult1 {
+/**
+ * True when this cancel set the environment hold.
+ */
+hold_set: boolean
+/**
+ * Generation of the live apply lease.
+ */
+live_generation: number
+outcome: ApplyCancelMatch
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -4331,6 +4427,16 @@ unreadable?: string
  * more than one matches; the bundle itself names no upgrade.
  */
 upgrade?: string
+}
+/**
+ * Object whose live digest moved since planning.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "StaleTarget".
+ */
+export interface StaleTarget1 {
+kind: string
+name: string
 }
 /**
  * Dependency hold carried on a status row (no product; the row already names it).
