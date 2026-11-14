@@ -89,7 +89,7 @@ export const Releases = () => {
           </tbody>
         </table>
       </Card>
-      <PromotionPolicies fleet={delivery.fleet} loading={delivery.loading} />
+      <PromotionPolicies fleet={delivery.fleet} loading={delivery.loading} token={token} />
       {token !== undefined && <Compatibility token={token} environments={names} />}
       {token !== undefined && (
         <Suspense fallback={null}>

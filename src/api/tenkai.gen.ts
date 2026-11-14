@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai commit 6959ee4552ca34b6ab1cdf25c25379c1645b8411 tenkai-http-v1.schema.json (sha256 af75a1b9d807a7327ce5d87cfc640b9e9b7a14ffec8db427d25b035d9e1282b5, contract tenkai.http.v1).
+// Generated from Sannrox/tenkai commit 18299c19076eaacaedce4d582425f392ff871a40 tenkai-http-v1.schema.json (sha256 91ce6fe418bfdece861d656c60fc20c2668f2d2c2a923c8bac830315f51c47e4, contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -445,7 +445,10 @@ ChannelExposureGraceRequest?: ChannelExposureGraceRequest
 ChannelHoldRequest?: ChannelHoldRequest
 ChannelListEntry?: ChannelListEntry
 ChannelPage?: ChannelPage
+ChannelPolicyPauseRequest?: ChannelPolicyPauseRequest
+ChannelPromotionEvidence?: ChannelPromotionEvidence
 ChannelPromotionPolicyStatus?: ChannelPromotionPolicyStatus
+ChannelPromotionPolicyView?: ChannelPromotionPolicyView
 ChannelRemoveRequest?: ChannelRemoveRequest
 CheckpointClass?: CheckpointClass
 CheckpointDecl?: CheckpointDecl
@@ -1223,6 +1226,41 @@ items: ChannelListEntry[]
 next_cursor?: string
 }
 /**
+ * Body of `POST /v1/products/{product}/channels/{channel}/policy/pause`
+ * and `.../policy/resume`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ChannelPolicyPauseRequest".
+ */
+export interface ChannelPolicyPauseRequest {
+operation: string
+version: number
+}
+/**
+ * Evidence the soak must keep true.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ChannelPromotionEvidence".
+ */
+export interface ChannelPromotionEvidence {
+canary?: boolean
+evaluation?: boolean
+/**
+ * Maximum share of soak time with any replica failing (0.0–1.0).
+ */
+failing_max_share?: number
+health_slo?: boolean
+/**
+ * Minimum share of soak time with every replica healthy (0.0–1.0).
+ */
+healthy_min_share?: number
+/**
+ * When true, exceeding `failing_max_share` recalls the soaking source
+ * release instead of only resetting the soak.
+ */
+recall_on_failing?: boolean
+}
+/**
  * Operator-visible soak row for `fleet status`.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -1235,6 +1273,38 @@ policy_id: string
 policy_version: number
 product: string
 reason?: string
+source_channel: string
+/**
+ * `waiting` | `soaking` | `ready` | `reset` | `refused` | `promoted` | `recalled`.
+ */
+state: string
+target_channel: string
+}
+/**
+ * Policy rules, pause actor, and soak progress for `GET /v1/products/{product}/channels/{channel}/policy`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ChannelPromotionPolicyView".
+ */
+export interface ChannelPromotionPolicyView {
+elapsed_ms?: number
+evidence: ChannelPromotionEvidence
+failing_share?: number
+healthy_share?: number
+instances_without_evidence?: string[]
+last_reset_at?: number
+last_reset_cause?: string
+paused: boolean
+paused_at?: number
+paused_by?: string
+policy_id: string
+policy_version: number
+product: string
+promoted_by?: string
+promoted_by_kind?: string
+reason?: string
+soak_duration_ms: number
+soaking_release?: string
 source_channel: string
 /**
  * `waiting` | `soaking` | `ready` | `reset` | `refused` | `promoted` | `recalled`.

@@ -19,7 +19,7 @@ export type Load<T> =
   | { kind: "error"; message: string };
 
 /** A failed read as the console shows it: never the server's raw text. */
-const failedLoad = (error: unknown): Load<never> => {
+export const failedLoad = (error: unknown): Load<never> => {
   if (error instanceof ApiError) {
     if ([404, 405, 503].includes(error.status)) {
       return { kind: "unavailable" };
