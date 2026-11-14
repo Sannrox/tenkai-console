@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyBody,
+  cancelApplyBody,
   expectedGeneration,
   holdBody,
   parseEvidence,
@@ -76,6 +77,15 @@ describe("lifecycle requests", () => {
       environment: "prod-eu",
       expected_generation: 41,
     });
+    expect(cancelApplyBody("prod-eu", 7, "  bad canary ")).toEqual({
+      version: 1,
+      operation: "cancel",
+      environment: "prod-eu",
+      expected_generation: 7,
+      reason: "bad canary",
+    });
+    // The server refuses an empty reason; a blank one is omitted so it defaults.
+    expect(cancelApplyBody("prod-eu", 7, " ")).not.toHaveProperty("reason");
     expect(releaseChannelHoldBody()).toEqual({ version: 1, operation: "channel_release" });
     expect(retryFailedTargetBody("prod-eu", 41, "api", "retry after probe")).toEqual({
       version: 1,
