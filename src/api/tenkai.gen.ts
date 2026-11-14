@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai commit 498ace59b5a8b2ea4794a3d350323d0ba7e87f47 tenkai-http-v1.schema.json (sha256 9dedee4f36819640cd9e61a8916949b6528ea8a7bf4d9fb288aaab4c60121b7c, contract tenkai.http.v1).
+// Generated from Sannrox/tenkai commit 59e4ca4790c799879ade94642f46a81924b5044d tenkai-http-v1.schema.json (sha256 c896e1c3749a90d9d0ec44f8e625985bc11d49775c2593c43fcc84f55744c65f, contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -527,6 +527,7 @@ EnvironmentGrace?: EnvironmentGrace
 EnvironmentInspectReport?: EnvironmentInspectReport
 EnvironmentLeaseInspect?: EnvironmentLeaseInspect
 EnvironmentListEntry?: EnvironmentListEntry
+EnvironmentListQuery?: EnvironmentListQuery
 EnvironmentMaintenanceInspect?: EnvironmentMaintenanceInspect1
 EnvironmentMaintenanceWindow?: EnvironmentMaintenanceWindow
 EnvironmentPlanStepSummary?: EnvironmentPlanStepSummary
@@ -568,6 +569,7 @@ GroupApprovers?: GroupApprovers
 HealthCheck?: HealthCheck
 HealthCheckState?: HealthCheckState
 HoldAuditEvent?: HoldAuditEvent
+HoldSelector?: HoldSelector2
 ImpactRefusal?: ImpactRefusal
 ImportJob?: ImportJob
 ImportJobList?: ImportJobList
@@ -1311,6 +1313,15 @@ export interface DeliveryHold {
 actor: string
 held_at: number
 reason: string
+selector?: HoldSelector
+}
+/**
+ * The selector this hold was placed by, when it was. Omitted for a hold
+ * placed on the environment by name.
+ */
+export interface HoldSelector {
+environments: string[]
+selector: string
 }
 /**
  * One page of [`ChannelListEntry`] values.
@@ -1808,6 +1819,13 @@ environment: string
 expected_generation: number
 operation: string
 reason?: (string | null)
+/**
+ * Selector this hold is placed by. Hold only: the environment must
+ * match it when the server resolves it, and the hold records it with
+ * every environment it matched then. A server that predates the field
+ * refuses it.
+ */
+selector?: string
 version: number
 }
 /**
@@ -1837,6 +1855,14 @@ action: string
 actor: string
 at: number
 reason: string
+selector?: HoldSelector1
+}
+/**
+ * The selector a `set` was placed by. Omitted otherwise.
+ */
+export interface HoldSelector1 {
+environments: string[]
+selector: string
 }
 /**
  * Declared failure threshold. Omitted when unset, including on channel
@@ -2398,6 +2424,7 @@ export interface DeliveryHold1 {
 actor: string
 held_at: number
 reason: string
+selector?: HoldSelector
 }
 /**
  * The workload identity issuer, its requested generation and its
@@ -2691,6 +2718,7 @@ export interface DeliveryHold2 {
 actor: string
 held_at: number
 reason: string
+selector?: HoldSelector
 }
 /**
  * Report-only live-spec comparison (#1028). Omitted when unknown.
@@ -2789,6 +2817,19 @@ id: string
 lease_held: boolean
 name: string
 subscription_count: number
+}
+/**
+ * Query of `GET /v1/environments`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EnvironmentListQuery".
+ */
+export interface EnvironmentListQuery {
+/**
+ * Only environments matching this selector (`key=value`, `key!=value`,
+ * `key in (a,b)`). Omitted or blank lists every environment.
+ */
+selector?: string
 }
 /**
  * Read-only view of the environment's own maintenance schedule, evaluated
@@ -2928,6 +2969,11 @@ running: boolean
  * via the `definition` "ErrorBody".
  */
 export interface ErrorBody {
+/**
+ * The selector clause that does not parse, on an `invalid_selector`
+ * refusal of a malformed clause.
+ */
+clause?: string
 error: string
 reason?: CommandRefusalReason
 }
@@ -3356,6 +3402,16 @@ export interface HealthCheck {
 message?: string
 name: string
 state: HealthCheckState
+}
+/**
+ * A selector and every environment it resolved to when the hold was set.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "HoldSelector".
+ */
+export interface HoldSelector2 {
+environments: string[]
+selector: string
 }
 /**
  * `GET /v1/imports/{id}` and the job file.
@@ -4766,6 +4822,7 @@ export interface DeliveryHold3 {
 actor: string
 held_at: number
 reason: string
+selector?: HoldSelector
 }
 /**
  * Dependency hold carried on a status row (no product; the row already names it).

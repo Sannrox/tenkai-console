@@ -342,7 +342,7 @@ const Detail = ({
             <dd className="m-0">
               {report.lease.held ? `held, generation ${report.lease.generation ?? 0}` : "free"}
             </dd>
-            <HoldRows hold={report.delivery_hold} view={holdView} />
+            <HoldRows report={report} view={holdView} />
             {holds.length > 0 && (
               <>
                 <dt className="text-muted">waiting</dt>
