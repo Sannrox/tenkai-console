@@ -1,6 +1,13 @@
+import type { UseQueryResult } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import type { EnvironmentInspectReport, ManagementLifecycleResult } from "../api/tenkai.gen";
+import type {
+  DeliveryHold,
+  DeliveryHoldView,
+  EnvironmentInspectReport,
+  ManagementLifecycleResult,
+} from "../api/tenkai.gen";
+import { auditLine, liftLine, recentAudit } from "../delivery/hold";
 import { holdLine } from "../delivery/model";
 import { useManagementCall } from "../management/use-management";
 import {
@@ -104,5 +111,52 @@ export const SubscriptionHold = ({
         </>
       )}
     </div>
+  );
+};
+
+/**
+ * Environment hold rows for the detail list: who holds it, whether it lifts
+ * itself, and the latest set and clear events with their actors, so an
+ * automatic hold and an operator hold stay apart.
+ */
+export const HoldRows = ({
+  hold,
+  view,
+}: {
+  hold: DeliveryHold | undefined;
+  view: UseQueryResult<DeliveryHoldView>;
+}) => {
+  const audit = recentAudit(view.data?.audit ?? []);
+  return (
+    <>
+      <dt className="text-muted">delivery hold</dt>
+      <dd className={`m-0 wrap-anywhere ${hold ? "text-warning" : "text-muted"}`}>
+        {hold ? holdLine(hold) : "none"}
+      </dd>
+      {hold && view.data && (
+        <>
+          <dt className="text-muted">lifts</dt>
+          <dd className="m-0">{liftLine(hold, view.data.threshold)}</dd>
+        </>
+      )}
+      {view.isError && (
+        <>
+          <dt className="text-muted">hold history</dt>
+          <dd className="m-0 text-muted">Could not load</dd>
+        </>
+      )}
+      {audit.length > 0 && (
+        <>
+          <dt className="text-muted">hold history</dt>
+          <dd className="m-0">
+            <ul aria-label="Hold history" className="m-0 list-none p-0 wrap-anywhere">
+              {audit.map((event) => (
+                <li key={`${event.at}:${event.action}:${event.actor}`}>{auditLine(event)}</li>
+              ))}
+            </ul>
+          </dd>
+        </>
+      )}
+    </>
   );
 };

@@ -4,6 +4,7 @@ import type {
   ApplyRequest,
   ApproveRequest,
   ChannelHoldRequest,
+  DeliveryFailureThresholdRequest,
   DeliveryHoldRequest,
   EnvironmentLeaseInspect,
   PlanRequest,
@@ -75,6 +76,31 @@ export const holdBody = (
 export const releaseHoldBody = (environment: string, generation: number): DeliveryHoldRequest => ({
   version: VERSION,
   operation: "release",
+  environment,
+  expected_generation: generation,
+});
+
+/** Same as `tenkaictl env hold <env> threshold --count N --window <duration>`. */
+export const thresholdBody = (
+  environment: string,
+  generation: number,
+  count: number,
+  window: string,
+): DeliveryFailureThresholdRequest => ({
+  version: VERSION,
+  operation: "hold_threshold",
+  environment,
+  expected_generation: generation,
+  count,
+  window,
+});
+
+export const clearThresholdBody = (
+  environment: string,
+  generation: number,
+): DeliveryFailureThresholdRequest => ({
+  version: VERSION,
+  operation: "hold_threshold_clear",
   environment,
   expected_generation: generation,
 });
