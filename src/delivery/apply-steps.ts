@@ -2,9 +2,9 @@ import { type } from "arktype";
 import { ApiError } from "../api/http";
 import { type AttemptCause, parseCause } from "./history";
 
-// `POST /v1/plans/{id}/apply?steps=true` (Tenkai #1076). The pinned contract
-// predates `ManagementLifecycleResult.steps` and `ApplyFailedBody`, so the
-// extra fields are validated here rather than trusted as a generated type.
+// `POST /v1/plans/{id}/apply?steps=true` (Tenkai #1076). Step results,
+// including `stale_target` (Tenkai #1272), are validated here rather than
+// trusted as a generated type; `ApplyFailedBody` is not in the contract.
 //
 // Reuse decision
 // Job: turn one apply response into per-step rows, filling remaining planned
@@ -32,6 +32,7 @@ const ApplyStepBody = type({
   "detail_truncated?": "boolean",
   "restored_version?": "string",
   "attempt_id?": "string",
+  "stale_target?": { kind: "string", name: "string", "+": "delete" },
   "+": "delete",
 });
 
@@ -200,3 +201,9 @@ export const stepAttempt = (row: ApplyRow): string => {
 export const stepDetail = (row: ApplyRow): string => row.detail ?? "";
 
 export const stepCut = (row: ApplyRow): boolean => row.detail_truncated === true;
+
+/** A step apply refused because a live object moved since planning names it. */
+export const stepStale = (row: ApplyRow): string | undefined =>
+  row.stale_target === undefined
+    ? undefined
+    : `${row.stale_target.kind} ${row.stale_target.name} changed since planning`;

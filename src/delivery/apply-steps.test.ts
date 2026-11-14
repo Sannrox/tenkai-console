@@ -11,6 +11,7 @@ import {
   stepAttempt,
   stepCut,
   stepRestored,
+  stepStale,
 } from "./apply-steps";
 
 const SUCCEEDED = {
@@ -177,5 +178,16 @@ describe("applyViewFromError", () => {
 describe("applyPath", () => {
   it("asks for steps on the encoded plan", () => {
     expect(applyPath("tenkai:plan:1")).toBe("v1/plans/tenkai%3Aplan%3A1/apply?steps=true");
+  });
+});
+
+describe("stepStale", () => {
+  it("names the live object that moved since planning", () => {
+    const [row] =
+      parseApplySteps({
+        steps: [{ ...FAILED, stale_target: { kind: "Service", name: "api" } }],
+      }) ?? [];
+    expect(row && stepStale(row)).toBe("Service api changed since planning");
+    expect(stepStale({ ...SUCCEEDED })).toBeUndefined();
   });
 });

@@ -21,6 +21,7 @@ import {
   stepCut,
   stepDetail,
   stepRestored,
+  stepStale,
 } from "../delivery/apply-steps";
 import { overlayRefusal } from "../delivery/config-schema";
 import {
@@ -44,6 +45,7 @@ import {
 import { Button, Card } from "../ui/kit";
 import { ApplyCancel } from "./apply-cancel";
 import { EnvironmentOverlays } from "./environment-overlays";
+import { TargetChanges } from "./target-changes";
 
 const STRIP = ["computed", "running", "succeeded"] as const;
 /** Inspect refresh while an apply holds the lease or this page is sending one. */
@@ -267,6 +269,8 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
               </dl>
             </Card>
           </div>
+
+          {plan && <TargetChanges plan={plan} token={token} />}
 
           {awaiting && plan && (
             <Quorum
@@ -507,6 +511,10 @@ const ApplySteps = ({ environment, rows }: { environment: string; rows: ApplyRow
 
 const StepCause = ({ row }: { row: ApplyRow }) => {
   const cut = stepCut(row) ? <span className="text-muted"> {APPLY_COPY.cut}</span> : null;
+  const stale = stepStale(row);
+  if (stale !== undefined) {
+    return <span className="text-warning">{stale}</span>;
+  }
   if (row.cause !== undefined) {
     const preview = `${causeLine(row.cause)}: ${causeSummary(row.cause)}`;
     const raw = causeRaw(row.cause);
