@@ -17,7 +17,7 @@ import {
   maintenanceTimeline,
   type MaintenanceTimeline,
 } from "../delivery/maintenance";
-import { holdLine, isHeldFailedTarget, productHasActivePlan } from "../delivery/model";
+import { isHeldFailedTarget, productHasActivePlan } from "../delivery/model";
 import {
   DOWNGRADE_NOTICE,
   previousRelease,
@@ -27,6 +27,7 @@ import {
 import {
   useDelivery,
   useEnvironmentDependencies,
+  useEnvironmentHold,
   useEnvironmentInspect,
   useEnvironmentStatus,
 } from "../delivery/use-delivery";
@@ -40,7 +41,7 @@ import {
 } from "../plan/requests";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { AddEnvironment, ConfigSections } from "./environment-config";
-import { SubscriptionHold } from "./environment-hold";
+import { HoldRows, SubscriptionHold } from "./environment-hold";
 import { Runtime } from "./environment-runtime";
 import { FleetTable } from "./fleet-table";
 import { HealthChecks } from "./health-checks";
@@ -162,6 +163,7 @@ const Detail = ({
   const spec = `${product.trim()}=${channel.trim()}`;
   const dependencies = useEnvironmentDependencies(token, report.name);
   const status = useEnvironmentStatus(token, report.name);
+  const holdView = useEnvironmentHold(token, report.name);
   const holds = dependencies.data?.kind === "ok" ? dependencies.data.value.holds : [];
   const waiting = heldProducts(holds);
   const nowSecs = Math.floor(now / 1000);
@@ -339,10 +341,7 @@ const Detail = ({
             <dd className="m-0">
               {report.lease.held ? `held, generation ${report.lease.generation ?? 0}` : "free"}
             </dd>
-            <dt className="text-muted">delivery hold</dt>
-            <dd className={`m-0 ${report.delivery_hold ? "text-warning" : "text-muted"}`}>
-              {report.delivery_hold ? holdLine(report.delivery_hold) : "none"}
-            </dd>
+            <HoldRows hold={report.delivery_hold} view={holdView} />
             {holds.length > 0 && (
               <>
                 <dt className="text-muted">waiting</dt>
@@ -511,7 +510,7 @@ const Detail = ({
           onInstance={onInstance}
         />
       </Suspense>
-      <ConfigSections report={report} token={token} />
+      <ConfigSections report={report} token={token} holdView={holdView.data} />
       <Runtime report={report} token={token} />
     </>
   );

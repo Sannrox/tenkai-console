@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type {
   ConnectivityClass,
+  DeliveryHoldView,
   EnvironmentConfigChange,
   EnvironmentInspectReport,
   ManagementLifecycleResult,
@@ -8,10 +9,11 @@ import type {
   WebhookEndpoint,
   WebhookEvent,
 } from "../api/tenkai.gen";
+import { thresholdLine } from "../delivery/hold";
 import { formatViewerInstant } from "../delivery/maintenance";
 import { configCall, nextOpening, registerBody } from "../management/environment-config";
 import { useManagementCall } from "../management/use-management";
-import { expectedGeneration } from "../plan/requests";
+import { clearThresholdBody, expectedGeneration, thresholdBody } from "../plan/requests";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 
 const field =
@@ -115,14 +117,16 @@ export const AddEnvironment = ({ token }: { token: string }) => {
  * with a reason and the generation this view shows; a stale generation is
  * refused by the server, not retried, so an edit never overwrites a change
  * this page did not show. Read-only credentials see no Edit once the server
- * has refused them.
+ * has refused them. The failure threshold shows once the hold view loads.
  */
 export const ConfigSections = ({
   report,
   token,
+  holdView,
 }: {
   report: EnvironmentInspectReport;
   token: string;
+  holdView?: DeliveryHoldView | undefined;
 }) => {
   const call = useManagementCall(token, `environment:${report.name}`, "management", message);
   const generation = expectedGeneration(report.lease);
@@ -161,6 +165,21 @@ export const ConfigSections = ({
       >
         <PolicyForm {...props} current={report.approval_policy} />
       </Section>
+      {holdView && (
+        <Section
+          title="Failure threshold"
+          allowed={call.allowed}
+          summary={holdView.threshold ? thresholdLine(holdView.threshold) : "none"}
+        >
+          <ThresholdForm
+            pending={call.isPending}
+            generation={generation}
+            declared={holdView.threshold !== undefined}
+            environment={report.name}
+            send={(path, body) => call.mutate({ path, body })}
+          />
+        </Section>
+      )}
       {call.outcome && (
         <div className="mt-2">
           <Notice tone={call.outcome.tone}>{call.outcome.text}</Notice>
@@ -251,6 +270,49 @@ const FactsForm = ({ pending, generation, send }: FormProps) => {
         confirm={`Clear ${key.trim()}`}
         disabled={!ready}
         onConfirm={() => send(draft, reason, { kind: "clear_fact", key: key.trim() })}
+      />
+    </>
+  );
+};
+
+/**
+ * Declare or clear the failed-target count and window that set an automatic
+ * environment hold. The request carries the draft's generation; a lost
+ * answer reads as unknown and is not resent.
+ */
+const ThresholdForm = ({
+  pending,
+  generation,
+  declared,
+  environment,
+  send,
+}: {
+  pending: boolean;
+  generation: number;
+  declared: boolean;
+  environment: string;
+  send: (path: string, body: unknown) => void;
+}) => {
+  const [draft] = useDraftGeneration(generation);
+  const [count, setCount] = useState("");
+  const [span, setSpan] = useState("");
+  const parsed = /^\d+$/.test(count.trim()) ? Number(count.trim()) : 0;
+  const path = `v1/environments/${encodeURIComponent(environment)}/hold/threshold`;
+  return (
+    <>
+      <Input label="Failed targets" value={count} onChange={setCount} />
+      <Input label="Window, as 1h" value={span} onChange={setSpan} />
+      <ConfirmButton
+        label="Set"
+        confirm={`Hold ${environment} at more than ${parsed} failed targets in ${span.trim()}`}
+        disabled={pending || parsed < 1 || span.trim() === ""}
+        onConfirm={() => send(path, thresholdBody(environment, draft, parsed, span.trim()))}
+      />
+      <ConfirmButton
+        label="Clear"
+        confirm={`Clear threshold on ${environment}`}
+        disabled={pending || !declared}
+        onConfirm={() => send(`${path}/clear`, clearThresholdBody(environment, draft))}
       />
     </>
   );

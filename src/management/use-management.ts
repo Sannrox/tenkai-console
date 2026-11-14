@@ -50,7 +50,7 @@ export const newRequestId = (): string =>
  * One management call, with its own request identity, per confirmed click; the client never retries or defers
  * mutations (main.tsx). A credential refusal hides that capability's controls
  * for the session, and every settled call refreshes the environment,
- * status, dependency, runtime, migration, runner, and history reads so the screen
+ * hold, status, dependency, runtime, migration, runner, and history reads so the screen
  * shows the server's state. History is reset, not invalidated, so extra
  * cursor pages are dropped instead of refetched against a shifted list.
  */
@@ -89,6 +89,7 @@ export const useManagementCall = <T>(
         queryClient.invalidateQueries({ queryKey: ["channels"] }),
         queryClient.invalidateQueries({ queryKey: ["environment"] }),
         queryClient.invalidateQueries({ queryKey: ["status"] }),
+        queryClient.invalidateQueries({ queryKey: ["hold"] }),
         queryClient.resetQueries({ queryKey: ["history"] }),
         queryClient.invalidateQueries({ queryKey: ["dependencies"] }),
         queryClient.invalidateQueries({ queryKey: ["runtime"] }),

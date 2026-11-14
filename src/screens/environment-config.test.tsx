@@ -397,4 +397,61 @@ describe("environment configuration", () => {
       calls.map((call) => (call.body as { expected_generation: number }).expected_generation),
     ).toStrictEqual([7, 7]);
   });
+
+  it("declares a failure threshold with the shown generation and reads a lost answer as unknown", async () => {
+    serve(() => ok);
+    const declared = {
+      audit: [],
+      threshold: {
+        environment: "prod",
+        count: 3,
+        window_ms: 3_600_000,
+        actor: "alice",
+        set_at: 1_700_000_000_000,
+      },
+    };
+    await render(<ConfigSections report={REPORT} token="operator" holdView={declared} />);
+    expect(
+      container.querySelector('[aria-label="Failure threshold configured"]')?.textContent,
+    ).toBe("more than 3 failed targets in 1h, set by alice at 2023-11-14T22:13:20.000Z");
+    // Failure threshold is the last section, after five others.
+    await click("Edit", 5);
+    await click("Clear");
+    await click("Clear threshold on prod");
+    expect(calls).toStrictEqual([
+      {
+        method: "POST",
+        path: "v1/environments/prod/hold/threshold/clear",
+        body: {
+          version: 1,
+          operation: "hold_threshold_clear",
+          environment: "prod",
+          expected_generation: 7,
+        },
+      },
+    ]);
+    // No answer at all: the request was sent, but its outcome is unknown.
+    serve(() => {
+      throw new TypeError("network down");
+    });
+    await type("Failed targets", "4");
+    await type("Window, as 1h", "30m");
+    await click("Set");
+    await click("Hold prod at more than 4 failed targets in 30m");
+    expect(calls).toStrictEqual([
+      {
+        method: "POST",
+        path: "v1/environments/prod/hold/threshold",
+        body: {
+          version: 1,
+          operation: "hold_threshold",
+          environment: "prod",
+          expected_generation: 7,
+          count: 4,
+          window: "30m",
+        },
+      },
+    ]);
+    expect(container.textContent).toContain("the outcome is unknown");
+  });
 });

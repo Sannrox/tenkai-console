@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ApiError, request } from "../api/http";
 import type {
   ChannelPage,
+  DeliveryHoldView,
   EnvironmentInspectReport,
   EnvironmentListEntry,
   FleetStatusReport,
@@ -66,6 +67,16 @@ export const useEnvironmentInspect = (token: string | undefined, name: string | 
     queryKey: ["environment", name, token],
     queryFn: () =>
       read<EnvironmentInspectReport>(`v1/environments/${encodeURIComponent(name ?? "")}`, token),
+    enabled: token !== undefined && Boolean(name),
+    retry: false,
+  });
+
+/** Environment hold, failure threshold, and hold audit trail. */
+export const useEnvironmentHold = (token: string | undefined, name: string | undefined) =>
+  useQuery({
+    queryKey: ["hold", name, token],
+    queryFn: () =>
+      read<DeliveryHoldView>(`v1/environments/${encodeURIComponent(name ?? "")}/hold`, token),
     enabled: token !== undefined && Boolean(name),
     retry: false,
   });
