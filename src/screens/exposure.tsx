@@ -25,6 +25,7 @@ import {
 } from "../management/use-management";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { RefreshFailed, td, th } from "../ui/posture";
+import { Findings } from "./exposure-waivers";
 
 const field =
   "min-w-0 rounded-md border border-field bg-white/4 px-2.5 py-1.5 font-mono text-xs text-fg placeholder:text-muted";
@@ -45,7 +46,7 @@ const saveCsv = (fileName: string, text: string): void => {
  * Pick A (#41): advisory-feed status on the first line, query by component
  * and range, then environment/release/component/criticality/freshness.
  * Propose fix-forward recalls matching catalog releases over HTTP; Export CSV
- * is the result table.
+ * is the result table. Feed findings and their waivers follow (#121).
  */
 export const Exposure = () => {
   const token = useSession((state) => state.session?.accessToken);
@@ -136,6 +137,7 @@ export const Exposure = () => {
           loading={query.isPending}
         />
       )}
+      {feed.data && <Findings token={token} matches={feed.data.matches} />}
     </>
   );
 };
