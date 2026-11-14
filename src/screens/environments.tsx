@@ -48,6 +48,7 @@ import { HealthChecks } from "./health-checks";
 
 const EnvironmentDependencies = lazy(() => import("./environment-dependencies"));
 const EnvironmentHistory = lazy(() => import("./environment-history"));
+const EnvironmentSecrets = lazy(() => import("./environment-secrets"));
 const InstanceExplain = lazy(() => import("./instance-explain"));
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
@@ -490,6 +491,7 @@ const Detail = ({
         </Suspense>
       )}
       <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
+        <EnvironmentSecrets environment={report.name} token={token} />
         <EnvironmentDependencies
           environment={report.name}
           token={token}
