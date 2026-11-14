@@ -49,36 +49,58 @@ const WebhookDelivery = type({
 
 export type WebhookDelivery = typeof WebhookDelivery.infer;
 
+// Tenkai #1327 pages the lists as `{items, next_cursor}`, newest first; older
+// servers answer a bare array, which is the whole list.
+const Deliveries = WebhookDelivery.array();
+const DeliveryPageBody = type({
+  items: Deliveries,
+  "next_cursor?": "string",
+  "+": "delete",
+});
+
+/** One page of a delivery list; `next` is the cursor of the page after it, if any. */
+export type DeliveryPage = { items: WebhookDelivery[]; next: string | undefined };
+
 const readDeliveries = async (
   path: string,
   token: string,
   fetcher: typeof fetch,
-): Promise<Load<WebhookDelivery[]>> => {
+  cursor: string | undefined,
+): Promise<Load<DeliveryPage>> => {
   let raw: unknown;
   try {
-    raw = await request<unknown>(path, { token }, fetcher);
+    const query = cursor === undefined ? "" : `?cursor=${encodeURIComponent(cursor)}`;
+    raw = await request<unknown>(`${path}${query}`, { token }, fetcher);
   } catch (error) {
     return failedLoad(error);
   }
-  // Tenkai #1327 pages the lists as `{items, next_cursor}`, newest first;
-  // older servers answer a bare array. The console reads the first page.
-  const items = typeof raw === "object" && raw !== null && "items" in raw ? raw.items : raw;
-  const value = WebhookDelivery.array()(items);
-  return value instanceof type.errors
+  if (Array.isArray(raw)) {
+    const items = Deliveries(raw);
+    return items instanceof type.errors
+      ? { kind: "error", message: "Could not load" }
+      : { kind: "ok", value: { items, next: undefined } };
+  }
+  const page = DeliveryPageBody(raw);
+  return page instanceof type.errors
     ? { kind: "error", message: "Could not load" }
-    : { kind: "ok", value };
+    : { kind: "ok", value: { items: page.items, next: page.next_cursor?.trim() || undefined } };
 };
 
-/** `GET /v1/environments/{environment}/webhooks/deliveries`, the newest page. */
+/**
+ * `GET /v1/environments/{environment}/webhooks/deliveries`: the newest page,
+ * or the page `cursor` names.
+ */
 export const fetchDeliveries = (
   environment: string,
   token: string,
   fetcher: typeof fetch = fetch,
-): Promise<Load<WebhookDelivery[]>> =>
+  cursor?: string,
+): Promise<Load<DeliveryPage>> =>
   readDeliveries(
     `v1/environments/${encodeURIComponent(environment)}/webhooks/deliveries`,
     token,
     fetcher,
+    cursor,
   );
 
 /**
@@ -90,8 +112,9 @@ export const fetchProductDeliveries = (
   product: string,
   token: string,
   fetcher: typeof fetch = fetch,
-): Promise<Load<WebhookDelivery[]>> =>
-  readDeliveries(`${productPath(product, "webhooks")}/deliveries`, token, fetcher);
+  cursor?: string,
+): Promise<Load<DeliveryPage>> =>
+  readDeliveries(`${productPath(product, "webhooks")}/deliveries`, token, fetcher, cursor);
 
 export type DeliveryRow = {
   id: string;

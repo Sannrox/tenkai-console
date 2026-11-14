@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type {
   EnvironmentConfigChange,
@@ -6,6 +5,7 @@ import type {
   ManagementLifecycleResult,
 } from "../api/tenkai.gen";
 import { attributed, failureGroups, type Source } from "../delivery/attribution";
+import { useDeliveryLists } from "../delivery/delivery-pages";
 import {
   deliveryRows,
   endpointsLine,
@@ -20,7 +20,7 @@ import { configCall } from "../management/environment-config";
 import { useManagementCall } from "../management/use-management";
 import { expectedGeneration } from "../plan/requests";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
-import { DeliveryFailures, Endpoints, TONE } from "./notification-routing";
+import { DeliveryFailures, Endpoints, MoreDeliveries, TONE } from "./notification-routing";
 
 const field =
   "min-w-0 rounded-md border border-field bg-white/4 px-2.5 py-1.5 text-xs text-fg placeholder:text-muted";
@@ -187,7 +187,11 @@ const OwnerForm = ({
   );
 };
 
-/** Raw deliveries, newest first per kind. Read only; the server retries, not the console. */
+/**
+ * Raw deliveries, newest first. Read only; the server retries, not the
+ * console. Further pages load on request and are never counted as complete
+ * while a cursor remains.
+ */
 const Deliveries = ({
   environment,
   token,
@@ -197,12 +201,14 @@ const Deliveries = ({
   token: string;
   ownerOf: (source: Source) => string | undefined;
 }) => {
-  const query = useQuery({
-    queryKey: ["webhook-deliveries", environment, token],
-    queryFn: () => fetchDeliveries(environment, token),
-    retry: false,
-  });
-  const load = query.data;
+  const { lists, more, loadingMore } = useDeliveryLists(
+    ["webhook-deliveries", environment, token],
+    [environment],
+    (key, cursor) => fetchDeliveries(key, token, fetch, cursor),
+  );
+  const list = lists?.[0];
+  const load = list?.load;
+  const partial = load?.kind === "ok" && list?.next !== undefined ? load.value.length : undefined;
   let body;
   if (load === undefined) {
     body = <p className="m-0 px-3.5 py-3 text-xs text-muted">{COPY.loading}</p>;
@@ -247,10 +253,18 @@ const Deliveries = ({
   return (
     <>
       {load?.kind === "ok" && attributed(load.value) && (
-        <DeliveryFailures groups={failureGroups(load.value, ownerOf)} />
+        <DeliveryFailures groups={failureGroups(load.value, ownerOf)} partial={partial} />
       )}
       <h3 className="mt-3 mb-1 text-xs font-semibold">Webhook deliveries</h3>
       <Card className="overflow-x-auto">{body}</Card>
+      {partial !== undefined && (
+        <MoreDeliveries
+          shown={partial}
+          failed={list?.moreFailed === true}
+          loading={loadingMore}
+          onMore={more}
+        />
+      )}
     </>
   );
 };
