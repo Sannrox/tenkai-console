@@ -1,6 +1,6 @@
 // Channel upgrade pace on Releases against a mocked API. Run with `pnpm build && pnpm e2e`.
 import { type Page, expect, test } from "@playwright/test";
-import type { ChannelPage, FleetStatusReport } from "../src/api/tenkai.gen";
+import type { ChannelPage, FleetStatusReport, PaceInstanceProgress } from "../src/api/tenkai.gen";
 import {
   type MockBackend,
   type Reply,
@@ -29,6 +29,7 @@ const CHANNELS: ChannelPage = {
 const MANAGER = ["read", "publish", "management"];
 const ok = (body: unknown): Reply => ({ status: 200, body });
 const PACE = /^\/v1\/products\/([^/]+)\/channels\/([^/]+)\/pace$/;
+const ADMIT = "/v1/products/api/channels/stable/admit";
 
 type Options = {
   /** Pace on `api/stable` in ms; `null` for none. */
@@ -40,12 +41,18 @@ type Options = {
   read?: Reply;
   /** Replaces the pace POST answer, for a refusal. */
   write?: Reply;
+  /** Instances each pace GET reports, in order; the last one repeats. */
+  reads?: PaceInstanceProgress[][];
+  /** Instances reported after an accepted early admission. */
+  admitted?: PaceInstanceProgress[];
+  /** Replaces the admit answer, for a refusal. */
+  admit?: Reply;
 };
 
-const paceRead = (ms: number | null): Reply =>
+const paceRead = (ms: number | null, instances: PaceInstanceProgress[]): Reply =>
   ms === null
     ? { status: 404, body: { error: "channel api/stable has no upgrade pace on its current head" } }
-    : ok({ release: "api@1.4.0", duration_ms: ms, promoted_at_ms: 1, instances: [] });
+    : ok({ release: "api@1.4.0", duration_ms: ms, promoted_at_ms: 1, instances });
 
 /** A server whose `api/stable` pace follows the writes it accepts. */
 const server = ({
@@ -54,13 +61,27 @@ const server = ({
   capabilities = ["read"],
   read,
   write,
+  reads = [[]],
+  admitted,
+  admit,
 }: Options): Routes => {
   let current = pace;
   const pending = [...writes];
+  let progress = [...reads];
   return (path, request) => {
+    if (path === ADMIT && request.method === "POST") {
+      if (admit) {
+        return admit;
+      }
+      if (admitted) {
+        progress = [admitted];
+      }
+      return ok({ version: 1, operation: "channel_admit", message: "instance admitted" });
+    }
     if (PACE.test(path)) {
       if (request.method !== "POST") {
-        return read ?? paceRead(current);
+        const instances = progress.length > 1 ? (progress.shift() ?? []) : (progress[0] ?? []);
+        return read ?? paceRead(current, instances);
       }
       if (write) {
         return write;
@@ -261,5 +282,257 @@ test.describe("channel upgrade pace on a phone", () => {
     expect(await page.locator("body").textContent()).not.toMatch(
       /\bADR\b|#\d+|HTTP \d{3}|\/v1\/|\bat \w+ \(|Error:|—/,
     );
+  });
+});
+
+// Server times: Wed 15 Nov 2023 02:00 and 04:00 UTC.
+const T1 = 1_700_013_600_000;
+const T2 = T1 + 7_200_000;
+const STARTED: PaceInstanceProgress = { environment: "canary", instance: "api", state: "started" };
+const WAITING: PaceInstanceProgress = {
+  environment: "stage",
+  instance: "api",
+  state: "waiting",
+  eligible_at_ms: T1,
+};
+const PAUSED: PaceInstanceProgress = {
+  environment: "prod",
+  instance: "api",
+  state: "paused",
+  eligible_at_ms: T2,
+  next_opens_at_ms: T1,
+};
+const EARLY = { action: "admit", actor: "alice", reason: "canary host", at: T1 };
+const ADMITTED: PaceInstanceProgress = {
+  environment: "stage",
+  instance: "api",
+  state: "admitted",
+  early_admission: EARLY,
+};
+
+const progressLine = (page: Page) => section(page).getByText(/^api@1\.4\.0: /);
+const rows = (page: Page) =>
+  section(page).getByRole("table", { name: "Instances" }).locator("tbody tr");
+
+const openProgress = async (page: Page, app: MockBackend) => {
+  await openPace(page, app);
+  await expect(value(page)).toHaveText("2h");
+};
+
+const admitTo = async (page: Page, instance: string, reason: string) => {
+  await section(page).getByRole("combobox", { name: "Instance" }).selectOption(instance);
+  await section(page).getByRole("textbox", { name: "Reason" }).fill(reason);
+  await section(page).getByRole("button", { name: "Admit early" }).click();
+  await section(page)
+    .getByRole("button", { name: `Admit ${instance} early: ${reason}` })
+    .click();
+};
+
+test.describe("channel upgrade pacing progress", () => {
+  test.use({ viewport: { width: 1280, height: 800 }, timezoneId: "UTC" });
+  let app: MockBackend;
+  test.afterEach(async () => {
+    await app.close();
+  });
+
+  test("in progress shows server eligible times, windows, and early admissions", async ({
+    page,
+  }) => {
+    app = await serveConsole(
+      server({
+        pace: 7_200_000,
+        reads: [
+          [
+            STARTED,
+            WAITING,
+            PAUSED,
+            { ...ADMITTED, environment: "edge", state: "paused", next_opens_at_ms: T2 },
+          ],
+        ],
+      }),
+    );
+    await openProgress(page, app);
+    await expect(progressLine(page)).toHaveText("api@1.4.0: in progress, 1 of 4 started");
+    await expect(rows(page)).toHaveText([
+      /^canary\/apistarted$/,
+      /^stage\/apiwaitingWed 15 Nov 02:00$/,
+      /^prod\/apipausedWed 15 Nov 04:00window opens Wed 15 Nov 02:00$/,
+      /^edge\/apipausedunknownwindow opens Wed 15 Nov 04:00; admitted early by alice: canary host$/,
+    ]);
+    await expect(section(page)).toContainText("Rollbacks and recall removals are never paced.");
+    await page.screenshot({
+      path: test.info().outputPath("progress-in-progress.png"),
+      fullPage: true,
+    });
+    await expectDesignRules(page);
+  });
+
+  test("paused by window when every pending instance waits on a closed window", async ({
+    page,
+  }) => {
+    app = await serveConsole(server({ pace: 7_200_000, reads: [[STARTED, PAUSED]] }));
+    await openProgress(page, app);
+    await expect(progressLine(page)).toHaveText(
+      "api@1.4.0: paused by maintenance window, 1 of 2 started",
+    );
+    await page.screenshot({ path: test.info().outputPath("progress-paused.png"), fullPage: true });
+    await expectDesignRules(page);
+  });
+
+  test("complete offers nothing to admit", async ({ page }) => {
+    app = await serveConsole(
+      server({ pace: 7_200_000, capabilities: MANAGER, reads: [[STARTED, STARTED]] }),
+    );
+    await openProgress(page, app);
+    await expect(progressLine(page)).toHaveText("api@1.4.0: complete, 2 of 2 started");
+    await page.waitForLoadState("networkidle");
+    await expect(section(page).getByRole("button", { name: "Admit early" })).toHaveCount(0);
+    await page.screenshot({
+      path: test.info().outputPath("progress-complete.png"),
+      fullPage: true,
+    });
+    await expectDesignRules(page);
+  });
+
+  test("shows progress without admission when not permitted", async ({ page }) => {
+    app = await serveConsole(server({ pace: 7_200_000, reads: [[WAITING, PAUSED]] }));
+    await openProgress(page, app);
+    await expect(rows(page)).toHaveCount(2);
+    await page.waitForLoadState("networkidle");
+    await expect(section(page).getByRole("button")).toHaveCount(0);
+    await expect(section(page).getByRole("textbox")).toHaveCount(0);
+    await page.screenshot({
+      path: test.info().outputPath("progress-no-permission.png"),
+      fullPage: true,
+    });
+    await expectDesignRules(page);
+  });
+
+  test("admits one instance with a reason, then reads progress again", async ({ page }) => {
+    app = await serveConsole(
+      server({
+        pace: 7_200_000,
+        capabilities: MANAGER,
+        reads: [[STARTED, WAITING, PAUSED]],
+        admitted: [STARTED, ADMITTED, PAUSED],
+      }),
+    );
+    const bodies: unknown[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "POST") {
+        bodies.push(request.postDataJSON());
+      }
+    });
+    await openProgress(page, app);
+    await expect(
+      section(page).getByRole("combobox", { name: "Instance" }).locator("option"),
+    ).toHaveText(["Instance", "stage/api", "prod/api"]);
+    await section(page).getByRole("combobox", { name: "Instance" }).selectOption("stage/api");
+    await expect(section(page).getByRole("button", { name: "Admit early" })).toBeDisabled();
+    await admitTo(page, "stage/api", "canary host");
+    await expect(section(page).getByRole("status")).toHaveText(
+      "stage/api admitted early and audited.",
+    );
+    await expect(rows(page).nth(1)).toHaveText(/admitted early by alice: canary host$/);
+    expect(posts(app)).toEqual([ADMIT]);
+    expect(bodies).toEqual([
+      {
+        version: 1,
+        operation: "channel_admit",
+        environment: "stage",
+        instance: "api",
+        reason: "canary host",
+      },
+    ]);
+    await page.screenshot({
+      path: test.info().outputPath("progress-admitted.png"),
+      fullPage: true,
+    });
+    await expectDesignRules(page);
+  });
+
+  test("an admit refusal shows fixed copy", async ({ page }) => {
+    app = await serveConsole(
+      server({
+        pace: 7_200_000,
+        capabilities: MANAGER,
+        reads: [[WAITING]],
+        admit: { status: 409, body: { error: "internal detail at store.rs:42" } },
+      }),
+    );
+    await openProgress(page, app);
+    await admitTo(page, "stage/api", "canary host");
+    await expect(section(page).getByRole("alert")).toHaveText("Admission refused.");
+    await expectDesignRules(page);
+  });
+
+  test("a lost admit response reads as unknown and is sent once", async ({ page }) => {
+    app = await serveConsole(
+      server({ pace: 7_200_000, capabilities: MANAGER, reads: [[WAITING]] }),
+    );
+    let attempts = 0;
+    await page.route("**/admit", async (route) => {
+      attempts += 1;
+      return route.abort("connectionreset");
+    });
+    await openProgress(page, app);
+    await admitTo(page, "stage/api", "canary host");
+    await expect(section(page).getByRole("status")).toHaveText(/outcome is unknown/);
+    await page.waitForLoadState("networkidle");
+    expect(attempts).toBe(1);
+    expect(posts(app)).toEqual([]);
+    await expect(rows(page)).toHaveText([/^stage\/apiwaiting/]);
+    await page.screenshot({ path: test.info().outputPath("progress-lost.png"), fullPage: true });
+    await expectDesignRules(page);
+  });
+
+  test("reads progress again after a minute, not every second", async ({ page }) => {
+    await page.clock.install({ time: T1 - 3_600_000 });
+    app = await serveConsole(
+      server({
+        pace: 7_200_000,
+        reads: [
+          [STARTED, WAITING],
+          [STARTED, STARTED],
+        ],
+      }),
+    );
+    await openProgress(page, app);
+    await expect(progressLine(page)).toHaveText("api@1.4.0: in progress, 1 of 2 started");
+    await page.waitForLoadState("networkidle");
+    const reads = () => app.sent.filter((sent) => PACE.test(sent.path)).length;
+    expect(reads()).toBe(1);
+    await page.clock.runFor(30_000);
+    await page.waitForLoadState("networkidle");
+    expect(reads()).toBe(1);
+    await page.clock.runFor(30_000);
+    await expect(progressLine(page)).toHaveText("api@1.4.0: complete, 2 of 2 started");
+    expect(reads()).toBe(2);
+    await page.clock.runFor(120_000);
+    await page.waitForLoadState("networkidle");
+    expect(reads()).toBe(2);
+  });
+});
+
+test.describe("channel upgrade pacing progress on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 }, timezoneId: "UTC" });
+  let app: MockBackend;
+  test.afterEach(async () => {
+    await app.close();
+  });
+
+  test("keeps progress and admission inside the viewport", async ({ page }) => {
+    app = await serveConsole(
+      server({
+        pace: 7_200_000,
+        capabilities: MANAGER,
+        reads: [[STARTED, WAITING, { ...PAUSED, early_admission: EARLY }]],
+      }),
+    );
+    await openProgress(page, app);
+    await expect(rows(page)).toHaveCount(3);
+    const box = await section(page).boundingBox();
+    expect(box && box.x >= 0 && box.x + box.width <= 390).toBe(true);
+    await page.screenshot({ path: test.info().outputPath("progress-phone.png"), fullPage: true });
   });
 });
