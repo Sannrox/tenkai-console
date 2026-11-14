@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai commit 9e1f8c9ddb9dbf3d660e293c59c4ba29932b7eea tenkai-http-v1.schema.json (sha256 6568bb44cbc333470df620d880fb15f225cd7bf60e50aa7b56ba545f70219896, contract tenkai.http.v1).
+// Generated from Sannrox/tenkai commit 7b055bafeca38f30c6aa7e3d44fd3cca6225d245 tenkai-http-v1.schema.json (sha256 13c6f449038273faaf1d690ecbaafc81dc60e6c48970a520f90b6dbfb856a5a0, contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -484,6 +484,7 @@ ChannelPolicyPauseRequest?: ChannelPolicyPauseRequest
 ChannelPromotionEvidence?: ChannelPromotionEvidence
 ChannelPromotionPolicyStatus?: ChannelPromotionPolicyStatus
 ChannelPromotionPolicyView?: ChannelPromotionPolicyView
+ChannelRecallRuleRequest?: ChannelRecallRuleRequest
 ChannelRemoveRequest?: ChannelRemoveRequest
 CheckpointClass?: CheckpointClass
 CheckpointDecl?: CheckpointDecl
@@ -647,6 +648,7 @@ PublishRequest?: PublishRequest
 QuorumPurpose?: QuorumPurpose
 QuorumRule?: QuorumRule
 ReachabilityVerdict?: ReachabilityVerdict
+RecallEnvironmentRemoval?: RecallEnvironmentRemoval
 RecallRangeCloseRequest?: RecallRangeCloseRequest
 RecallRangePage?: RecallRangePage
 RecallRangeRequest?: RecallRangeRequest
@@ -712,6 +714,7 @@ UnsubscribeRequest?: UnsubscribeRequest
 WaiverCategory?: WaiverCategory
 WaiverScopeKind?: WaiverScopeKind
 WebhookDelivery?: WebhookDelivery
+WebhookDeliveryPage?: WebhookDeliveryPage
 WebhookEndpoint?: WebhookEndpoint
 WebhookEvent?: WebhookEvent
 }
@@ -1434,6 +1437,28 @@ source_channel: string
  */
 state: string
 target_channel: string
+}
+/**
+ * Body of `PUT /v1/products/{product}/channels/{channel}/policy`: replace the
+ * active promotion policy's recall rule. `expected_generation` is the policy
+ * version the caller read; another version is refused.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ChannelRecallRuleRequest".
+ */
+export interface ChannelRecallRuleRequest {
+expected_generation: number
+/**
+ * Maximum share of soak time with any replica failing (0.0–1.0).
+ */
+failing_max_share: number
+operation: string
+/**
+ * When true, exceeding `failing_max_share` recalls the soaking release.
+ */
+recall_on_failing: boolean
+soak_duration_ms: number
+version: number
 }
 /**
  * Body of `POST /v1/products/{product}/channels/{channel}/remove`.
@@ -4106,6 +4131,20 @@ manifest_digest: string
 provenance: Provenance
 }
 /**
+ * Removal of a recalled release from one environment: `done` of `total`
+ * instances have moved off it. `total` counts the instances holding it when
+ * it was recalled plus any still holding it now; recalls recorded without
+ * that snapshot count only the current holders.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RecallEnvironmentRemoval".
+ */
+export interface RecallEnvironmentRemoval {
+done: number
+environment: string
+total: number
+}
+/**
  * Body of `POST /v1/products/{product}/recall-range/close`.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -4185,6 +4224,19 @@ version: number
 export interface RecallView {
 covers_future: boolean
 failing_instances?: string[]
+/**
+ * The policy's `failing_max_share` threshold that `failing_share` exceeded.
+ */
+failing_max_share?: number
+/**
+ * Share of soak time with any replica failing that tripped the recall.
+ */
+failing_share?: number
+/**
+ * Share of soak time with every replica healthy when a promotion policy
+ * recalled the release. Omitted for other recalls.
+ */
+healthy_share?: number
 policy_id?: string
 policy_version?: string
 principal_kind?: string
@@ -4193,6 +4245,10 @@ reason?: string
 recalled_at?: number
 recalled_by?: string
 release: string
+/**
+ * Per-environment removal counts, sorted by environment.
+ */
+removal_environments?: RecallEnvironmentRemoval[]
 removal_progress?: RecallRemovalProgress[]
 }
 /**
@@ -4958,6 +5014,17 @@ sources?: DeliverySource[]
  */
 state: string
 url: string
+}
+/**
+ * One page of webhook deliveries, newest recorded first across every kind
+ * and scope read. Follow `next_cursor` until it is omitted.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "WebhookDeliveryPage".
+ */
+export interface WebhookDeliveryPage {
+items: WebhookDelivery[]
+next_cursor?: string
 }
 
 export const TENKAI_CONTRACT = "tenkai.http.v1";

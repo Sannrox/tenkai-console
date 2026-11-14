@@ -8,6 +8,11 @@ import { failedLoad, type Load } from "./owners";
 // the covering range, and every instance still running the release. Older
 // servers only accept POST on that path and answer 405; a newer server
 // answers 404 for a release that is not recalled.
+//
+// Since Tenkai #1287 a policy recall also carries the measured shares and the
+// threshold they exceeded, and every recall reports `done` of `total`
+// instances per environment. Recalls recorded before that omit the shares and
+// count only current holders, so their `done` is always 0.
 
 const Removal = type({
   environment: "string",
@@ -28,6 +33,10 @@ const RecallView = type({
   "failing_instances?": "string[]",
   "range?": "string",
   "removal_progress?": Removal.array(),
+  "healthy_share?": "number",
+  "failing_share?": "number",
+  "failing_max_share?": "number",
+  "removal_environments?": type({ environment: "string", done: "number", total: "number" }).array(),
 });
 
 export type RecallView = typeof RecallView.infer;
@@ -75,15 +84,66 @@ export const recallRange = (view: RecallView): { text: string; future: boolean }
       ? { text: `${view.range} · open, covers future releases`, future: true }
       : { text: `${view.range} · closed`, future: false };
 
-export type RemovalRow = { environment: string; instances: string[] };
+/** A 0..1 share as a percent with at most one decimal, so 5.1% never reads as 5%. */
+export const percent = (value: number): string => `${Number((value * 100).toFixed(1))}%`;
 
-/** Instances still running the release, grouped per environment in server order. */
+/**
+ * A policy recall the server reads back without shares while it does report
+ * per-environment removal: recorded before shares and the holder snapshot
+ * existed, so its removal counts start at the current holders. An older
+ * server reports neither field and is not this case.
+ */
+export const recordedBeforeMeasures = (view: RecallView): boolean =>
+  view.policy_id !== undefined &&
+  view.healthy_share === undefined &&
+  view.failing_share === undefined &&
+  view.removal_environments !== undefined;
+
+/** The measured shares as one line, or undefined when the recall carries none. */
+export const measuredShares = (view: RecallView): string | undefined => {
+  const parts = [
+    view.healthy_share !== undefined && `healthy ${percent(view.healthy_share)}`,
+    view.failing_share !== undefined && `failing ${percent(view.failing_share)}`,
+  ].filter(Boolean);
+  return parts.length === 0 ? undefined : parts.join(" · ");
+};
+
+/**
+ * One environment's removal: the instances still running the release and,
+ * when the server counts them, `done` of `total`.
+ */
+export type RemovalRow = {
+  environment: string;
+  instances: string[];
+  counts?: { done: number; total: number };
+};
+
+/**
+ * Removal per environment: every counted environment in server order, then
+ * any other environment with instances still running the release.
+ */
 export const removalByEnvironment = (view: RecallView): RemovalRow[] => {
-  const rows = new Map<string, string[]>();
+  const rows = new Map<string, RemovalRow>();
+  for (const { environment, done, total } of view.removal_environments ?? []) {
+    rows.set(environment, { environment, instances: [], counts: { done, total } });
+  }
   for (const entry of view.removal_progress ?? []) {
     if (entry.remaining) {
-      rows.set(entry.environment, [...(rows.get(entry.environment) ?? []), entry.instance]);
+      const row = rows.get(entry.environment) ?? { environment: entry.environment, instances: [] };
+      rows.set(entry.environment, { ...row, instances: [...row.instances, entry.instance] });
     }
   }
-  return [...rows].map(([environment, instances]) => ({ environment, instances }));
+  return [...rows.values()];
 };
+
+/** `done` of `total` summed over the counted environments, undefined when none is counted. */
+export const removalTotals = (rows: RemovalRow[]): { done: number; total: number } | undefined =>
+  rows.some((row) => row.counts)
+    ? rows.reduce(
+        (sum, { counts }) => ({
+          done: sum.done + (counts?.done ?? 0),
+          total: sum.total + (counts?.total ?? 0),
+        }),
+        { done: 0, total: 0 },
+      )
+    : undefined;

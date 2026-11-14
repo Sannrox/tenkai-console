@@ -6,11 +6,16 @@ import {
   evidenceLine,
   fetchPolicyView,
   pauseBody,
+  parseRecallRule,
   pauseOutcome,
   policyPath,
   promotedBy,
   promotionPolicies,
   recallRule,
+  recallRuleBody,
+  recallRuleInput,
+  recallRuleLine,
+  recallRuleOutcome,
   resetCause,
   soakLine,
 } from "./promotion-policies";
@@ -160,5 +165,75 @@ describe("pauseOutcome", () => {
     });
     expect(pauseOutcome("resume", new ApiError(409, "secret detail")).text).toBe("Resume refused.");
     expect(pauseOutcome("pause", undefined)).toEqual({ tone: "ok", text: "Paused and audited." });
+  });
+});
+
+describe("recall rule edit", () => {
+  it("starts from the rule the policy holds", () => {
+    expect(recallRuleInput(view({}))).toEqual({ soak: "1h", failingMax: "0.05", recall: false });
+    expect(
+      recallRuleInput(view({ soak_duration_ms: 90_000, evidence: { recall_on_failing: true } })),
+    ).toEqual({ soak: "90s", failingMax: "0", recall: true });
+  });
+
+  it("checks shape only: a whole duration with a unit and a share from 0 to 1", () => {
+    const rule = (soak: string, failingMax: string) =>
+      parseRecallRule({ soak, failingMax, recall: true });
+    expect(rule(" 90m ", "0.1")).toEqual({
+      soak_duration_ms: 5_400_000,
+      failing_max_share: 0.1,
+      recall_on_failing: true,
+    });
+    expect(rule("2d", "1")?.soak_duration_ms).toBe(172_800_000);
+    expect(rule("0s", "0")?.soak_duration_ms).toBe(0);
+    for (const [soak, share] of [
+      ["1h", ""],
+      ["1h", "1.5"],
+      ["1h", "-0.1"],
+      ["1h", "5%"],
+      ["1h", "0x1"],
+      ["1h", "1e-1"],
+      ["1.5h", "0.1"],
+      ["60", "0.1"],
+      ["-1h", "0.1"],
+      ["99999999999999999d", "0.1"],
+    ]) {
+      expect(rule(soak ?? "", share ?? "")).toBeUndefined();
+    }
+  });
+
+  it("fences the body by the policy version read and previews it", () => {
+    const rule = { soak_duration_ms: 3_600_000, failing_max_share: 0.05, recall_on_failing: true };
+    expect(recallRuleBody(3, rule)).toEqual({
+      version: 1,
+      operation: "channel_configure",
+      expected_generation: 3,
+      soak_duration_ms: 3_600_000,
+      failing_max_share: 0.05,
+      recall_on_failing: true,
+    });
+    expect(recallRuleLine(rule)).toBe("soak 1h, recall when failing > 0.05");
+    expect(recallRuleLine({ ...rule, recall_on_failing: false })).toBe(
+      "soak 1h, reset only when failing > 0.05",
+    );
+  });
+
+  it("reads a lost answer as unknown, 409 as stale, and hides refusal text", () => {
+    expect(recallRuleOutcome(new TypeError("network")).tone).toBe("unknown");
+    expect(recallRuleOutcome(new ApiError(503, "x")).tone).toBe("unknown");
+    expect(recallRuleOutcome(new ApiError(409, "secret detail"))).toEqual({
+      tone: "bad",
+      text: "The policy changed since you read it. Nothing was set; reload and check it.",
+      stale: true,
+    });
+    expect(recallRuleOutcome(new ApiError(403, "secret detail")).text).toBe("Not permitted.");
+    expect(recallRuleOutcome(new ApiError(405, "x")).text).toBe(
+      "This server cannot edit the recall rule.",
+    );
+    expect(recallRuleOutcome(new ApiError(400, "secret detail")).text).toBe("Recall rule refused.");
+    expect(recallRuleOutcome(undefined)).toEqual({
+      tone: "ok",
+      text: "Recall rule set and audited.",
+    });
   });
 });

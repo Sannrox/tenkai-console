@@ -7,18 +7,27 @@ import {
   at,
   evidenceLine,
   fetchPolicyView,
+  parseRecallRule,
   pauseBody,
   pauseOutcome,
   policyPath,
   promotedBy,
   recallRule,
+  recallRuleBody,
+  recallRuleInput,
+  recallRuleLine,
+  recallRuleOutcome,
   resetCause,
   share,
   soakLine,
   type PolicyView,
+  type RecallRule,
 } from "../delivery/promotion-policies";
 import { useManagementCall } from "../management/use-management";
-import { Card, ConfirmButton, Notice } from "../ui/kit";
+import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
+
+const field =
+  "min-w-0 rounded-md border border-field bg-white/4 px-2.5 py-1.5 font-mono text-xs text-fg placeholder:text-muted";
 
 const LOAD_TEXT = {
   unavailable: "This server does not report policy detail.",
@@ -28,11 +37,11 @@ const LOAD_TEXT = {
 const message = (result: ManagementLifecycleResult) => result.message;
 
 /**
- * One promotion policy: rules, pause actor, and the soaking release. Pause
- * and resume are catalog-wide management writes, offered only when
- * `/v1/auth/me` grants management and no credential refusal hid them. Each
- * confirmed click is one request; a lost answer reads as unknown and is
- * never resent.
+ * One promotion policy: rules, pause actor, and the soaking release. Pause,
+ * resume, and the recall rule edit are catalog-wide management writes,
+ * offered only when `/v1/auth/me` grants management and no credential
+ * refusal hid them. Each confirmed click is one request; a lost answer reads
+ * as unknown and is never resent.
  */
 export const PolicyDetail = ({
   token,
@@ -77,6 +86,15 @@ export const PolicyDetail = ({
               />
             </div>
           )}
+          {permitted && (
+            <RecallRuleEdit
+              token={token}
+              product={product}
+              channel={channel}
+              view={load.value}
+              reload={() => void query.refetch()}
+            />
+          )}
         </Card>
       ) : (
         <p className="m-0 text-xs text-muted">
@@ -89,6 +107,113 @@ export const PolicyDetail = ({
         </div>
       )}
     </section>
+  );
+};
+
+/**
+ * Edit the recall rule, fenced by the policy version on screen: the server
+ * refuses another version with 409 rather than merging. Every settled write
+ * reads the policy again, and the form restarts from the version read.
+ */
+const RecallRuleEdit = ({
+  token,
+  product,
+  channel,
+  view,
+  reload,
+}: {
+  token: string;
+  product: string;
+  channel: string;
+  view: PolicyView;
+  reload: () => void;
+}) => {
+  const call = useManagementCall(token, "fleet", "management", message);
+  const outcome = call.isSuccess
+    ? recallRuleOutcome(undefined)
+    : call.error
+      ? recallRuleOutcome(call.error)
+      : undefined;
+  return (
+    <div aria-label="Recall rule" role="group" className="mt-2 grid gap-2">
+      <RecallRuleForm
+        key={view.policy_version}
+        view={view}
+        name={`${product} ${channel}`}
+        pending={call.isPending}
+        send={(rule) =>
+          call.mutate({
+            path: policyPath(product, channel),
+            method: "PUT",
+            body: recallRuleBody(view.policy_version, rule),
+          })
+        }
+      />
+      {outcome && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Notice tone={outcome.tone}>{outcome.text}</Notice>
+          {outcome.stale && <Button onClick={reload}>Reload</Button>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const RecallRuleForm = ({
+  view,
+  name,
+  pending,
+  send,
+}: {
+  view: PolicyView;
+  name: string;
+  pending: boolean;
+  send: (rule: RecallRule) => void;
+}) => {
+  const [input, setInput] = useState(() => recallRuleInput(view));
+  const rule = parseRecallRule(input);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <label className="flex items-center gap-1.5">
+        <span className="text-muted">Minimum soak</span>
+        <input
+          aria-label="Minimum soak"
+          placeholder="1h"
+          value={input.soak}
+          onChange={(event) => setInput({ ...input, soak: event.target.value })}
+          className={`${field} w-20`}
+        />
+      </label>
+      <label className="flex items-center gap-1.5">
+        <span className="text-muted">Failing max, 0 to 1</span>
+        <input
+          aria-label="Failing max share"
+          placeholder="0.05"
+          inputMode="decimal"
+          value={input.failingMax}
+          onChange={(event) => setInput({ ...input, failingMax: event.target.value })}
+          className={`${field} w-20`}
+        />
+      </label>
+      <label className="flex items-center gap-1.5">
+        <input
+          type="checkbox"
+          checked={input.recall}
+          onChange={(event) => setInput({ ...input, recall: event.target.checked })}
+        />
+        <span>Recall on failing</span>
+      </label>
+      <ConfirmButton
+        label="Set recall rule"
+        confirm={`Set ${name} v${view.policy_version}: ${rule ? recallRuleLine(rule) : ""}`}
+        disabled={rule === undefined || pending}
+        onConfirm={() => {
+          if (rule !== undefined) {
+            send(rule);
+          }
+        }}
+      />
+    </div>
   );
 };
 

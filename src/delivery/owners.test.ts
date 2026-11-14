@@ -92,6 +92,21 @@ describe("fetchProductDeliveries", () => {
     ]);
   });
 
+  // Since Tenkai #1327 the list is a page; older servers send a bare array.
+  it("reads the first page of a paged list", async () => {
+    const load = await fetchProductDeliveries(
+      "api",
+      "t",
+      answering(200, { items: [RETRYING], next_cursor: "c2" }),
+    );
+    expect(load.kind === "ok" ? load.value.map((delivery) => delivery.id) : load).toStrictEqual([
+      RETRYING.id,
+    ]);
+    expect(await fetchProductDeliveries("api", "t", answering(200, { items: [{}] }))).toStrictEqual(
+      { kind: "error", message: "Could not load" },
+    );
+  });
+
   it("reads an older server as unavailable and 403 as no access", async () => {
     expect(await fetchProductDeliveries("api", "t", answering(404, {}))).toStrictEqual({
       kind: "unavailable",
