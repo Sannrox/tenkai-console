@@ -184,4 +184,29 @@ describe("fetchStatus", () => {
       ),
     ).resolves.toEqual({ kind: "ok", value: [{ product: "api", certificate: null }] });
   });
+
+  it("keeps health and checks, including a state this build does not know", async () => {
+    const checks = [
+      { name: "disk", state: "failing", message: "97% full" },
+      { name: "queue", state: "draining" },
+    ];
+    await expect(
+      fetchStatus(
+        "prod",
+        "t",
+        answering(200, [
+          {
+            product: "api",
+            channel: "stable",
+            head: "1",
+            health: "unhealthy",
+            health_checks: checks,
+          },
+        ]),
+      ),
+    ).resolves.toEqual({
+      kind: "ok",
+      value: [{ product: "api", health: "unhealthy", health_checks: checks }],
+    });
+  });
 });

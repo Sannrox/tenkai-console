@@ -1,4 +1,4 @@
-import type { HealthTone } from "./instances";
+import type { HealthCheck, HealthTone } from "./instances";
 
 // `GET /v1/environments/{environment}/status` `StatusRow.certificate`
 // (Tenkai #1072 / #1167). The pinned contract predates the field, so the
@@ -27,10 +27,14 @@ export type CertificateStatus = {
   renewal_failure?: string;
 };
 
+/** Status fields the console reads: identity, and live health with its checks (Tenkai #1057). */
 export type StatusRow = {
   product: string;
   instance?: string;
   certificate?: CertificateStatus | null;
+  health?: string | null;
+  error?: string | null;
+  health_checks?: HealthCheck[];
 };
 
 export type StatusLoad =

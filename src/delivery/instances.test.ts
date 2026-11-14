@@ -3,7 +3,9 @@ import {
   bindingRows,
   grantRows,
   healthByInstance,
+  healthRollup,
   instanceHealth,
+  instanceHealthView,
   instanceName,
 } from "./instances";
 
@@ -118,6 +120,56 @@ describe("instanceHealth", () => {
         health: "error",
       }),
     ).toEqual({ label: "error", tone: "bad" });
+  });
+});
+
+describe("instanceHealthView", () => {
+  it("raises healthy to the worst check, and the truncation check is a plain warning", () => {
+    expect(
+      instanceHealthView({
+        health: "healthy",
+        health_checks: [{ name: "truncated", state: "warning", message: "output truncated" }],
+      }),
+    ).toEqual({
+      label: "warning",
+      tone: "warn",
+      checks: [{ name: "truncated", state: "warning", message: "output truncated", tone: "warn" }],
+    });
+  });
+
+  it("names a failing instance and lists its checks worst first", () => {
+    const view = instanceHealthView({
+      health: "unhealthy",
+      health_checks: [
+        { name: "cert", state: "warning", message: "expires soon" },
+        { name: "disk", state: "failing", message: "97% full" },
+      ],
+    });
+    expect(view.label).toBe("failing");
+    expect(view.tone).toBe("bad");
+    expect(view.checks.map((check) => check.name)).toEqual(["disk", "cert"]);
+  });
+
+  it("keeps a stale report unknown, never healthy", () => {
+    expect(instanceHealthView({ health: "unknown" })).toEqual({
+      label: "unknown",
+      tone: "bad",
+      checks: [],
+    });
+  });
+});
+
+describe("healthRollup", () => {
+  it("counts unknown apart from healthy, worst first", () => {
+    expect(
+      healthRollup([
+        { label: "healthy", tone: "ok" },
+        { label: "unknown", tone: "bad" },
+        { label: "healthy", tone: "ok" },
+        { label: "warning", tone: "warn" },
+      ]),
+    ).toEqual({ label: "1 unknown · 1 warning · 2 healthy", tone: "bad" });
+    expect(healthRollup([])).toEqual({ label: "none", tone: "muted" });
   });
 });
 

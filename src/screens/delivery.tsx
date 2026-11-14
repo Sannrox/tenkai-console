@@ -17,6 +17,9 @@ export const Delivery = ({
   items: FleetAttention[];
   fleet: FleetStatusReport | undefined;
 }) => {
+  // Server `unhealthy` folds in unknown health; split it so unknown stands on its own.
+  const health = (summary: string) =>
+    fleet?.environments.filter((row) => row.health_summary === summary).length ?? "·";
   if (rows.length === 0) {
     return (
       <p className="m-0 text-xs text-muted">No environments yet. Add one with tenkaictl env add.</p>
@@ -58,6 +61,7 @@ export const Delivery = ({
               <th className={th}>Current</th>
               <th className={th}>Behind</th>
               <th className={th}>Unhealthy</th>
+              <th className={th}>Unknown</th>
               <th className={th}>Empty</th>
             </tr>
           </thead>
@@ -66,7 +70,8 @@ export const Delivery = ({
               <td className={`${td} font-semibold`}>{fleet?.environment_count ?? rows.length}</td>
               <td className={`${td} text-ok`}>{fleet?.environments_current ?? "·"}</td>
               <td className={`${td} text-warning`}>{fleet?.environments_behind ?? "·"}</td>
-              <td className={`${td} text-danger`}>{fleet?.environments_unhealthy ?? "·"}</td>
+              <td className={`${td} text-danger`}>{health("error")}</td>
+              <td className={`${td} text-warning`}>{health("unknown")}</td>
               <td className={td}>{fleet?.environments_empty ?? "·"}</td>
             </tr>
           </tbody>

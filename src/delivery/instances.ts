@@ -20,11 +20,21 @@ export type HealthTone = "ok" | "warn" | "bad" | "muted";
 
 export type InstanceHealth = { label: string; tone: HealthTone };
 
-/** Reported instance health; missing on older inspect bodies is `n/a`. */
-export const instanceHealth = (subscription: InstanceSubscription): InstanceHealth => {
-  const health = subscription.health?.trim() ?? "";
-  if (health === "ok") {
-    return { label: "ok", tone: "ok" };
+/**
+ * Reported instance health; missing on older bodies is `n/a`.
+ * `unhealthy` is the serving label for a failing observation; a stale
+ * observation is already `unknown` on the server, never healthy.
+ */
+const reportedHealth = (
+  reported: string | null | undefined,
+  error: string | null | undefined,
+): InstanceHealth => {
+  const health = reported?.trim() ?? "";
+  if (health === "ok" || health === "healthy") {
+    return { label: health, tone: "ok" };
+  }
+  if (health === "unhealthy") {
+    return { label: "failing", tone: "bad" };
   }
   if (health === "error" || health === "unknown") {
     return { label: health, tone: "bad" };
@@ -32,10 +42,102 @@ export const instanceHealth = (subscription: InstanceSubscription): InstanceHeal
   if (health !== "") {
     return { label: health, tone: "warn" };
   }
-  if ((subscription.error ?? "").trim() !== "") {
+  if ((error ?? "").trim() !== "") {
     return { label: "error", tone: "bad" };
   }
   return { label: "n/a", tone: "muted" };
+};
+
+export const instanceHealth = (subscription: InstanceSubscription): InstanceHealth =>
+  reportedHealth(subscription.health, subscription.error);
+
+/** One check from the latest health observation, as status reports it. */
+export type HealthCheck = { name: string; state: string; message?: string };
+
+export type HealthCheckView = { name: string; state: string; message: string; tone: HealthTone };
+
+export type InstanceHealthView = InstanceHealth & { checks: HealthCheckView[] };
+
+// Check states, mildest first. A state this build does not know reads as a warning.
+const CHECK_STATES = ["healthy", "repairing", "warning", "failing"];
+const checkRank = (state: string): number => {
+  const rank = CHECK_STATES.indexOf(state);
+  return rank < 0 ? 2 : rank;
+};
+const CHECK_TONE: HealthTone[] = ["ok", "warn", "warn", "bad"];
+const BASE_RANK: Record<HealthTone, number> = { muted: -1, ok: 0, warn: 2, bad: 3 };
+
+/**
+ * Instance state from a status row: the reported health, raised to the worst
+ * reported check (a `truncated` output is one more warning). `unknown` stays
+ * unknown; the server sends no checks for a stale observation.
+ */
+export const instanceHealthView = (row: {
+  health?: string | null | undefined;
+  error?: string | null | undefined;
+  health_checks?: readonly HealthCheck[] | undefined;
+}): InstanceHealthView => {
+  const checks = (row.health_checks ?? [])
+    .map((check) => ({
+      name: check.name,
+      state: check.state,
+      message: check.message?.trim() ?? "",
+      tone: CHECK_TONE[checkRank(check.state)] ?? "warn",
+    }))
+    .toSorted(
+      (left, right) =>
+        checkRank(right.state) - checkRank(left.state) || left.name.localeCompare(right.name),
+    );
+  const base = reportedHealth(row.health, row.error);
+  const worst = checks[0];
+  // `unknown` and `failing` are `bad`, which no check outranks.
+  const raise = worst !== undefined && checkRank(worst.state) > BASE_RANK[base.tone];
+  return raise ? { label: worst.state, tone: worst.tone, checks } : { ...base, checks };
+};
+
+type HealthRow = Parameters<typeof instanceHealthView>[0] & { product: string; instance?: string };
+
+/**
+ * Each subscription with its status row and health. Status carries the live
+ * checks; inspect health stands in when status is not loaded or omits the row.
+ */
+export const withHealth = <Row extends HealthRow>(
+  subscriptions: readonly InstanceSubscription[],
+  rows: readonly Row[] | undefined,
+) => {
+  const byInstance = new Map(rows?.map((row) => [row.instance?.trim() || row.product, row]));
+  return subscriptions.map((subscription) => {
+    const instance = instanceName(subscription);
+    const row = byInstance.get(instance);
+    return { subscription, instance, row, health: instanceHealthView(row ?? subscription) };
+  });
+};
+
+const TONE_ORDER: HealthTone[] = ["bad", "warn", "ok", "muted"];
+
+/**
+ * Environment roll-up of instance states, worst first: `1 failing · 2 unknown
+ * · 3 healthy`. Unknown is counted on its own, never as healthy.
+ */
+export const healthRollup = (healths: readonly InstanceHealth[]): InstanceHealth => {
+  const counts = new Map<string, InstanceHealth & { count: number }>();
+  for (const health of healths) {
+    const seen = counts.get(health.label);
+    counts.set(health.label, { ...health, count: (seen?.count ?? 0) + 1 });
+  }
+  const entries = [...counts.values()].toSorted(
+    (left, right) =>
+      TONE_ORDER.indexOf(left.tone) - TONE_ORDER.indexOf(right.tone) ||
+      left.label.localeCompare(right.label),
+  );
+  const first = entries[0];
+  if (first === undefined) {
+    return { label: "none", tone: "muted" };
+  }
+  return {
+    label: entries.map((entry) => `${entry.count} ${entry.label}`).join(" · "),
+    tone: first.tone,
+  };
 };
 
 export const healthByInstance = (

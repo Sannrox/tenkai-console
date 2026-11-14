@@ -79,7 +79,11 @@ export const useEnvironmentDependencies = (token: string | undefined, name: stri
     retry: false,
   });
 
-/** Instance status, including workload certificates when the server reports them. */
+/**
+ * Instance status: workload certificates and live health. Health turns
+ * `unknown` on the server 60s after the last observation by default, so it is
+ * reread every 30s rather than left showing an old healthy.
+ */
 export const useEnvironmentStatus = (token: string | undefined, name: string | undefined) =>
   useQuery({
     queryKey: ["status", name, token],
@@ -87,4 +91,5 @@ export const useEnvironmentStatus = (token: string | undefined, name: string | u
       import("./identity-status").then((mod) => mod.fetchStatus(name ?? "", token ?? "")),
     enabled: token !== undefined && Boolean(name),
     retry: false,
+    refetchInterval: 30_000,
   });
