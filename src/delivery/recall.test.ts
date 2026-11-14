@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { RecallView } from "../api/tenkai.gen";
-import { fetchRecall, recallActor, recallRange, removalByEnvironment } from "./recall";
+import {
+  fetchRecall,
+  measuredShares,
+  percent,
+  recallActor,
+  recallRange,
+  recordedBeforeMeasures,
+  removalByEnvironment,
+  removalTotals,
+} from "./recall";
 
 const answering =
   (status: number, body: unknown): typeof fetch =>
@@ -85,5 +94,56 @@ describe("recall lines", () => {
       { environment: "prod", instances: ["api-a", "api-b"] },
     ]);
     expect(removalByEnvironment(view({}))).toEqual([]);
+  });
+});
+
+const remaining = (environment: string, instance: string) => ({
+  environment,
+  instance,
+  deployed: "api@1.0.0",
+  remaining: true,
+});
+
+describe("measures and removal counts", () => {
+  const policy = { policy_id: "channel-promotion-policy:api/stable", policy_version: "2" };
+
+  it("shows the measured shares to a tenth of a percent", () => {
+    expect(percent(0.051)).toBe("5.1%");
+    expect(percent(1)).toBe("100%");
+    expect(measuredShares(view({ ...policy, healthy_share: 0.88, failing_share: 0.12 }))).toBe(
+      "healthy 88% · failing 12%",
+    );
+    expect(measuredShares(view({ recalled_by: "oidc:alice" }))).toBeUndefined();
+  });
+
+  // Before measures, a policy recall has counts but no shares; an older server has neither.
+  it("tells a policy recall recorded before measures from an older server and a manual recall", () => {
+    const counts = [{ environment: "lab", done: 0, total: 1 }];
+    expect(recordedBeforeMeasures(view({ ...policy, removal_environments: counts }))).toBe(true);
+    expect(recordedBeforeMeasures(view({ ...policy }))).toBe(false);
+    expect(
+      recordedBeforeMeasures(view({ ...policy, failing_share: 1, removal_environments: counts })),
+    ).toBe(false);
+    expect(recordedBeforeMeasures(view({ removal_environments: counts }))).toBe(false);
+  });
+
+  it("joins counted environments with the instances still running, and sums them", () => {
+    const rows = removalByEnvironment(
+      view({
+        removal_environments: [
+          { environment: "lab", done: 2, total: 2 },
+          { environment: "prod", done: 1, total: 3 },
+        ],
+        removal_progress: [remaining("prod", "api-b"), remaining("prod", "api-c")],
+      }),
+    );
+    expect(rows).toEqual([
+      { environment: "lab", instances: [], counts: { done: 2, total: 2 } },
+      { environment: "prod", instances: ["api-b", "api-c"], counts: { done: 1, total: 3 } },
+    ]);
+    expect(removalTotals(rows)).toEqual({ done: 3, total: 5 });
+    expect(
+      removalTotals(removalByEnvironment(view({ removal_progress: [remaining("a", "b")] }))),
+    ).toBeUndefined();
   });
 });

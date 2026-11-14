@@ -60,13 +60,16 @@ const readDeliveries = async (
   } catch (error) {
     return failedLoad(error);
   }
-  const value = WebhookDelivery.array()(raw);
+  // Tenkai #1327 pages the lists as `{items, next_cursor}`, newest first;
+  // older servers answer a bare array. The console reads the first page.
+  const items = typeof raw === "object" && raw !== null && "items" in raw ? raw.items : raw;
+  const value = WebhookDelivery.array()(items);
   return value instanceof type.errors
     ? { kind: "error", message: "Could not load" }
     : { kind: "ok", value };
 };
 
-/** `GET /v1/environments/{environment}/webhooks/deliveries`, newest first per kind. */
+/** `GET /v1/environments/{environment}/webhooks/deliveries`, the newest page. */
 export const fetchDeliveries = (
   environment: string,
   token: string,

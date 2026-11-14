@@ -1,7 +1,8 @@
 import { type } from "arktype";
 import { ApiError, request } from "../api/http";
-import type { ChannelPolicyPauseRequest } from "../api/tenkai.gen";
+import type { ChannelPolicyPauseRequest, ChannelRecallRuleRequest } from "../api/tenkai.gen";
 import { ageMs } from "./exposure";
+import { graceWindow } from "./grace";
 import { failedLoad, type Load } from "./owners";
 
 // `FleetStatusReport.promotion_policies` (Tenkai #899), read-only. The server
@@ -203,4 +204,100 @@ export const pauseOutcome = (
     return { tone: "bad", text: "This server cannot pause policies." };
   }
   return { tone: "bad", text: `${verb === "pause" ? "Pause" : "Resume"} refused.` };
+};
+
+// Recall rule write (Tenkai #1287): `PUT .../channels/{channel}/policy`
+// replaces soak, failing threshold, and recall-on-failing, keeping the rest of
+// the policy and its pause. It is fenced by the policy version the operator
+// read; another version is refused with 409, never merged.
+
+export type RecallRuleInput = { soak: string; failingMax: string; recall: boolean };
+
+export type RecallRule = Pick<
+  ChannelRecallRuleRequest,
+  "soak_duration_ms" | "failing_max_share" | "recall_on_failing"
+>;
+
+const SOAK = /^(\d+)(ms|d|h|m|s)$/;
+const SHARE = /^(?:\d+\.?\d*|\.\d+)$/;
+const SOAK_UNIT_MS: Record<string, number> = {
+  ms: 1,
+  s: 1_000,
+  m: 60_000,
+  h: 3_600_000,
+  d: 86_400_000,
+};
+
+/** The form's starting values: the rule as the policy holds it now. */
+export const recallRuleInput = (view: PolicyView): RecallRuleInput => ({
+  soak: graceWindow(view.soak_duration_ms),
+  failingMax: String(view.evidence.failing_max_share ?? 0),
+  recall: view.evidence.recall_on_failing === true,
+});
+
+/**
+ * The rule to send, or undefined when its shape is wrong: a whole duration
+ * with a unit (`90m`, `1h`) and a share from 0 to 1. Whether the values are
+ * acceptable is the server's call.
+ */
+export const parseRecallRule = (input: RecallRuleInput): RecallRule | undefined => {
+  const soak = SOAK.exec(input.soak.trim());
+  const failingText = input.failingMax.trim();
+  const failing = SHARE.test(failingText) ? Number(failingText) : Number.NaN;
+  const size = SOAK_UNIT_MS[soak?.[2] ?? ""];
+  if (!soak?.[1] || size === undefined || !(failing >= 0 && failing <= 1)) {
+    return undefined;
+  }
+  const ms = Number(soak[1]) * size;
+  return Number.isSafeInteger(ms)
+    ? { soak_duration_ms: ms, failing_max_share: failing, recall_on_failing: input.recall }
+    : undefined;
+};
+
+/** The PUT body, fenced by the policy version the operator read. */
+export const recallRuleBody = (
+  policyVersion: number,
+  rule: RecallRule,
+): ChannelRecallRuleRequest => ({
+  version: 1,
+  operation: "channel_configure",
+  expected_generation: policyVersion,
+  ...rule,
+});
+
+/** The rule as the confirmation names it, so the confirmation is the preview. */
+export const recallRuleLine = (rule: RecallRule): string =>
+  `soak ${graceWindow(rule.soak_duration_ms)}, ${rule.recall_on_failing ? "recall" : "reset only"} when failing > ${rule.failing_max_share}`;
+
+/**
+ * What a recall rule write answer means. No answer, or a 5xx that may have
+ * landed, is unknown; 409 is a policy that changed since it was read, to be
+ * reloaded and checked; other refusals say so without the server's text.
+ */
+export const recallRuleOutcome = (
+  error: unknown,
+): { tone: "ok" | "bad" | "unknown"; text: string; stale?: true } => {
+  if (error === undefined) {
+    return { tone: "ok", text: "Recall rule set and audited." };
+  }
+  if (!(error instanceof ApiError) || error.status >= 500) {
+    return {
+      tone: "unknown",
+      text: "No answer from the server; the outcome is unknown until the next read.",
+    };
+  }
+  if (error.status === 409) {
+    return {
+      tone: "bad",
+      text: "The policy changed since you read it. Nothing was set; reload and check it.",
+      stale: true,
+    };
+  }
+  if (error.status === 403) {
+    return { tone: "bad", text: "Not permitted." };
+  }
+  if (error.status === 404 || error.status === 405) {
+    return { tone: "bad", text: "This server cannot edit the recall rule." };
+  }
+  return { tone: "bad", text: "Recall rule refused." };
 };
