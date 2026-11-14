@@ -78,8 +78,8 @@ flowchart LR
 ```
 
 `api/tenkai-http-v1.schema.json` is Tenkai's published HTTP contract,
-vendored from a signed Tenkai release and pinned by tag and SHA-256 in
-`api/tenkai.pin`; `src/api/tenkai.gen.ts` is generated from it, and server
+vendored from a signed Tenkai release (or a Tenkai `main` commit ahead of
+one) and pinned by ref and SHA-256 in `api/tenkai.pin`; `src/api/tenkai.gen.ts` is generated from it, and server
 responses are validated at runtime. At startup the console requires
 `/healthz` to list the contract it was built for and shows "server too old"
 otherwise. A management action whose response is lost reads as unknown, never
@@ -149,14 +149,21 @@ forward command next to the token form.
 ## API types
 
 `api/tenkai-http-v1.schema.json` is Tenkai's published HTTP contract, vendored
-from a signed Tenkai release. `api/tenkai.pin` records the release tag and the
-schema's SHA-256 (`<vX.Y.Z> <sha256>`). `src/api/tenkai.gen.ts` is generated
-from it.
+from a signed Tenkai release. `api/tenkai.pin` records the ref and the schema's
+SHA-256 (`<ref> <sha256>`). `src/api/tenkai.gen.ts` is generated from it.
+
+Console screens for a Tenkai feature land before the Tenkai release that ships
+it, so the ref may also be a full commit on Tenkai `main`. A commit has no
+published checksum: sync requires it to be on `main` and to keep the
+`tenkai.http.v1` contract id, and the runtime `/healthz` check still guards
+version skew. Pin the release tag once it is cut.
 
 ```sh
 pnpm api:sync <vX.Y.Z>   # fetch the release schema, check SHA256SUMS, pin and regenerate
+pnpm api:sync <commit>   # vendor the schema at a full commit on tenkai main, pin and regenerate
 pnpm api:check           # CI: fail when the schema does not match the pin or types are stale
 pnpm api:drift           # scheduled: fail when the pin is behind tenkai's latest release
+                         # (a commit pin is current while it contains that release)
 ```
 
 ## Develop

@@ -1,7 +1,7 @@
 import { type } from "arktype";
 import { request } from "../api/http";
 import type {
-  ApprovalEnvelope,
+  ApprovalStatementEnvelope,
   CheckpointDecl,
   MigrationDeclaration,
   MigrationListEntry,
@@ -145,7 +145,7 @@ export const parseMigrationEvidence = (
 };
 
 /** Parse a compensating plan approval; the map key is the pending plan id. */
-export const parsePlanApproval = (text: string): ApprovalEnvelope | string => {
+export const parsePlanApproval = (text: string): ApprovalStatementEnvelope | string => {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -178,8 +178,8 @@ const optionalBackup = (digest: string): { backup_receipt_digest: string } | obj
 
 const optionalPlanApprovals = (
   pending: string | undefined,
-  envelope: ApprovalEnvelope | undefined,
-): { plan_approvals: { [k: string]: ApprovalEnvelope } } | object =>
+  envelope: ApprovalStatementEnvelope | undefined,
+): { plan_approvals: { [k: string]: ApprovalStatementEnvelope } } | object =>
   pending && envelope ? { plan_approvals: { [pending]: envelope } } : {};
 
 export const previewBody = (
@@ -200,7 +200,7 @@ export const applyBody = (
   evidence: MigrationEvidence,
   backup: string,
   pendingPlanId: string | undefined,
-  planApproval: ApprovalEnvelope | undefined,
+  planApproval: ApprovalStatementEnvelope | undefined,
 ): PackageMigrationApplyRequest => ({
   version: VERSION,
   environment,
@@ -215,7 +215,7 @@ export const mutateBody = (
   generation: number,
   evidence: MigrationEvidence,
   pendingPlanId: string | undefined,
-  planApproval: ApprovalEnvelope | undefined,
+  planApproval: ApprovalStatementEnvelope | undefined,
 ): PackageMigrationMutateRequest => ({
   version: VERSION,
   expected_generation: generation,

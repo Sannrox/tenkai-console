@@ -44,11 +44,11 @@
       "additionalProperties": false,
       "properties": {
         "approval": {
-          "$ref": "#/$defs/ApprovalEnvelope"
+          "$ref": "#/$defs/ApprovalStatementEnvelope"
         },
         "approvals": {
           "items": {
-            "$ref": "#/$defs/ApprovalEnvelope"
+            "$ref": "#/$defs/ApprovalStatementEnvelope"
           },
           "type": "array"
         },
@@ -74,7 +74,7 @@
           "type": "boolean"
         },
         "trust_roots": {
-          "$ref": "#/$defs/PlanApprovalTrustRoots"
+          "$ref": "#/$defs/TrustRoots"
         },
         "version": {
           "format": "uint32",
@@ -92,27 +92,175 @@
       ],
       "type": "object"
     },
-    "ApprovalEnvelope": {
-      "additionalProperties": false,
+    "ApplyStepResult": {
+      "description": "The result of one step of a remote apply (#1076): the same facts an\nembedded apply prints and records. Readers ignore fields they do not know.",
       "properties": {
-        "key_id": {
+        "action": {
           "type": "string"
         },
-        "schema": {
+        "attempt_id": {
+          "description": "The recorded deployment attempt (#1054), when one was recorded.",
           "type": "string"
         },
-        "signature": {
+        "cause": {
+          "$ref": "#/$defs/DeploymentCause"
+        },
+        "detail": {
+          "description": "The step's detail, cut to [`STEP_DETAIL_CHARS`].",
           "type": "string"
         },
-        "statement": {
-          "$ref": "#/$defs/ApprovalStatement"
+        "detail_truncated": {
+          "type": "boolean"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        },
+        "restored_version": {
+          "description": "The version running after a restore: the previous version of a step\nrolled back on failure, or the target of a rollback step.",
+          "type": "string"
+        },
+        "status": {
+          "description": "`succeeded`, `blocked`, `failed` or `rolled_back`.",
+          "type": "string"
+        },
+        "to_version": {
+          "type": "string"
         }
       },
       "required": [
-        "schema",
-        "key_id",
-        "statement",
-        "signature"
+        "product",
+        "instance",
+        "action",
+        "status",
+        "to_version"
+      ],
+      "type": "object"
+    },
+    "ApprovalBrief": {
+      "additionalProperties": false,
+      "description": "Bounded facts an approver reads before the full step list.",
+      "properties": {
+        "actor_chain": {
+          "items": {
+            "$ref": "#/$defs/ApprovalBriefActor"
+          },
+          "type": "array"
+        },
+        "blast_radius": {
+          "$ref": "#/$defs/ApprovalBriefBlast"
+        },
+        "changes": {
+          "$ref": "#/$defs/ApprovalBriefChanges"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "policy": {
+          "$ref": "#/$defs/ApprovalBriefPolicy"
+        },
+        "proposer": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposer",
+        "blast_radius",
+        "changes",
+        "policy"
+      ],
+      "type": "object"
+    },
+    "ApprovalBriefActor": {
+      "additionalProperties": false,
+      "description": "One actor that called on behalf of the proposer, outermost first.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "description": "`human` or `agent`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "ApprovalBriefBlast": {
+      "additionalProperties": false,
+      "description": "Environments, instances, criticality, and whether a restore pin exists.",
+      "properties": {
+        "criticality": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "instances": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rollback_available": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "environment",
+        "instances",
+        "rollback_available"
+      ],
+      "type": "object"
+    },
+    "ApprovalBriefChanges": {
+      "additionalProperties": false,
+      "description": "Counts of rendered target-change kinds plus flagged risky changes.",
+      "properties": {
+        "counts": {
+          "additionalProperties": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "risky": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ApprovalBriefPolicy": {
+      "additionalProperties": false,
+      "description": "What the live approval policy would do without a human, and the agent budget.",
+      "properties": {
+        "budget": {
+          "description": "`inside`, `over`, or `not_configured`.",
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "without_human": {
+          "description": "`auto` or `require_human`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "without_human",
+        "budget"
       ],
       "type": "object"
     },
@@ -162,54 +310,28 @@
       ],
       "type": "object"
     },
-    "ApprovalTrustRoots": {
+    "ApprovalStatementEnvelope": {
       "additionalProperties": false,
+      "description": "A signed approval: a statement, the key that signed it and the\nsignature. Plan approvals use [`ApprovalStatement`]; package migration\napprovals sign their own statement in the same envelope, under their own\nschema, purpose and domain ([`SignedApproval`]).",
       "properties": {
-        "signers": {
-          "items": {
-            "$ref": "#/$defs/ApprovalTrustedSigner"
-          },
-          "type": "array"
-        },
-        "version": {
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "required": [
-        "version",
-        "signers"
-      ],
-      "type": "object"
-    },
-    "ApprovalTrustedSigner": {
-      "additionalProperties": false,
-      "properties": {
-        "identity": {
-          "type": "string"
-        },
         "key_id": {
           "type": "string"
         },
-        "not_after": {
-          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
-          "format": "int64",
-          "type": "integer"
-        },
-        "not_before": {
-          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
-          "format": "int64",
-          "type": "integer"
-        },
-        "public_key": {
+        "schema": {
           "type": "string"
+        },
+        "signature": {
+          "type": "string"
+        },
+        "statement": {
+          "$ref": "#/$defs/ApprovalStatement"
         }
       },
       "required": [
+        "schema",
         "key_id",
-        "identity",
-        "public_key"
+        "statement",
+        "signature"
       ],
       "type": "object"
     },
@@ -217,7 +339,7 @@
       "additionalProperties": false,
       "properties": {
         "approval": {
-          "$ref": "#/$defs/ApprovalEnvelope"
+          "$ref": "#/$defs/ApprovalStatementEnvelope"
         },
         "environment": {
           "type": "string"
@@ -231,7 +353,7 @@
           "type": "string"
         },
         "trust_roots": {
-          "$ref": "#/$defs/PlanApprovalTrustRoots"
+          "$ref": "#/$defs/TrustRoots"
         },
         "version": {
           "format": "uint32",
@@ -266,6 +388,41 @@
       "required": [
         "from",
         "to"
+      ],
+      "type": "object"
+    },
+    "AuthSession": {
+      "description": "Authenticated session as returned by `GET /v1/auth/me`.",
+      "properties": {
+        "capabilities": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "groups": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "principal": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "principal",
+        "kind",
+        "capabilities"
       ],
       "type": "object"
     },
@@ -456,6 +613,29 @@
       ],
       "type": "object"
     },
+    "CertificateStatus": {
+      "description": "What `status` shows of an instance's workload certificate.",
+      "properties": {
+        "expires_at": {
+          "description": "When the certificate expires, in Unix seconds.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "near_expiry": {
+          "description": "In the last sixth of its lifetime, so renewal is late.",
+          "type": "boolean"
+        },
+        "renewal_failure": {
+          "description": "Why the last renewal attempt failed, while it is the latest.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "expires_at",
+        "near_expiry"
+      ],
+      "type": "object"
+    },
     "ChangeEvent": {
       "description": "One durable change. `cursor` is the opaque resume token (monotonic sequence).",
       "properties": {
@@ -498,6 +678,8 @@
         "release_published",
         "release_promoted",
         "release_recalled",
+        "channel_head_removed",
+        "promotion_soak_reset",
         "compatibility_result_recorded",
         "trust_threshold_crossed"
       ],
@@ -519,6 +701,85 @@
       "required": [
         "events",
         "next_cursor"
+      ],
+      "type": "object"
+    },
+    "ChannelAdmitRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/products/{product}/channels/{channel}/admit`.",
+      "properties": {
+        "environment": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "environment",
+        "instance",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "ChannelConfigureRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/products/{product}/channels/{channel}/pace`.",
+      "properties": {
+        "operation": {
+          "type": "string"
+        },
+        "upgrade_pace": {
+          "description": "Duration (`30`, `250ms`, `2m`, `3h`) or `off`. A bare number is seconds.",
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "upgrade_pace"
+      ],
+      "type": "object"
+    },
+    "ChannelExposureGraceRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/products/{product}/channels/{channel}/exposure-grace`.",
+      "properties": {
+        "grace": {
+          "description": "Duration (`30`, `250ms`, `2m`, `24h`) or `off`. A bare number is seconds.",
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "grace"
       ],
       "type": "object"
     },
@@ -588,6 +849,79 @@
       },
       "required": [
         "items"
+      ],
+      "type": "object"
+    },
+    "ChannelPromotionPolicyStatus": {
+      "description": "Operator-visible soak row for `fleet status`.",
+      "properties": {
+        "instances_without_evidence": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "paused": {
+          "type": "boolean"
+        },
+        "policy_id": {
+          "type": "string"
+        },
+        "policy_version": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "product": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "source_channel": {
+          "type": "string"
+        },
+        "state": {
+          "description": "`waiting` | `soaking` | `ready` | `reset` | `refused` | `promoted` | `recalled`.",
+          "type": "string"
+        },
+        "target_channel": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "product",
+        "target_channel",
+        "source_channel",
+        "policy_id",
+        "policy_version",
+        "paused",
+        "state"
+      ],
+      "type": "object"
+    },
+    "ChannelRemoveRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/products/{product}/channels/{channel}/remove`.\n`expected_head` (`<product>@<version>`) refuses the removal when another\nrelease heads the channel.",
+      "properties": {
+        "expected_head": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operation": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation"
       ],
       "type": "object"
     },
@@ -716,6 +1050,23 @@
         "key_id",
         "signer_identity",
         "expires_at"
+      ],
+      "type": "object"
+    },
+    "CommandRefusalReason": {
+      "additionalProperties": false,
+      "description": "Bounded gate that refused a command. `code` reuses instance-explain checks\nplus the closed refusal list; `next` names the action and its actor.",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "next": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "next"
       ],
       "type": "object"
     },
@@ -986,6 +1337,12 @@
         },
         {
           "properties": {
+            "candidates": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
             "contract": {
               "type": "string"
             },
@@ -1053,6 +1410,13 @@
         },
         "release_digest": {
           "type": "string"
+        },
+        "satisfied_by": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Required contracts satisfied by a last-successful deployment (`product@version`).",
+          "type": "object"
         },
         "version": {
           "format": "uint32",
@@ -1322,14 +1686,6 @@
       ],
       "type": "string"
     },
-    "CriticalityTargetKind": {
-      "description": "Who a criticality assignment names.",
-      "enum": [
-        "environment",
-        "product"
-      ],
-      "type": "string"
-    },
     "DeclaredCriticality": {
       "description": "Operator-declared criticality, with who set it and why.",
       "properties": {
@@ -1356,6 +1712,139 @@
         "reason",
         "set_at",
         "source"
+      ],
+      "type": "object"
+    },
+    "DeliveryFailureThresholdRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/environments/{environment}/hold/threshold` and\n`POST /v1/environments/{environment}/hold/threshold/clear`.",
+      "properties": {
+        "count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "environment": {
+          "type": "string"
+        },
+        "expected_generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "window": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "environment",
+        "expected_generation"
+      ],
+      "type": "object"
+    },
+    "DeliveryFreeze": {
+      "description": "A named environment freeze with a start and an end, evaluated by the clock.",
+      "properties": {
+        "actor": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "from_ms": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "scheduled_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "until_ms": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "environment",
+        "from_ms",
+        "until_ms",
+        "reason",
+        "actor",
+        "scheduled_at"
+      ],
+      "type": "object"
+    },
+    "DeliveryFreezeRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/environments/{environment}/hold/schedule` and\n`POST /v1/environments/{environment}/hold/cancel`.",
+      "properties": {
+        "environment": {
+          "type": "string"
+        },
+        "expected_generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "from": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "until": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "environment",
+        "expected_generation",
+        "name"
       ],
       "type": "object"
     },
@@ -1423,8 +1912,19 @@
           },
           "type": "array"
         },
+        "freezes": {
+          "description": "Active and upcoming environment freezes. Omitted when empty, including\non channel hold views.",
+          "items": {
+            "$ref": "#/$defs/DeliveryFreeze"
+          },
+          "type": "array"
+        },
         "hold": {
           "$ref": "#/$defs/DeliveryHold"
+        },
+        "threshold": {
+          "$ref": "#/$defs/FailureThreshold",
+          "description": "Declared failure threshold. Omitted when unset, including on channel\nhold views."
         }
       },
       "required": [
@@ -1432,33 +1932,209 @@
       ],
       "type": "object"
     },
-    "DerivedAssignment": {
-      "additionalProperties": false,
-      "description": "One assignment inside a signed derived envelope.",
+    "DependencyHoldView": {
+      "description": "One durable unmet-required-contract hold.",
       "properties": {
-        "kind": {
-          "$ref": "#/$defs/CriticalityTargetKind"
+        "contracts": {
+          "items": {
+            "$ref": "#/$defs/UnmetContract"
+          },
+          "type": "array"
         },
-        "level": {
-          "$ref": "#/$defs/CriticalityLevel"
+        "held_at": {
+          "format": "int64",
+          "type": "integer"
         },
-        "name": {
+        "product": {
           "type": "string"
         },
-        "reason": {
-          "default": "",
-          "type": "string"
-        },
-        "source": {
+        "release_id": {
           "type": "string"
         }
       },
       "required": [
-        "kind",
-        "name",
-        "level",
-        "source"
+        "product",
+        "release_id",
+        "contracts",
+        "held_at"
       ],
+      "type": "object"
+    },
+    "DeploymentAttemptView": {
+      "description": "One recorded deployment attempt, as stored.",
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "cause": {
+          "$ref": "#/$defs/DeploymentCause"
+        },
+        "created_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "detail": {
+          "default": "",
+          "type": "string"
+        },
+        "from_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "lease_generation": {
+          "type": "string"
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        },
+        "restore": {
+          "$ref": "#/$defs/DeploymentCause"
+        },
+        "status": {
+          "type": "string"
+        },
+        "to_version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "created_at",
+        "instance",
+        "product",
+        "to_version",
+        "status"
+      ],
+      "type": "object"
+    },
+    "DeploymentCause": {
+      "description": "Bounded, redacted structured cause of one failed or rolled-back attempt.",
+      "properties": {
+        "gate": {
+          "type": "string"
+        },
+        "gate_value": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/DeploymentCauseKind"
+        },
+        "phase": {
+          "$ref": "#/$defs/DeploymentCausePhase"
+        },
+        "raw": {
+          "type": "string"
+        },
+        "resources": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "phase",
+        "kind",
+        "summary"
+      ],
+      "type": "object"
+    },
+    "DeploymentCauseKind": {
+      "description": "Closed deploy-failure kind the executor already distinguishes (#1055).",
+      "enum": [
+        "probe_failed",
+        "gate_breached",
+        "command_exited",
+        "not_ready",
+        "target_unavailable",
+        "compatibility_blocked",
+        "placement_refused",
+        "cleanup_failed",
+        "restore_failed",
+        "restored",
+        "executor_failed",
+        "host_not_restored",
+        "drain_wait"
+      ],
+      "type": "string"
+    },
+    "DeploymentCausePhase": {
+      "description": "Closed deploy-failure phase recorded on an attempt (#1055).",
+      "enum": [
+        "admission",
+        "pull",
+        "activate",
+        "health_probe",
+        "slo_gate",
+        "cleanup",
+        "restore"
+      ],
+      "type": "string"
+    },
+    "DeploymentHistoryPage": {
+      "description": "One page of [`DeploymentAttemptView`] values.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/DeploymentAttemptView"
+          },
+          "type": "array"
+        },
+        "next_cursor": {
+          "type": "string"
+        },
+        "owner": {
+          "$ref": "#/$defs/OwnerView",
+          "description": "Environment owner contact and notification URLs (#1066)."
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object"
+    },
+    "DeploymentHistoryQuery": {
+      "description": "Query parameters for `GET /v1/environments/{environment}/history`.",
+      "properties": {
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "product": {
+          "description": "Instance name. Unnamed instances equal the product.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
       "type": "object"
     },
     "DerivedCriticality": {
@@ -1502,19 +2178,23 @@
     },
     "DerivedEnvelope": {
       "additionalProperties": false,
-      "description": "Signed derived criticality from an external evidence source.",
+      "description": "Signed derived criticality from an external evidence source (#866).\nWire format: docs/manage-environments.md#derived-criticality-wire-format.",
       "properties": {
         "key_id": {
+          "description": "`sha256:` and the lowercase hex SHA-256 of the signer's Ed25519 public key.",
           "type": "string"
         },
         "schema": {
+          "description": "`tenkai.derived-criticality.v2`.",
           "type": "string"
         },
         "signature": {
+          "description": "Standard padded base64 Ed25519 signature over\n`TENKAI-DERIVED-CRITICALITY-V2`, one NUL byte, and the statement bytes.",
           "type": "string"
         },
         "statement": {
-          "$ref": "#/$defs/DerivedStatement"
+          "description": "Standard padded base64 of the statement JSON bytes the producer signed.",
+          "type": "string"
         }
       },
       "required": [
@@ -1536,32 +2216,6 @@
       },
       "required": [
         "applied"
-      ],
-      "type": "object"
-    },
-    "DerivedStatement": {
-      "additionalProperties": false,
-      "description": "Signed bytes of a derived-criticality envelope.",
-      "properties": {
-        "assignments": {
-          "items": {
-            "$ref": "#/$defs/DerivedAssignment"
-          },
-          "type": "array"
-        },
-        "generated_at": {
-          "format": "int64",
-          "type": "integer"
-        },
-        "max_age_ms": {
-          "format": "int64",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "generated_at",
-        "max_age_ms",
-        "assignments"
       ],
       "type": "object"
     },
@@ -1766,6 +2420,44 @@
         {
           "additionalProperties": false,
           "properties": {
+            "key": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "set_label",
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "key",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "clear_label",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "key"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "constraint": {
               "type": "string"
             },
@@ -1876,6 +2568,13 @@
               },
               "type": "array"
             },
+            "feedback": {
+              "description": "Captured feedback observations the endpoint also receives (#1102).",
+              "items": {
+                "$ref": "#/$defs/FeedbackEvent"
+              },
+              "type": "array"
+            },
             "kind": {
               "const": "set_webhook",
               "type": "string"
@@ -1914,6 +2613,37 @@
                 "string",
                 "null"
               ]
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Environment owner contact for display, audit, and notification routing (#1066).",
+          "properties": {
+            "contact": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "set_owner",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "contact"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "clear_owner",
+              "type": "string"
             }
           },
           "required": [
@@ -2026,6 +2756,131 @@
             "kind"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Bind a dependent instance's contract to a provider instance (ADR 0044 §3).",
+          "properties": {
+            "contract": {
+              "type": "string"
+            },
+            "dependent": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "bind",
+              "type": "string"
+            },
+            "provider": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "dependent",
+            "contract",
+            "provider"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Remove one binding.",
+          "properties": {
+            "contract": {
+              "type": "string"
+            },
+            "dependent": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "unbind",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "dependent",
+            "contract"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Store a value the client sealed for one instance's secret key\n(ADR 0045 §2). Never a plain value.",
+          "properties": {
+            "instance": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "set_sealed_secret",
+              "type": "string"
+            },
+            "sealed": {
+              "$ref": "#/$defs/SealedValue"
+            },
+            "secret": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "instance",
+            "secret",
+            "key",
+            "sealed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Record the environment's offline recovery public key (ADR 0045 §7):\nstandard base64 of an uncompressed P-256 point. Its private half\nnever reaches Tenkai. A replaced key's wraps are dropped.",
+          "properties": {
+            "kind": {
+              "const": "set_sealed_recovery_key",
+              "type": "string"
+            },
+            "public_key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "public_key"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Remove one sealed key. `present_in_target` states that a release\nreading it finds the key in the target by other means.",
+          "properties": {
+            "instance": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "delete_sealed_secret",
+              "type": "string"
+            },
+            "present_in_target": {
+              "type": "boolean"
+            },
+            "secret": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "instance",
+            "secret",
+            "key"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -2131,6 +2986,32 @@
       ],
       "type": "object"
     },
+    "EnvironmentDependencies": {
+      "description": "Environment dependency graph for status and `env dependencies`.",
+      "properties": {
+        "environment": {
+          "type": "string"
+        },
+        "holds": {
+          "items": {
+            "$ref": "#/$defs/DependencyHoldView"
+          },
+          "type": "array"
+        },
+        "products": {
+          "items": {
+            "$ref": "#/$defs/ProductDependencyView"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment",
+        "holds",
+        "products"
+      ],
+      "type": "object"
+    },
     "EnvironmentDerivedCriticality": {
       "properties": {
         "age_ms": {
@@ -2199,6 +3080,13 @@
           "description": "The plan approval policy file this environment uses, as configured,\nwhen one is set (#820).",
           "type": "string"
         },
+        "config": {
+          "description": "Effective non-secret config and declared secret names per product (#1019).",
+          "items": {
+            "$ref": "#/$defs/EnvironmentProductConfig"
+          },
+          "type": "array"
+        },
         "constraints": {
           "default": [],
           "description": "Environment constraints (`version_pin`, `version_range`, `require_fact`).",
@@ -2210,6 +3098,13 @@
         "criticality": {
           "$ref": "#/$defs/EnvironmentCriticality",
           "description": "Declared and derived criticality when either is set (#694)."
+        },
+        "delivery_freezes": {
+          "description": "Active and upcoming dated change freezes. Omitted when none.",
+          "items": {
+            "$ref": "#/$defs/DeliveryFreeze"
+          },
+          "type": "array"
         },
         "delivery_hold": {
           "$ref": "#/$defs/DeliveryHold",
@@ -2230,6 +3125,24 @@
         },
         "id": {
           "type": "string"
+        },
+        "identity_issuer": {
+          "$ref": "#/$defs/IssuerStatus",
+          "description": "The workload identity issuer, its requested generation and its\nuploaded candidate (ADR 0046 §2), when any is set. Never a key."
+        },
+        "identity_issuer_waiting": {
+          "description": "The instances the next issuer rotation step waits for, each with why\n(ADR 0046 §7). Beside `identity_issuer`, whose shape older clients\ndecode strictly.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "latest_failures": {
+          "description": "Latest failed or rolled back attempt per instance (#1054).",
+          "items": {
+            "$ref": "#/$defs/DeploymentAttemptView"
+          },
+          "type": "array"
         },
         "latest_plan": {
           "anyOf": [
@@ -2275,6 +3188,10 @@
           "description": "Non-secret product overlays as `product.key=value`.",
           "type": "object"
         },
+        "owner": {
+          "$ref": "#/$defs/OwnerView",
+          "description": "Environment owner contact and notification URLs (#1066). Omitted when unset."
+        },
         "preview": {
           "$ref": "#/$defs/PreviewInspect",
           "description": "Present only for preview environments bound to a branch pin."
@@ -2282,6 +3199,10 @@
         "retirement": {
           "$ref": "#/$defs/EnvironmentRetirement",
           "description": "Present after this environment has been retired from operational use."
+        },
+        "sealed_recovery_warning": {
+          "description": "Why sealed values would be lost with every runtime (ADR 0045 §7):\nno recovery key, or values without a wrap for it.",
+          "type": "string"
         },
         "subscriptions": {
           "items": {
@@ -2487,6 +3408,11 @@
         "id": {
           "type": "string"
         },
+        "instance": {
+          "default": "",
+          "description": "Instance this step applies to. Equals `product` when unnamed.",
+          "type": "string"
+        },
         "order": {
           "format": "uint32",
           "minimum": 0,
@@ -2517,6 +3443,10 @@
         "approval": {
           "$ref": "#/$defs/PlanApprovalView",
           "description": "Whether the latest plan was approved by policy or still needs a human."
+        },
+        "approval_brief": {
+          "$ref": "#/$defs/ApprovalBrief",
+          "description": "Bounded approval brief, returned before step detail (#1089)."
         },
         "created_at": {
           "format": "int64",
@@ -2561,6 +3491,93 @@
         "state",
         "created_at",
         "step_count"
+      ],
+      "type": "object"
+    },
+    "EnvironmentProductConfig": {
+      "description": "Effective overlay config for one product, with secret names only.",
+      "properties": {
+        "defaults": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "digest": {
+          "type": "string"
+        },
+        "overlay": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "product": {
+          "type": "string"
+        },
+        "rotate_after": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Declared `rotate_after` durations per secret name (#1078).",
+          "type": "object"
+        },
+        "secrets": {
+          "description": "Declared secret key names. Values are never stored or returned.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "product"
+      ],
+      "type": "object"
+    },
+    "EnvironmentRecipient": {
+      "description": "One recipient key an operator or client may pin: an unrevoked\nruntime's, or the environment's offline recovery key (ADR 0045 §7),\nwhich has no runtime.",
+      "properties": {
+        "capability": {
+          "type": "string"
+        },
+        "fingerprint": {
+          "type": "string"
+        },
+        "public_key": {
+          "type": "string"
+        },
+        "recovery": {
+          "description": "The environment's offline recovery key, not a runtime's.",
+          "type": "boolean"
+        },
+        "runtime_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtime_id",
+        "fingerprint",
+        "public_key",
+        "capability"
+      ],
+      "type": "object"
+    },
+    "EnvironmentRecipients": {
+      "properties": {
+        "environment": {
+          "type": "string"
+        },
+        "recipients": {
+          "items": {
+            "$ref": "#/$defs/EnvironmentRecipient"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment",
+        "recipients"
       ],
       "type": "object"
     },
@@ -2813,6 +3830,11 @@
             "null"
           ]
         },
+        "instance": {
+          "default": "",
+          "description": "Instance this subscription names. Equals `product` when unnamed.",
+          "type": "string"
+        },
         "overlay_digest": {
           "default": null,
           "type": [
@@ -2822,6 +3844,10 @@
         },
         "product": {
           "type": "string"
+        },
+        "spec_drift": {
+          "$ref": "#/$defs/SpecDriftView",
+          "description": "Report-only live-spec comparison (#1028). Omitted when unknown."
         },
         "state": {
           "type": "string"
@@ -2839,6 +3865,9 @@
       "properties": {
         "error": {
           "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/CommandRefusalReason"
         }
       },
       "required": [
@@ -2852,53 +3881,6 @@
         "failed"
       ],
       "type": "string"
-    },
-    "EvaluationTrustRoots": {
-      "additionalProperties": false,
-      "properties": {
-        "signers": {
-          "items": {
-            "$ref": "#/$defs/EvaluationTrustedSigner"
-          },
-          "type": "array"
-        },
-        "version": {
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "required": [
-        "version",
-        "signers"
-      ],
-      "type": "object"
-    },
-    "EvaluationTrustedSigner": {
-      "additionalProperties": false,
-      "properties": {
-        "key_id": {
-          "type": "string"
-        },
-        "not_after": {
-          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
-          "format": "int64",
-          "type": "integer"
-        },
-        "not_before": {
-          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
-          "format": "int64",
-          "type": "integer"
-        },
-        "public_key": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "key_id",
-        "public_key"
-      ],
-      "type": "object"
     },
     "EvidenceSigner": {
       "additionalProperties": false,
@@ -3113,6 +4095,40 @@
       ],
       "type": "object"
     },
+    "ExposureGraceRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/environments/{environment}/exposure-grace`.",
+      "properties": {
+        "environment": {
+          "type": "string"
+        },
+        "expected_generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "grace": {
+          "description": "Duration (`30`, `250ms`, `2m`, `24h`) or `off`. A bare number is seconds.",
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "environment",
+        "expected_generation",
+        "grace"
+      ],
+      "type": "object"
+    },
     "ExposureQueryRequest": {
       "description": "Query parameters for `GET /v1/exposures` and `tenkaictl exposure query`.",
       "properties": {
@@ -3154,6 +4170,194 @@
       ],
       "type": "object"
     },
+    "ExposureWaiver": {
+      "description": "Active waiver plus the fields query and inspect show.",
+      "properties": {
+        "actor": {
+          "type": "string"
+        },
+        "advisory_id": {
+          "type": "string"
+        },
+        "category": {
+          "$ref": "#/$defs/WaiverCategory"
+        },
+        "component": {
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "product": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "release_id": {
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/WaiverScopeKind"
+        }
+      },
+      "required": [
+        "advisory_id",
+        "scope",
+        "category",
+        "reason",
+        "actor",
+        "expires_at"
+      ],
+      "type": "object"
+    },
+    "ExposureWaiverClearRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/exposures/waivers/clear`.",
+      "properties": {
+        "advisory_id": {
+          "type": "string"
+        },
+        "component": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "operation": {
+          "type": "string"
+        },
+        "product": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "release_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scope": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "advisory_id",
+        "scope",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "ExposureWaiverRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/exposures/waivers`.",
+      "properties": {
+        "advisory_id": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "component": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expires": {
+          "description": "RFC3339 timestamp or duration (`7d`, `24h`). A bare number is seconds.",
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "product": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "release_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scope": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "advisory_id",
+        "scope",
+        "category",
+        "reason",
+        "expires"
+      ],
+      "type": "object"
+    },
+    "FailureThreshold": {
+      "description": "Declared count and window that can set an automatic environment hold.",
+      "properties": {
+        "actor": {
+          "type": "string"
+        },
+        "count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "set_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "window_ms": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "environment",
+        "count",
+        "window_ms",
+        "actor",
+        "set_at"
+      ],
+      "type": "object"
+    },
+    "FeedbackEvent": {
+      "description": "Captured-observation webhook events (#1102). They live in their own\nendpoint field, `feedback`, so a version that does not know them ignores\nthe field and keeps the endpoint's apply and operational subscriptions.",
+      "enum": [
+        "feedback.observation"
+      ],
+      "type": "string"
+    },
     "FirstAdministrator": {
       "description": "Whether a first administrator is configured: a `[grants]` rule that gives\nfleet management (#631). Without one, only the management token can\nadminister the server. Reported unauthenticated on `/healthz` (#815), so\nit is one coarse status and never names a rule or an identity.",
       "enum": [
@@ -3190,6 +4394,17 @@
           "type": "boolean"
         },
         "name": {
+          "type": "string"
+        },
+        "open_exposures": {
+          "description": "Open (release, advisory) matches on this environment (#900).",
+          "items": {
+            "$ref": "#/$defs/OpenEnvironmentExposure"
+          },
+          "type": "array"
+        },
+        "owner": {
+          "description": "Environment owner contact when set (#1066).",
           "type": "string"
         },
         "posture": {
@@ -3273,6 +4488,13 @@
           "minimum": 0,
           "type": "integer"
         },
+        "promotion_policies": {
+          "description": "Active channel promotion policies and soak state (#899).",
+          "items": {
+            "$ref": "#/$defs/ChannelPromotionPolicyStatus"
+          },
+          "type": "array"
+        },
         "server_version": {
           "default": "",
           "description": "The server's own version, which runners and consoles compare\nagainst (#761).",
@@ -3348,17 +4570,29 @@
             "$ref": "#/$defs/GrantRuleView"
           },
           "type": "array"
+        },
+        "unreadable": {
+          "description": "Stored rows this release cannot read (#850), for example written by\na newer release. No replica of this release applies them; remove one\nby its `value`.",
+          "items": {
+            "$ref": "#/$defs/UnreadableGrantRule"
+          },
+          "type": "array"
         }
       },
       "required": [
         "generation",
-        "rules"
+        "rules",
+        "unreadable"
       ],
       "type": "object"
     },
     "GrantRuleView": {
       "description": "A stored rule: the rule as the configuration file would hold it, and who\ncreated it, when and why.",
       "properties": {
+        "applied": {
+          "description": "Whether replicas of this release apply the rule: false when the\nconfiguration file declares its claim value or the rule fails this\nrelease's checks (#850).",
+          "type": "boolean"
+        },
         "created_at_ms": {
           "format": "int64",
           "type": "integer"
@@ -3370,6 +4604,10 @@
         "declared_by_config": {
           "description": "The configuration file declares this claim value, so the stored\nrule is ignored.",
           "type": "boolean"
+        },
+        "not_applied_reason": {
+          "description": "Why the rule is not applied.",
+          "type": "string"
         },
         "reason": {
           "type": "string"
@@ -3383,7 +4621,8 @@
         "created_by",
         "created_at_ms",
         "reason",
-        "declared_by_config"
+        "declared_by_config",
+        "applied"
       ],
       "type": "object"
     },
@@ -3405,6 +4644,34 @@
         "approvers"
       ],
       "type": "object"
+    },
+    "HealthCheck": {
+      "description": "One named check inside a probe's structured stdout.",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/HealthCheckState"
+        }
+      },
+      "required": [
+        "name",
+        "state"
+      ],
+      "type": "object"
+    },
+    "HealthCheckState": {
+      "enum": [
+        "healthy",
+        "repairing",
+        "warning",
+        "failing"
+      ],
+      "type": "string"
     },
     "HoldAuditEvent": {
       "description": "One immutable set, clear, or retry transition.",
@@ -3428,6 +4695,22 @@
         "reason",
         "actor",
         "at"
+      ],
+      "type": "object"
+    },
+    "ImpactRefusal": {
+      "description": "A remaining installed dependent that would be unsatisfied.",
+      "properties": {
+        "contract": {
+          "type": "string"
+        },
+        "dependent": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "dependent",
+        "contract"
       ],
       "type": "object"
     },
@@ -3607,9 +4890,160 @@
       ],
       "type": "object"
     },
+    "InstanceExplainBlocker": {
+      "description": "Why one check currently blocks the next change.",
+      "properties": {
+        "check": {
+          "description": "Stable check name in admission order.",
+          "type": "string"
+        },
+        "evidence": {
+          "type": "string"
+        },
+        "unblock": {
+          "description": "Operator action that lifts this check.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check",
+        "evidence",
+        "unblock"
+      ],
+      "type": "object"
+    },
+    "InstanceExplainReport": {
+      "description": "Read-only explain view for one instance.",
+      "properties": {
+        "blockers": {
+          "items": {
+            "$ref": "#/$defs/InstanceExplainBlocker"
+          },
+          "type": "array"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "next_change": {
+          "$ref": "#/$defs/InstanceNextChange"
+        }
+      },
+      "required": [
+        "environment",
+        "instance",
+        "blockers"
+      ],
+      "type": "object"
+    },
+    "InstanceNextChange": {
+      "description": "What the next change would be if nothing blocked it.",
+      "properties": {
+        "action": {
+          "description": "`install`, `upgrade`, `restart`, or `current`.",
+          "type": "string"
+        },
+        "deployed": {
+          "type": "string"
+        },
+        "head": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "head"
+      ],
+      "type": "object"
+    },
+    "IssuerStatus": {
+      "description": "The issuer state of an environment for inspection. A view: clients\nignore fields they do not know (#1172).",
+      "properties": {
+        "candidate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IssuerSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The uploaded candidate, waiting for an approved step."
+        },
+        "current": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IssuerSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "next": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IssuerSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The next issuer an add step recorded, waiting for the issue step."
+        },
+        "previous": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IssuerSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The issuer the last issue step replaced, still trusted until its\nremove step."
+        },
+        "requested": {
+          "description": "The generation `prepare` asked a candidate for.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "IssuerSummary": {
+      "description": "The issuer as `env inspect` and `status` show it. Never a key. A view:\nclients ignore fields they do not know (#1172).",
+      "properties": {
+        "fingerprint": {
+          "type": "string"
+        },
+        "generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recipients": {
+          "description": "Recipients the key is wrapped for; empty means it is lost.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "generation",
+        "fingerprint",
+        "recipients"
+      ],
+      "type": "object"
+    },
     "ManagementLifecycleResult": {
-      "additionalProperties": false,
-      "description": "Versioned result shared by catalog lifecycle routes.",
+      "description": "Versioned result shared by catalog lifecycle routes. A client ignores\nfields it does not know, so a newer server can add one (#1172);\nrequests stay strict.",
       "properties": {
         "digest": {
           "type": "string"
@@ -3620,8 +5054,19 @@
         "operation": {
           "type": "string"
         },
+        "replaced_head": {
+          "description": "`<product>@<version>` the channel headed before this promotion (#1173).\nOmitted when the channel had no head or already named the promoted\nrelease.",
+          "type": "string"
+        },
         "resource": {
           "type": "string"
+        },
+        "steps": {
+          "description": "One entry per step of an applied plan (#1076). Returned only to a\nclient that asks with `?steps=true`: older clients refuse unknown\nfields here, so the default response stays as it was.",
+          "items": {
+            "$ref": "#/$defs/ApplyStepResult"
+          },
+          "type": "array"
         },
         "version": {
           "format": "uint32",
@@ -3656,6 +5101,9 @@
         },
         "severity": {
           "$ref": "#/$defs/Severity"
+        },
+        "waiver": {
+          "$ref": "#/$defs/ExposureWaiver"
         }
       },
       "required": [
@@ -3665,30 +5113,6 @@
         "component_version",
         "release",
         "release_id"
-      ],
-      "type": "object"
-    },
-    "MigrationApprovalEnvelope": {
-      "additionalProperties": false,
-      "properties": {
-        "key_id": {
-          "type": "string"
-        },
-        "schema": {
-          "type": "string"
-        },
-        "signature": {
-          "type": "string"
-        },
-        "statement": {
-          "$ref": "#/$defs/MigrationApprovalStatement"
-        }
-      },
-      "required": [
-        "schema",
-        "key_id",
-        "statement",
-        "signature"
       ],
       "type": "object"
     },
@@ -3719,6 +5143,31 @@
         "purpose",
         "issued_at",
         "expires_at"
+      ],
+      "type": "object"
+    },
+    "MigrationApprovalStatementEnvelope": {
+      "additionalProperties": false,
+      "description": "A signed approval: a statement, the key that signed it and the\nsignature. Plan approvals use [`ApprovalStatement`]; package migration\napprovals sign their own statement in the same envelope, under their own\nschema, purpose and domain ([`SignedApproval`]).",
+      "properties": {
+        "key_id": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "signature": {
+          "type": "string"
+        },
+        "statement": {
+          "$ref": "#/$defs/MigrationApprovalStatement"
+        }
+      },
+      "required": [
+        "schema",
+        "key_id",
+        "statement",
+        "signature"
       ],
       "type": "object"
     },
@@ -4180,6 +5629,40 @@
       ],
       "type": "object"
     },
+    "OpenEnvironmentExposure": {
+      "description": "One open deployed exposure, with age, on a fleet row (#900).",
+      "properties": {
+        "advisory_id": {
+          "type": "string"
+        },
+        "age_ms": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "first_seen_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "overdue": {
+          "description": "True when `age_ms` exceeds `exposure.max_age_ms.<severity>` on the environment.",
+          "type": "boolean"
+        },
+        "release": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "release",
+        "advisory_id",
+        "severity",
+        "first_seen_at",
+        "age_ms"
+      ],
+      "type": "object"
+    },
     "OperationalEvent": {
       "description": "Operational events of [`crate::operational_events`] (#724). They live in\ntheir own endpoint field, `operational`, so a version that does not know\nthem ignores the field and keeps the endpoint's apply subscriptions.",
       "oneOf": [
@@ -4202,14 +5685,49 @@
           "const": "runner.attestation_refused",
           "description": "A runner's attested enrollment or renewal, or its inventory under\nthe attestation policy, was refused (#675). The code names why.",
           "type": "string"
+        },
+        {
+          "const": "release.recalled",
+          "description": "A published release was recalled (#1066).",
+          "type": "string"
+        },
+        {
+          "const": "hold.automatic",
+          "description": "An automatic failure-threshold hold was set (#1066).",
+          "type": "string"
+        },
+        {
+          "const": "health.stale",
+          "description": "An instance health observation aged past its max age (#1066).",
+          "type": "string"
         }
       ]
+    },
+    "OwnerView": {
+      "description": "Contact and notification URLs as inspect, status, and history show them.",
+      "properties": {
+        "contact": {
+          "description": "Display and audit contact. Not an identity.",
+          "type": "string"
+        },
+        "endpoints": {
+          "description": "Configured notification URLs. Empty means no reachable endpoint.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "contact"
+      ],
+      "type": "object"
     },
     "PackageMigrationApplyRequest": {
       "additionalProperties": false,
       "properties": {
         "approval": {
-          "$ref": "#/$defs/MigrationApprovalEnvelope"
+          "$ref": "#/$defs/MigrationApprovalStatementEnvelope"
         },
         "backup_receipt_digest": {
           "type": [
@@ -4230,12 +5748,12 @@
         },
         "plan_approvals": {
           "additionalProperties": {
-            "$ref": "#/$defs/ApprovalEnvelope"
+            "$ref": "#/$defs/ApprovalStatementEnvelope"
           },
           "type": "object"
         },
         "trust_roots": {
-          "$ref": "#/$defs/ApprovalTrustRoots"
+          "$ref": "#/$defs/TrustRoots"
         },
         "version": {
           "format": "uint32",
@@ -4257,7 +5775,7 @@
       "additionalProperties": false,
       "properties": {
         "approval": {
-          "$ref": "#/$defs/MigrationApprovalEnvelope"
+          "$ref": "#/$defs/MigrationApprovalStatementEnvelope"
         },
         "expected_generation": {
           "format": "uint64",
@@ -4266,12 +5784,12 @@
         },
         "plan_approvals": {
           "additionalProperties": {
-            "$ref": "#/$defs/ApprovalEnvelope"
+            "$ref": "#/$defs/ApprovalStatementEnvelope"
           },
           "type": "object"
         },
         "trust_roots": {
-          "$ref": "#/$defs/ApprovalTrustRoots"
+          "$ref": "#/$defs/TrustRoots"
         },
         "version": {
           "format": "uint32",
@@ -4316,7 +5834,7 @@
       "type": "object"
     },
     "PackageMigrationResult": {
-      "additionalProperties": false,
+      "description": "The result of a migration route. A client ignores top-level fields it\ndoes not know (#1172); the digest-bound record inside stays strict.",
       "properties": {
         "record": {
           "$ref": "#/$defs/MigrationRecord"
@@ -4406,75 +5924,6 @@
         "state",
         "releases",
         "missing"
-      ],
-      "type": "object"
-    },
-    "PlanApprovalTrustRoots": {
-      "additionalProperties": false,
-      "properties": {
-        "signers": {
-          "items": {
-            "$ref": "#/$defs/PlanApprovalTrustedSigner"
-          },
-          "type": "array"
-        },
-        "version": {
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "required": [
-        "version",
-        "signers"
-      ],
-      "type": "object"
-    },
-    "PlanApprovalTrustedSigner": {
-      "additionalProperties": false,
-      "properties": {
-        "environments": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "groups": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "identity": {
-          "type": "string"
-        },
-        "key_id": {
-          "type": "string"
-        },
-        "not_after": {
-          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
-          "format": "int64",
-          "type": "integer"
-        },
-        "not_before": {
-          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
-          "format": "int64",
-          "type": "integer"
-        },
-        "providers": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "public_key": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "key_id",
-        "identity",
-        "public_key"
       ],
       "type": "object"
     },
@@ -4657,9 +6106,58 @@
       ],
       "type": "object"
     },
+    "ProductDependencyView": {
+      "description": "One subscribed or deployed product in contract plan order.",
+      "properties": {
+        "impact": {
+          "$ref": "#/$defs/ProductImpact"
+        },
+        "product": {
+          "type": "string"
+        },
+        "requirements": {
+          "items": {
+            "$ref": "#/$defs/RequirementView"
+          },
+          "type": "array"
+        },
+        "state": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "product",
+        "state",
+        "requirements",
+        "impact"
+      ],
+      "type": "object"
+    },
+    "ProductImpact": {
+      "description": "Remaining-dependent protection for remove, upgrade, and rollback of a product.",
+      "properties": {
+        "remove": {
+          "$ref": "#/$defs/ImpactRefusal"
+        },
+        "rollback": {
+          "$ref": "#/$defs/ImpactRefusal"
+        },
+        "upgrade": {
+          "$ref": "#/$defs/ImpactRefusal"
+        }
+      },
+      "type": "object"
+    },
     "PromoteRequest": {
       "additionalProperties": false,
       "properties": {
+        "expected_head": {
+          "description": "`<product>@<version>` the channel must head for the promotion to\nreplace it (#1158). An empty channel, or one already heading `spec`,\nis promoted either way. A server that predates the field refuses it.",
+          "type": "string"
+        },
         "operation": {
           "type": "string"
         },
@@ -4711,9 +6209,118 @@
       ],
       "type": "object"
     },
+    "ProviderView": {
+      "description": "How a contract is satisfied in the deployed set.",
+      "oneOf": [
+        {
+          "properties": {
+            "contract": {
+              "type": "string"
+            },
+            "granted": {
+              "description": "The edge is a peer grant (ADR 0046 §5): the dependent or the\nprovider holds a workload certificate, so its peer document\nnames the other side. Tenkai cannot see whether the product\nenforces it.",
+              "type": "boolean"
+            },
+            "instance": {
+              "type": "string"
+            },
+            "product": {
+              "type": "string"
+            },
+            "release": {
+              "type": "string"
+            },
+            "state": {
+              "const": "unique",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "product",
+            "release",
+            "contract"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "state": {
+              "const": "absent",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "products": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "state": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "products"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PublishInputEntry": {
+      "additionalProperties": false,
+      "description": "One file or directory from the release workdir, relative to the manifest.",
+      "properties": {
+        "content": {
+          "description": "Standard base64 file bytes. Empty for directories.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/PublishInputKind"
+        },
+        "mode": {
+          "description": "Unix mode bits the artifact digest binds (`mode & 0o7777`).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "kind",
+        "mode"
+      ],
+      "type": "object"
+    },
+    "PublishInputKind": {
+      "enum": [
+        "file",
+        "dir"
+      ],
+      "type": "string"
+    },
     "PublishRequest": {
       "additionalProperties": false,
       "properties": {
+        "inputs": {
+          "description": "Declared deploy inputs next to the manifest, with modes the signature binds.",
+          "items": {
+            "$ref": "#/$defs/PublishInputEntry"
+          },
+          "type": "array"
+        },
         "manifest": {
           "type": "string"
         },
@@ -4724,7 +6331,7 @@
           "$ref": "#/$defs/SignatureEnvelope"
         },
         "trust_roots": {
-          "$ref": "#/$defs/ReleaseTrustRoots"
+          "$ref": "#/$defs/TrustRoots"
         },
         "version": {
           "format": "uint32",
@@ -4786,6 +6393,71 @@
       ],
       "type": "object"
     },
+    "RecallRangeCloseRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/products/{product}/recall-range/close`.",
+      "properties": {
+        "before": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "product",
+        "from",
+        "before"
+      ],
+      "type": "object"
+    },
+    "RecallRangeRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/products/{product}/recall-range`.",
+      "properties": {
+        "before": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "product",
+        "from",
+        "reason"
+      ],
+      "type": "object"
+    },
     "RecallRequest": {
       "additionalProperties": false,
       "properties": {
@@ -4801,6 +6473,32 @@
       "required": [
         "version",
         "operation"
+      ],
+      "type": "object"
+    },
+    "RecipientWrap": {
+      "additionalProperties": false,
+      "description": "A wrap a runtime made for an approved recipient (ADR 0045 §5), for one\nstored value of an instance, named by its slot and sealed digest.",
+      "properties": {
+        "digest": {
+          "description": "The value's sealed digest when it was re-wrapped.",
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "secret": {
+          "type": "string"
+        },
+        "wrap": {
+          "$ref": "#/$defs/SealedWrap"
+        }
+      },
+      "required": [
+        "secret",
+        "key",
+        "digest",
+        "wrap"
       ],
       "type": "object"
     },
@@ -4931,6 +6629,39 @@
       ],
       "type": "object"
     },
+    "ReleaseLabelRequest": {
+      "additionalProperties": false,
+      "description": "Body of `PUT`/`DELETE` `/v1/releases/{product}/{version}/labels`.",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "key",
+        "reason"
+      ],
+      "type": "object"
+    },
     "ReleaseListEntry": {
       "description": "Identifying fields and current digest/version for one published release.",
       "properties": {
@@ -4993,57 +6724,6 @@
       ],
       "type": "object"
     },
-    "ReleaseTrustRoots": {
-      "additionalProperties": false,
-      "properties": {
-        "signers": {
-          "items": {
-            "$ref": "#/$defs/ReleaseTrustedSigner"
-          },
-          "type": "array"
-        },
-        "version": {
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "required": [
-        "version",
-        "signers"
-      ],
-      "type": "object"
-    },
-    "ReleaseTrustedSigner": {
-      "additionalProperties": false,
-      "properties": {
-        "identity": {
-          "type": "string"
-        },
-        "key_id": {
-          "type": "string"
-        },
-        "not_after": {
-          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
-          "format": "int64",
-          "type": "integer"
-        },
-        "not_before": {
-          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
-          "format": "int64",
-          "type": "integer"
-        },
-        "public_key": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "key_id",
-        "identity",
-        "public_key"
-      ],
-      "type": "object"
-    },
     "RemoveGrantRuleRequest": {
       "additionalProperties": false,
       "description": "`DELETE /v1/grant-rules`.",
@@ -5064,6 +6744,30 @@
         "value",
         "reason",
         "generation"
+      ],
+      "type": "object"
+    },
+    "RequirementView": {
+      "description": "One required or optional contract on a product.",
+      "properties": {
+        "contract": {
+          "type": "string"
+        },
+        "minimum": {
+          "type": "string"
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "provider": {
+          "$ref": "#/$defs/ProviderView"
+        }
+      },
+      "required": [
+        "contract",
+        "minimum",
+        "optional",
+        "provider"
       ],
       "type": "object"
     },
@@ -5191,6 +6895,13 @@
         "revoked_at": {
           "format": "int64",
           "type": "integer"
+        },
+        "unopenable": {
+          "description": "Sealed values (`<instance> <secret>/<key>`) that no recipient can open\nonce the revoked runtime's wraps are dropped: they must be set again\n(ADR 0045 §5).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "required": [
@@ -5290,6 +7001,10 @@
           "type": "integer"
         },
         "revoked_by": {
+          "type": "string"
+        },
+        "sealing_fingerprint": {
+          "description": "HPKE sealing key fingerprint when this runner advertised one (ADR 0045).",
           "type": "string"
         },
         "state": {
@@ -5422,6 +7137,183 @@
       ],
       "type": "object"
     },
+    "SealedRewrapRequest": {
+      "additionalProperties": false,
+      "description": "Ask for a plan that re-wraps every sealed value of the environment for\none more recipient key (ADR 0045 §5). The operation is `plan`: the\nresult is a plan that needs signed approval like any other.",
+      "properties": {
+        "environment": {
+          "type": "string"
+        },
+        "expected_generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "recipient": {
+          "description": "`sha256:<hex>` fingerprint of an unrevoked recipient key of the\nenvironment.",
+          "type": "string"
+        },
+        "recovered": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/RecipientWrap"
+            },
+            "type": "array"
+          },
+          "description": "Wraps for `recipient` that `secret recover` made offline with the\nrecovery key (ADR 0045 §7), by instance. The plan's steps carry\nthem; they take effect only once the recipient's runtime runs the\napproved step and opens each value with them. Omitted when empty,\nso a plain re-wrap request is unchanged; a server that predates the\nfield refuses it.",
+          "type": "object"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "environment",
+        "expected_generation",
+        "recipient"
+      ],
+      "type": "object"
+    },
+    "SealedSecretEntry": {
+      "description": "One sealed key as `secret list` shows it. Never a value.",
+      "properties": {
+        "age_ms": {
+          "description": "Age from [`set_at`], never from the value (#1078).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "digest": {
+          "description": "`sha256:` digest of the sealed ciphertext.",
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "overdue": {
+          "description": "True when `age_ms` is past `rotate_after`. False, and omitted, when\nthe secret has no rotation age.",
+          "type": "boolean"
+        },
+        "recipients": {
+          "description": "Recipient fingerprints that can open the value.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rotate_after": {
+          "description": "Declared `rotate_after` duration (`90d`) when the subscribed release\nnames one.",
+          "type": "string"
+        },
+        "sealed": {
+          "$ref": "#/$defs/SealedValue",
+          "description": "The stored ciphertext and wraps, only when the caller asked for them\n(`secret recover` opens its wraps offline). Never a value."
+        },
+        "secret": {
+          "type": "string"
+        },
+        "set_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "set_by": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "instance",
+        "secret",
+        "key",
+        "digest",
+        "set_by",
+        "set_at",
+        "recipients"
+      ],
+      "type": "object"
+    },
+    "SealedSecretList": {
+      "properties": {
+        "environment": {
+          "type": "string"
+        },
+        "recovery_key": {
+          "description": "Fingerprint of the environment's offline recovery key (ADR 0045 §7).\nAbsent: losing every runtime loses the environment's sealed values.",
+          "type": "string"
+        },
+        "secrets": {
+          "items": {
+            "$ref": "#/$defs/SealedSecretEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "environment",
+        "secrets"
+      ],
+      "type": "object"
+    },
+    "SealedValue": {
+      "additionalProperties": false,
+      "description": "A sealed value as the client submits it and the server stores it.",
+      "properties": {
+        "ciphertext": {
+          "description": "Standard base64 of the 12-byte nonce followed by the AES-256-GCM\nciphertext and tag of the value under the data key.",
+          "type": "string"
+        },
+        "format_version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "wraps": {
+          "description": "One HPKE wrap of the data key per recipient.",
+          "items": {
+            "$ref": "#/$defs/SealedWrap"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "format_version",
+        "ciphertext",
+        "wraps"
+      ],
+      "type": "object"
+    },
+    "SealedWrap": {
+      "additionalProperties": false,
+      "description": "The data key wrapped for one recipient key.",
+      "properties": {
+        "encapsulated_key": {
+          "description": "Standard base64 HPKE encapsulated key.",
+          "type": "string"
+        },
+        "fingerprint": {
+          "description": "`sha256:<hex>` fingerprint of the recipient's sealing key.",
+          "type": "string"
+        },
+        "wrapped_key": {
+          "description": "Standard base64 HPKE ciphertext of the data key.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fingerprint",
+        "encapsulated_key",
+        "wrapped_key"
+      ],
+      "type": "object"
+    },
     "ServiceStatus": {
       "properties": {
         "backup": {
@@ -5454,6 +7346,12 @@
         },
         "status": {
           "type": "string"
+        },
+        "stored_grant_rules_withheld": {
+          "description": "How many stored grant rules this replica withholds (#850): rows it\ncannot read or rules that fail its checks, for example written by a\nnewer release. Never names a rule; `GET /v1/grant-rules` lists them.\nAbsent when none; it never fails readiness.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
         },
         "trust": {
           "$ref": "#/$defs/TrustStatus",
@@ -5491,6 +7389,19 @@
         "level",
         "owner",
         "reason"
+      ],
+      "type": "object"
+    },
+    "SetOwnerRequest": {
+      "additionalProperties": false,
+      "description": "Body of `PUT /v1/products/{product}/owner` and environment `set_owner`.",
+      "properties": {
+        "contact": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contact"
       ],
       "type": "object"
     },
@@ -5580,6 +7491,53 @@
       ],
       "type": "object"
     },
+    "SpecDriftObject": {
+      "description": "One named object in a spec-drift report.",
+      "properties": {
+        "fields": {
+          "description": "Cheap top-level names: `containers`, `images`, `env`. Never values.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "description": "`unknown`, `current`, or `modified outside Tenkai`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "status"
+      ],
+      "type": "object"
+    },
+    "SpecDriftView": {
+      "description": "Per-instance drift shown on inspect, status, and support bundles.",
+      "properties": {
+        "objects": {
+          "items": {
+            "$ref": "#/$defs/SpecDriftObject"
+          },
+          "type": "array"
+        },
+        "status": {
+          "description": "`unknown`, `current`, or `modified outside Tenkai`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "type": "object"
+    },
     "StagedBundle": {
       "description": "One archive in the staging directory.",
       "properties": {
@@ -5626,14 +7584,46 @@
       ],
       "type": "object"
     },
+    "StatusDependencyHold": {
+      "description": "Dependency hold carried on a status row (no product; the row already names it).",
+      "properties": {
+        "contracts": {
+          "items": {
+            "$ref": "#/$defs/UnmetContract"
+          },
+          "type": "array"
+        },
+        "held_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "release_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "release_id",
+        "contracts",
+        "held_at"
+      ],
+      "type": "object"
+    },
     "StatusRow": {
       "properties": {
+        "certificate": {
+          "$ref": "#/$defs/CertificateStatus",
+          "description": "The instance's workload certificate, as its runtime last reported\nit (ADR 0046 §3). Omitted when none was reported."
+        },
         "channel": {
           "type": "string"
         },
         "delivery_hold": {
           "$ref": "#/$defs/DeliveryHold",
           "description": "Present while the subscribed channel is held."
+        },
+        "dependency_hold": {
+          "$ref": "#/$defs/StatusDependencyHold",
+          "description": "Present while a required contract is unmet (ADR 0043)."
         },
         "deployed": {
           "type": [
@@ -5656,12 +7646,32 @@
             "null"
           ]
         },
+        "health_checks": {
+          "description": "Failing and warning checks from the latest health observation (#1057).\nEmpty when none were reported or the observation is stale.",
+          "items": {
+            "$ref": "#/$defs/HealthCheck"
+          },
+          "type": "array"
+        },
+        "instance": {
+          "default": "",
+          "description": "Instance this row describes. Equals `product` when unnamed (ADR 0044 §1).",
+          "type": "string"
+        },
         "overlay_stale": {
           "default": false,
           "type": "boolean"
         },
+        "owner": {
+          "description": "Product owner contact when set (#1066).",
+          "type": "string"
+        },
         "product": {
           "type": "string"
+        },
+        "spec_drift": {
+          "$ref": "#/$defs/SpecDriftView",
+          "description": "Report-only live-spec comparison (#1028). Omitted when unknown."
         }
       },
       "required": [
@@ -5681,6 +7691,10 @@
           "format": "uint64",
           "minimum": 0,
           "type": "integer"
+        },
+        "instance": {
+          "description": "Named instance; omitted or empty defaults to the product.",
+          "type": "string"
         },
         "operation": {
           "type": "string"
@@ -5862,6 +7876,28 @@
       ],
       "type": "object"
     },
+    "TrustRoots": {
+      "additionalProperties": false,
+      "description": "Signer keys an operator pins for one [`TrustRootKind`], as read from its\nTOML file or a request body.",
+      "properties": {
+        "signers": {
+          "items": {
+            "$ref": "#/$defs/TrustedSigner"
+          },
+          "type": "array"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "signers"
+      ],
+      "type": "object"
+    },
     "TrustSource": {
       "description": "Whether an entry shows material the server loaded and uses, or a file as\nit is on disk now, which a client that read it at startup adopts only\nonce restarted.",
       "enum": [
@@ -5879,6 +7915,60 @@
         "expired"
       ],
       "type": "string"
+    },
+    "TrustedSigner": {
+      "additionalProperties": false,
+      "description": "One pinned Ed25519 signer key.",
+      "properties": {
+        "environments": {
+          "description": "Plan approval only: environments this signer may approve for.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "groups": {
+          "description": "Plan approval only: approver groups it counts toward.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "identity": {
+          "description": "Who holds the key. Empty only for model evaluation signers.",
+          "type": "string"
+        },
+        "key_id": {
+          "description": "`sha256:<hex>` of the public key.",
+          "type": "string"
+        },
+        "not_after": {
+          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "not_before": {
+          "description": "Unix milliseconds. Absent: validity is not recorded (#812).",
+          "format": "int64",
+          "type": "integer"
+        },
+        "providers": {
+          "description": "Plan approval only: approval policy providers it may sign for.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "public_key": {
+          "description": "Standard base64 of the 32-byte Ed25519 public key.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key_id",
+        "public_key"
+      ],
+      "type": "object"
     },
     "TrustedSignerView": {
       "properties": {
@@ -5909,6 +7999,107 @@
         "revoked"
       ],
       "type": "object"
+    },
+    "UnmetContract": {
+      "description": "Unmet contract named by a dependency hold.",
+      "properties": {
+        "candidates": {
+          "description": "Satisfying provider instances when the contract is ambiguous.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "contract": {
+          "type": "string"
+        },
+        "minimum": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract",
+        "minimum"
+      ],
+      "type": "object"
+    },
+    "UnreadableGrantRule": {
+      "description": "A stored row this release cannot read; it is never applied.",
+      "properties": {
+        "reason": {
+          "description": "Why it cannot be read.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The claim value the row is stored under.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "UnsubscribeRequest": {
+      "additionalProperties": false,
+      "description": "`DELETE /v1/environments/{environment}/subscriptions/{product}`: remove\na product from the environment's desired state; the next approved plan\nremoves what is recorded for it (ADR 0049).",
+      "properties": {
+        "environment": {
+          "type": "string"
+        },
+        "expected_generation": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "expected_version": {
+          "description": "The version of the instance's recorded release the caller means to\nremove. Required while one is recorded; refused when another is.",
+          "type": "string"
+        },
+        "instance": {
+          "description": "Named instance; omitted or empty defaults to the product.",
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "environment",
+        "expected_generation",
+        "product"
+      ],
+      "type": "object"
+    },
+    "WaiverCategory": {
+      "description": "Why the operator waived the finding.",
+      "enum": [
+        "false_positive",
+        "mitigated",
+        "upstream_dependency"
+      ],
+      "type": "string"
+    },
+    "WaiverScopeKind": {
+      "description": "How broadly a waiver applies. Narrower ranks higher.",
+      "enum": [
+        "global",
+        "product",
+        "component",
+        "release"
+      ],
+      "type": "string"
     },
     "WebhookDelivery": {
       "description": "One webhook delivery as `GET .../webhooks/deliveries` reports it.",
@@ -5961,6 +8152,13 @@
           "default": [],
           "items": {
             "$ref": "#/$defs/WebhookEvent"
+          },
+          "type": "array"
+        },
+        "feedback": {
+          "description": "Captured feedback observations this endpoint also receives; none\nunless listed (#1102).",
+          "items": {
+            "$ref": "#/$defs/FeedbackEvent"
           },
           "type": "array"
         },
@@ -6053,6 +8251,15 @@
       "request": null,
       "response": {
         "$ref": "#/$defs/OidcClientDiscovery"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/auth/me",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/AuthSession"
       }
     },
     {
@@ -6287,6 +8494,28 @@
       }
     },
     {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/exposures/waivers",
+      "request": {
+        "$ref": "#/$defs/ExposureWaiverRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/exposures/waivers/clear",
+      "request": {
+        "$ref": "#/$defs/ExposureWaiverClearRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
       "auth": "read",
       "method": "GET",
       "path": "/v1/advisory-feed",
@@ -6347,6 +8576,35 @@
           "$ref": "#/$defs/StatusRow"
         },
         "type": "array"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/environments/{environment}/instances/{instance}/explain",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/InstanceExplainReport"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/environments/{environment}/dependencies",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/EnvironmentDependencies"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/environments/{environment}/history",
+      "request": {
+        "$ref": "#/$defs/DeploymentHistoryQuery"
+      },
+      "response": {
+        "$ref": "#/$defs/DeploymentHistoryPage"
       }
     },
     {
@@ -6454,11 +8712,251 @@
       }
     },
     {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/products/{product}/owner",
+      "request": null,
+      "response": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/OwnerView"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    {
+      "auth": "management",
+      "method": "PUT",
+      "path": "/v1/products/{product}/owner",
+      "request": {
+        "$ref": "#/$defs/SetOwnerRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/OwnerView"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "DELETE",
+      "path": "/v1/products/{product}/owner",
+      "request": null,
+      "response": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/OwnerView"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/products/{product}/webhooks",
+      "request": null,
+      "response": {
+        "items": {
+          "$ref": "#/$defs/WebhookEndpoint"
+        },
+        "type": "array"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "PUT",
+      "path": "/v1/products/{product}/webhooks",
+      "request": {
+        "$ref": "#/$defs/WebhookEndpoint"
+      },
+      "response": {
+        "type": "string"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "DELETE",
+      "path": "/v1/products/{product}/webhooks",
+      "request": null,
+      "response": {
+        "type": "string"
+      }
+    },
+    {
       "auth": "management",
       "method": "PUT",
       "path": "/v1/environments/{environment}/facts",
       "request": {
         "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/environments/{environment}/labels",
+      "request": null,
+      "response": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "PUT",
+      "path": "/v1/environments/{environment}/labels",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "DELETE",
+      "path": "/v1/environments/{environment}/labels",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/releases/{product}/{version}/labels",
+      "request": null,
+      "response": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "PUT",
+      "path": "/v1/releases/{product}/{version}/labels",
+      "request": {
+        "$ref": "#/$defs/ReleaseLabelRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "DELETE",
+      "path": "/v1/releases/{product}/{version}/labels",
+      "request": {
+        "$ref": "#/$defs/ReleaseLabelRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "PUT",
+      "path": "/v1/environments/{environment}/bindings",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "DELETE",
+      "path": "/v1/environments/{environment}/bindings",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/environments/{environment}/sealed-secrets",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/SealedSecretList"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "PUT",
+      "path": "/v1/environments/{environment}/sealed-secrets",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "DELETE",
+      "path": "/v1/environments/{environment}/sealed-secrets",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/environments/{environment}/sealed-secrets/rewrap",
+      "request": {
+        "$ref": "#/$defs/SealedRewrapRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/environments/{environment}/identity-issuer/prepare",
+      "request": {
+        "$ref": "#/$defs/PlanRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/environments/{environment}/identity-issuer/plan",
+      "request": {
+        "$ref": "#/$defs/PlanRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/environments/{environment}/identity-issuer/rewrap",
+      "request": {
+        "$ref": "#/$defs/SealedRewrapRequest"
       },
       "response": {
         "$ref": "#/$defs/ManagementLifecycleResult"
@@ -6534,6 +9032,28 @@
       "auth": "management",
       "method": "DELETE",
       "path": "/v1/environments/{environment}/webhooks",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "PUT",
+      "path": "/v1/environments/{environment}/owner",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "DELETE",
+      "path": "/v1/environments/{environment}/owner",
       "request": {
         "$ref": "#/$defs/EnvironmentConfigRequest"
       },
@@ -6563,6 +9083,17 @@
     },
     {
       "auth": "management",
+      "method": "DELETE",
+      "path": "/v1/environments/{environment}/subscriptions/{product}",
+      "request": {
+        "$ref": "#/$defs/UnsubscribeRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
       "method": "POST",
       "path": "/v1/environments/{environment}/retire",
       "request": {
@@ -6578,6 +9109,17 @@
       "path": "/v1/environments/{environment}/plans",
       "request": {
         "$ref": "#/$defs/PlanRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/environments/{environment}/apply/cancel",
+      "request": {
+        "$ref": "#/$defs/DeliveryHoldRequest"
       },
       "response": {
         "$ref": "#/$defs/ManagementLifecycleResult"
@@ -6628,9 +9170,64 @@
     {
       "auth": "management",
       "method": "POST",
+      "path": "/v1/environments/{environment}/hold/schedule",
+      "request": {
+        "$ref": "#/$defs/DeliveryFreezeRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/environments/{environment}/hold/cancel",
+      "request": {
+        "$ref": "#/$defs/DeliveryFreezeRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/environments/{environment}/hold/threshold",
+      "request": {
+        "$ref": "#/$defs/DeliveryFailureThresholdRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/environments/{environment}/hold/threshold/clear",
+      "request": {
+        "$ref": "#/$defs/DeliveryFailureThresholdRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
       "path": "/v1/environments/{environment}/failed-targets/{product}/retry",
       "request": {
         "$ref": "#/$defs/RetryFailedTargetRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/environments/{environment}/exposure-grace",
+      "request": {
+        "$ref": "#/$defs/ExposureGraceRequest"
       },
       "response": {
         "$ref": "#/$defs/ManagementLifecycleResult"
@@ -6684,6 +9281,15 @@
       }
     },
     {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/environments/{environment}/recipient-keys",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/EnvironmentRecipients"
+      }
+    },
+    {
       "auth": "management",
       "method": "GET",
       "path": "/v1/runners/{credential_id}",
@@ -6729,6 +9335,50 @@
       "path": "/v1/products/{product}/channels/{channel}/hold/release",
       "request": {
         "$ref": "#/$defs/ChannelHoldRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "publish",
+      "method": "POST",
+      "path": "/v1/products/{product}/channels/{channel}/remove",
+      "request": {
+        "$ref": "#/$defs/ChannelRemoveRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/products/{product}/channels/{channel}/pace",
+      "request": {
+        "$ref": "#/$defs/ChannelConfigureRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/products/{product}/channels/{channel}/admit",
+      "request": {
+        "$ref": "#/$defs/ChannelAdmitRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/products/{product}/channels/{channel}/exposure-grace",
+      "request": {
+        "$ref": "#/$defs/ChannelExposureGraceRequest"
       },
       "response": {
         "$ref": "#/$defs/ManagementLifecycleResult"
@@ -6788,6 +9438,28 @@
       }
     },
     {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/products/{product}/recall-range",
+      "request": {
+        "$ref": "#/$defs/RecallRangeRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/products/{product}/recall-range/close",
+      "request": {
+        "$ref": "#/$defs/RecallRangeCloseRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
       "auth": "publish",
       "method": "POST",
       "path": "/v1/channels/{channel}/promote",
@@ -6803,7 +9475,7 @@
       "method": "POST",
       "path": "/v1/model-evaluation/trust",
       "request": {
-        "$ref": "#/$defs/EvaluationTrustRoots"
+        "$ref": "#/$defs/TrustRoots"
       },
       "response": {
         "type": "null"

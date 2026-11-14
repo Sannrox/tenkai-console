@@ -34,29 +34,42 @@ export const registerBody = (
 const SEGMENT: Record<EnvironmentConfigChange["kind"], string> = {
   set_fact: "facts",
   clear_fact: "facts",
+  set_label: "labels",
+  clear_label: "labels",
   set_constraint: "constraints",
   clear_constraint: "constraints",
   set_maintenance_window: "maintenance-windows",
   remove_maintenance_window: "maintenance-windows",
   set_webhook: "webhooks",
   clear_webhooks: "webhooks",
+  set_owner: "owner",
+  clear_owner: "owner",
   set_approval_policy: "approval-policy",
   clear_approval_policy: "approval-policy",
-  // Routable for completeness; the console has no editor for it yet.
-  set_runner_attestation: "runner-attestation",
-  clear_runner_attestation: "runner-attestation",
   set_criticality: "criticality",
   clear_criticality: "criticality",
+  // Routable for completeness; the console has no editor for these yet.
+  set_runner_attestation: "runner-attestation",
+  clear_runner_attestation: "runner-attestation",
+  bind: "bindings",
+  unbind: "bindings",
+  set_sealed_secret: "sealed-secrets",
+  set_sealed_recovery_key: "sealed-secrets",
+  delete_sealed_secret: "sealed-secrets",
 };
 
 const CLEARS = new Set<EnvironmentConfigChange["kind"]>([
   "clear_fact",
+  "clear_label",
   "clear_constraint",
   "remove_maintenance_window",
   "clear_webhooks",
+  "clear_owner",
   "clear_approval_policy",
   "clear_runner_attestation",
   "clear_criticality",
+  "unbind",
+  "delete_sealed_secret",
 ]);
 
 /** The route, method and body of one change, as the server routes it. */

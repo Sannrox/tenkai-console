@@ -80,7 +80,7 @@ describe("compatibility", () => {
         release_digest: "8f3a",
         failures: [],
         satisfied_by: "postgres@16.2.0",
-      } as CompatibilityReport),
+      } as unknown as CompatibilityReport),
     ).toBe("none");
   });
 
