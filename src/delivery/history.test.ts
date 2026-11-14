@@ -111,6 +111,12 @@ describe("parseHistory", () => {
     expect(parsed?.items[0]?.cause).toBeUndefined();
   });
 
+  it("keeps the environment owner the page reports", () => {
+    expect(
+      parseHistory({ items: [], owner: { contact: "ops", endpoints: ["https://h.test"] } })?.owner,
+    ).toStrictEqual({ contact: "ops", endpoints: ["https://h.test"] });
+  });
+
   it("rejects a body without items", () => {
     expect(parseHistory({ next_cursor: "x" })).toBeUndefined();
   });

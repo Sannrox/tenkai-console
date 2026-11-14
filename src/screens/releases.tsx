@@ -26,14 +26,16 @@ import { Migrations } from "./migrations";
 import { PromotionPolicies } from "./promotion-policies";
 
 const ReleaseLabels = lazy(() => import("./release-labels"));
+// Product owners and endpoints load on first visit to this screen.
+const ProductOwners = lazy(() => import("./product-owners"));
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 
 /**
  * The software catalog. Channels (decision 4D): the head each channel points
  * to, from the channel catalog; below it, promotion policy status, a release's
- * compatibility per environment, publish, promote, recall, release labels,
- * and package migrations.
+ * compatibility per environment, product owners, publish, promote, recall,
+ * release labels, and package migrations.
  */
 export const Releases = () => {
   const token = useSession((state) => state.session?.accessToken);
@@ -89,6 +91,11 @@ export const Releases = () => {
       </Card>
       <PromotionPolicies fleet={delivery.fleet} loading={delivery.loading} />
       {token !== undefined && <Compatibility token={token} environments={names} />}
+      {token !== undefined && (
+        <Suspense fallback={null}>
+          <ProductOwners token={token} products={table.products} />
+        </Suspense>
+      )}
       {token !== undefined && <Catalog token={token} channels={table.channels} />}
       {token !== undefined && (
         <Suspense>

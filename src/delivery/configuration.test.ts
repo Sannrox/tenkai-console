@@ -185,6 +185,21 @@ describe("fleet table rows", () => {
     };
     expect(fleetTableRows(fleet, [])[0]?.lastApply).toBe("succeeded");
   });
+
+  it("shows the environment owner, and a dot when none is set", () => {
+    const fleet: FleetStatusReport = {
+      environment_count: 2,
+      environments: [fleetRow("edge", { owner: "ops@example.test" }), fleetRow("lab")],
+      environments_behind: 0,
+      environments_current: 2,
+      environments_empty: 0,
+      environments_unhealthy: 0,
+    };
+    expect(fleetTableRows(fleet, []).map((row) => row.owner)).toStrictEqual([
+      "ops@example.test",
+      "·",
+    ]);
+  });
 });
 
 describe("fleet attention", () => {
