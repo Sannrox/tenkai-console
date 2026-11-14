@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai commit 59e4ca4790c799879ade94642f46a81924b5044d tenkai-http-v1.schema.json (sha256 c896e1c3749a90d9d0ec44f8e625985bc11d49775c2593c43fcc84f55744c65f, contract tenkai.http.v1).
+// Generated from Sannrox/tenkai commit 9e1f8c9ddb9dbf3d660e293c59c4ba29932b7eea tenkai-http-v1.schema.json (sha256 6568bb44cbc333470df620d880fb15f225cd7bf60e50aa7b56ba545f70219896, contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -145,6 +145,20 @@ export type ConnectivityClass = ("connected" | "intermittent" | "isolated")
  * via the `definition` "CriticalityLevel".
  */
 export type CriticalityLevel = ("low" | "medium" | "high" | "critical")
+/**
+ * Configuration that caused a delivery: an environment's or a product's
+ * endpoint list. A URL on both is one delivery with both sources.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DeliverySource".
+ */
+export type DeliverySource = ({
+kind: "environment"
+name: string
+} | {
+kind: "product"
+name: string
+})
 /**
  * Whether an owner or one endpoint receives notifications.
  * 
@@ -499,6 +513,7 @@ DeliveryFreezeRequest?: DeliveryFreezeRequest
 DeliveryHold?: DeliveryHold
 DeliveryHoldRequest?: DeliveryHoldRequest
 DeliveryHoldView?: DeliveryHoldView
+DeliverySource?: DeliverySource
 DependencyHoldView?: DependencyHoldView
 DeploymentAttemptView?: DeploymentAttemptView
 DeploymentCause?: DeploymentCause
@@ -1949,7 +1964,8 @@ reachability?: OwnerReachability
 }
 /**
  * Whether notifications reach this owner, from recorded deliveries.
- * Present where delivery records are readable (environment inspect).
+ * Present where delivery records are readable: environment inspect and
+ * product owner reads on a community host.
  */
 export interface OwnerReachability {
 endpoints?: EndpointReachability[]
@@ -3260,6 +3276,11 @@ subscription_count: number
  * True when any subscription has health `unknown` or a non-empty error.
  */
 unhealthy: boolean
+/**
+ * True when the environment has neither an owner nor a webhook endpoint
+ * of its own. Product endpoints are not counted. Omitted when false.
+ */
+unrouted?: boolean
 }
 /**
  * One open deployed exposure, with age, on a fleet row (#900).
@@ -4924,6 +4945,12 @@ id: string
  */
 last_error?: string
 next_attempt_at: number
+/**
+ * Configuration that caused this delivery: the environment, the
+ * product, or both when they share the URL. Omitted for host webhooks
+ * and for deliveries recorded before sources were kept.
+ */
+sources?: DeliverySource[]
 /**
  * `pending`, `retrying` or `delivered`. The environment list also shows
  * one synthetic `unconfigured` row (event `owner.unconfigured`) while

@@ -3,6 +3,7 @@ import { configCall } from "../management/environment-config";
 import {
   deliveryRows,
   fetchDeliveries,
+  fetchProductDeliveries,
   fetchProductRouting,
   ownerReach,
   productEndpointPath,
@@ -66,6 +67,38 @@ describe("fetchDeliveries", () => {
         error: "owner ops has no notification endpoint",
       },
     ]);
+  });
+});
+
+describe("fetchProductDeliveries", () => {
+  it("reads the product route and keeps each delivery's sources", async () => {
+    const fetcher = answering(200, [
+      {
+        ...RETRYING,
+        sources: [
+          { kind: "environment", name: "prod" },
+          { kind: "product", name: "api" },
+        ],
+      },
+    ]);
+    const load = await fetchProductDeliveries("api", "t", fetcher);
+    const called = fetcher.mock.calls[0]?.[0];
+    const href =
+      called instanceof URL ? called.href : called instanceof Request ? called.url : called;
+    expect(href).toMatch(/v1\/products\/api\/webhooks\/deliveries$/);
+    expect(load.kind === "ok" ? load.value[0]?.sources : undefined).toStrictEqual([
+      { kind: "environment", name: "prod" },
+      { kind: "product", name: "api" },
+    ]);
+  });
+
+  it("reads an older server as unavailable and 403 as no access", async () => {
+    expect(await fetchProductDeliveries("api", "t", answering(404, {}))).toStrictEqual({
+      kind: "unavailable",
+    });
+    expect(await fetchProductDeliveries("api", "t", answering(403, {}))).toStrictEqual({
+      kind: "forbidden",
+    });
   });
 });
 

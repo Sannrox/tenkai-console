@@ -42,24 +42,21 @@ const WebhookDelivery = type({
   next_attempt_at: "number",
   "delivered_at?": "number",
   "last_error?": "string",
+  // Kind stays a string so a source kind this console does not know reads as is.
+  "sources?": type({ kind: "string", name: "string", "+": "delete" }).array(),
   "+": "delete",
 });
 
 export type WebhookDelivery = typeof WebhookDelivery.infer;
 
-/** `GET /v1/environments/{environment}/webhooks/deliveries`, newest first per kind. */
-export const fetchDeliveries = async (
-  environment: string,
+const readDeliveries = async (
+  path: string,
   token: string,
-  fetcher: typeof fetch = fetch,
+  fetcher: typeof fetch,
 ): Promise<Load<WebhookDelivery[]>> => {
   let raw: unknown;
   try {
-    raw = await request<unknown>(
-      `v1/environments/${encodeURIComponent(environment)}/webhooks/deliveries`,
-      { token },
-      fetcher,
-    );
+    raw = await request<unknown>(path, { token }, fetcher);
   } catch (error) {
     return failedLoad(error);
   }
@@ -68,6 +65,30 @@ export const fetchDeliveries = async (
     ? { kind: "error", message: "Could not load" }
     : { kind: "ok", value };
 };
+
+/** `GET /v1/environments/{environment}/webhooks/deliveries`, newest first per kind. */
+export const fetchDeliveries = (
+  environment: string,
+  token: string,
+  fetcher: typeof fetch = fetch,
+): Promise<Load<WebhookDelivery[]>> =>
+  readDeliveries(
+    `v1/environments/${encodeURIComponent(environment)}/webhooks/deliveries`,
+    token,
+    fetcher,
+  );
+
+/**
+ * `GET /v1/products/{product}/webhooks/deliveries` (Tenkai #1291): deliveries
+ * the product's endpoints routed, in every environment the caller may read.
+ * Older servers and tenant mode read as unavailable.
+ */
+export const fetchProductDeliveries = (
+  product: string,
+  token: string,
+  fetcher: typeof fetch = fetch,
+): Promise<Load<WebhookDelivery[]>> =>
+  readDeliveries(`${productPath(product, "webhooks")}/deliveries`, token, fetcher);
 
 export type DeliveryRow = {
   id: string;

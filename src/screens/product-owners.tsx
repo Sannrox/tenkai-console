@@ -1,11 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import type { OwnerView, WebhookEndpoint, WebhookEvent } from "../api/tenkai.gen";
+import type {
+  FleetStatusReport,
+  OwnerView,
+  WebhookEndpoint,
+  WebhookEvent,
+} from "../api/tenkai.gen";
+import { failureGroups, type Source } from "../delivery/attribution";
 import {
   endpointsLine,
+  fetchProductDeliveries,
   fetchProductRouting,
   type Load,
   ownerLine,
+  ownerReach,
   type ProductRouting,
   productEndpointPath,
   productPath,
@@ -13,6 +21,7 @@ import {
 } from "../delivery/owners";
 import { useManagementCall } from "../management/use-management";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
+import { DeliveryFailures, Endpoints, TONE } from "./notification-routing";
 
 const field =
   "min-w-0 rounded-md border border-field bg-white/4 px-2.5 py-1.5 text-xs text-fg placeholder:text-muted";
@@ -31,11 +40,20 @@ const LOAD_TEXT = {
 
 /**
  * Product owners and their own notification endpoints, one row per product
- * in the catalog. Product writes carry no generation or reason: the last
- * write wins. One endpoint is removed by URL; the others stay. Each confirmed click is one request; a lost answer reads as
+ * in the catalog, with the server's reachability verdict where it reports one
+ * and failing product deliveries by source and owner. Product writes carry no
+ * generation or reason: the last write wins. One endpoint is removed by URL; the others stay. Each confirmed click is one request; a lost answer reads as
  * unknown and is not resent.
  */
-export const ProductOwners = ({ token, products }: { token: string; products: string[] }) => {
+export const ProductOwners = ({
+  token,
+  products,
+  fleet,
+}: {
+  token: string;
+  products: string[];
+  fleet: FleetStatusReport | undefined;
+}) => {
   const query = useQuery({
     queryKey: ["product-owners", token, products],
     queryFn: async () =>
@@ -50,6 +68,16 @@ export const ProductOwners = ({ token, products }: { token: string; products: st
     retry: false,
   });
   const call = useManagementCall(token, "fleet", "management", describe);
+  const routed = Object.values(query.data ?? {}).flatMap((load) =>
+    load.kind === "ok" ? [load.value] : [],
+  );
+  // Older servers and tenant hosts report no verdict: the column stays away.
+  const reaching = routed.some((value) => value.owner?.reachability !== undefined);
+  const endpoints = products.flatMap((name) => {
+    const load = query.data?.[name];
+    const reach = load?.kind === "ok" ? ownerReach(load.value.owner) : undefined;
+    return (reach?.endpoints ?? []).map((row) => Object.assign(row, { product: name }));
+  });
   const [product, setProduct] = useState("");
   const selected = products.includes(product) ? product : (products[0] ?? "");
   const routing = query.data?.[selected];
@@ -66,17 +94,19 @@ export const ProductOwners = ({ token, products }: { token: string; products: st
             <tr>
               <th className={th}>Product</th>
               <th className={th}>Owner</th>
+              {reaching && <th className={th}>Reachability</th>}
               <th className={th}>Endpoints</th>
             </tr>
           </thead>
           <tbody>
             {products.map((name) => {
               const load = query.data?.[name];
+              const reach = load?.kind === "ok" ? ownerReach(load.value.owner) : undefined;
               return (
                 <tr key={name} className="[&:last-child>td]:border-b-0">
                   <td className={`${td} font-semibold`}>{name}</td>
                   {load === undefined ? (
-                    <td colSpan={2} className={`${td} text-muted`}>
+                    <td colSpan={reaching ? 3 : 2} className={`${td} text-muted`}>
                       Loading
                     </td>
                   ) : load.kind === "ok" ? (
@@ -84,12 +114,20 @@ export const ProductOwners = ({ token, products }: { token: string; products: st
                       <td className={`${td} break-all ${load.value.owner ? "" : "text-muted"}`}>
                         {ownerLine(load.value.owner)}
                       </td>
+                      {reaching && (
+                        <td
+                          aria-label={`${name} reachability`}
+                          className={`${td} ${reach ? TONE[reach.tone] : "text-muted"}`}
+                        >
+                          {reach?.verdict ?? "·"}
+                        </td>
+                      )}
                       <td className={`${td} font-mono break-all`}>
                         {endpointsLine(load.value.webhooks.map((hook) => hook.url))}
                       </td>
                     </>
                   ) : (
-                    <td colSpan={2} className={`${td} text-muted`}>
+                    <td colSpan={reaching ? 3 : 2} className={`${td} text-muted`}>
                       {load.kind === "error" ? load.message : LOAD_TEXT[load.kind]}
                     </td>
                   )}
@@ -99,6 +137,8 @@ export const ProductOwners = ({ token, products }: { token: string; products: st
           </tbody>
         </table>
       </Card>
+      {endpoints.length > 0 && <Endpoints rows={endpoints} />}
+      <ProductFailures token={token} products={products} routing={query.data} fleet={fleet} />
       {call.allowed && current && (
         <Card className="mt-2 flex flex-wrap items-center gap-2 px-3.5 py-3 text-xs">
           {products.length > 1 && (
@@ -132,6 +172,68 @@ export const ProductOwners = ({ token, products }: { token: string; products: st
         </div>
       )}
     </section>
+  );
+};
+
+/**
+ * Failing deliveries the products' endpoints routed, by source and owner.
+ * Hidden where the server lists no product deliveries (older servers, tenant
+ * hosts); a product the caller may not read is named, never guessed.
+ */
+const MISSED = {
+  forbidden: "No access to deliveries of",
+  error: "Could not load deliveries of",
+} as const;
+
+const ProductFailures = ({
+  token,
+  products,
+  routing,
+  fleet,
+}: {
+  token: string;
+  products: string[];
+  routing: Record<string, Load<ProductRouting>> | undefined;
+  fleet: FleetStatusReport | undefined;
+}) => {
+  const query = useQuery({
+    queryKey: ["product-deliveries", token, products],
+    queryFn: () =>
+      Promise.all(
+        products.map(
+          async (product) => [product, await fetchProductDeliveries(product, token)] as const,
+        ),
+      ),
+    retry: false,
+  });
+  const loads = query.data ?? [];
+  const listed = loads.flatMap(([, load]) => (load.kind === "ok" ? load.value : []));
+  const missed = (kind: "forbidden" | "error") =>
+    loads.flatMap(([product, load]) => (load.kind === kind ? [product] : []));
+  if (!loads.some(([, load]) => load.kind !== "unavailable")) {
+    return null;
+  }
+  const ownerOf = ({ kind, name }: Source): string | undefined => {
+    if (kind === "product") {
+      const load = routing?.[name];
+      return load?.kind === "ok" ? ownerLine(load.value.owner) : undefined;
+    }
+    const row = fleet?.environments.find((item) => item.name === name);
+    return kind === "environment" && row ? row.owner?.trim() || "none" : undefined;
+  };
+  return (
+    <>
+      {loads.some(([, load]) => load.kind === "ok") && (
+        <DeliveryFailures groups={failureGroups(listed, ownerOf)} />
+      )}
+      {(["forbidden", "error"] as const).map((kind) =>
+        missed(kind).length > 0 ? (
+          <p key={kind} className="mt-1 mb-0 text-xs text-muted">
+            {MISSED[kind]} {missed(kind).join(", ")}
+          </p>
+        ) : null,
+      )}
+    </>
   );
 };
 
