@@ -419,3 +419,21 @@ describe("PlanPage apply steps", () => {
     expect(container.querySelector('table[aria-label="Apply steps"]')).toBeNull();
   });
 });
+
+describe("PlanPage access", () => {
+  it("says no access to the plan without the server's words", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(
+        async () =>
+          new Response(JSON.stringify({ error: "insufficient delivery capability" }), {
+            status: 403,
+          }),
+      ),
+    );
+    await render();
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe("No access to this plan");
+    expect(container.textContent).not.toContain("insufficient delivery capability");
+    expect(container.querySelector('[aria-label="Approval brief"]')).toBeNull();
+  });
+});
