@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import type { ChannelListEntry, ManagementLifecycleResult } from "../api/tenkai.gen";
 import { useAuthSession } from "../auth/identity";
 import { graceWindow } from "../delivery/grace";
@@ -8,15 +8,16 @@ import {
   admitOutcome,
   admitPath,
   admittable,
+  configuredPace,
   fetchPace,
   instanceName,
   paceBody,
   paceChannels,
   paceInstant,
   paceOutcome,
+  paceRows,
   paceStatus,
   pacePath,
-  paceText,
   parsePace,
   type PaceChannel,
   type PaceInstance,
@@ -88,18 +89,35 @@ const ChannelPace = ({ token, items }: { token: string; items: readonly ChannelL
           </span>
         </p>
       )}
-      {target && <Pace key={picked} token={token} target={target} />}
+      {target && (
+        <Pace
+          key={picked}
+          token={token}
+          target={target}
+          configured={configuredPace(items, target)}
+        />
+      )}
     </section>
   );
 };
 
 /**
- * One channel's pace and its progress. The editor and early admission are
- * offered only when `/v1/auth/me` grants management and no credential refusal
- * hid it. Each confirmed click is one request; a lost answer reads as unknown
- * and is never resent. A confirmed write reads the pace again.
+ * One channel's pace and its progress. `configured` is the channel list's
+ * pace, undefined on a server that does not report it. The editor and early
+ * admission are offered only when `/v1/auth/me` grants management and no
+ * credential refusal hid it. Each confirmed click is one request; a lost
+ * answer reads as unknown and is never resent. A settled write refreshes the
+ * channel list and a confirmed one reads the pace again.
  */
-const Pace = ({ token, target }: { token: string; target: PaceChannel }) => {
+const Pace = ({
+  token,
+  target,
+  configured,
+}: {
+  token: string;
+  target: PaceChannel;
+  configured: number | null | undefined;
+}) => {
   const { product, channel } = target;
   const query = useQuery({
     queryKey: ["channel-pace", token, product, channel],
@@ -136,8 +154,17 @@ const Pace = ({ token, target }: { token: string; target: PaceChannel }) => {
     <div className="mt-2 grid gap-2 text-xs">
       {load === undefined ? null : load.kind === "ok" ? (
         <dl aria-label="Pace" className="m-0 grid grid-cols-[max-content_1fr] gap-x-4">
-          <dt className="text-muted">current head</dt>
-          <dd className="m-0 font-mono">{paceText(load.progress?.duration_ms ?? null)}</dd>
+          {paceRows(configured, load.progress?.duration_ms ?? null).map(
+            ({ label, pace: shown, note }) => (
+              <Fragment key={label}>
+                <dt className="text-muted">{label}</dt>
+                <dd className="m-0">
+                  <span className="font-mono">{shown}</span>
+                  {note && <span className="text-muted"> {note}</span>}
+                </dd>
+              </Fragment>
+            ),
+          )}
         </dl>
       ) : (
         <p className="m-0 text-muted">{LOAD_TEXT[load.kind]}</p>
@@ -162,7 +189,7 @@ const Pace = ({ token, target }: { token: string; target: PaceChannel }) => {
                 }
               }}
             />
-            {load.progress !== null && (
+            {(configured === undefined ? load.progress !== null : configured !== null) && (
               <ConfirmButton
                 label="Turn off"
                 confirm={`Turn off ${name} pace`}
@@ -171,7 +198,9 @@ const Pace = ({ token, target }: { token: string; target: PaceChannel }) => {
               />
             )}
           </div>
-          <p className="m-0 text-muted">A changed pace applies from the next promotion.</p>
+          {configured === undefined && (
+            <p className="m-0 text-muted">A changed pace applies from the next promotion.</p>
+          )}
         </>
       )}
       {outcome && <Notice tone={outcome.tone}>{outcome.text}</Notice>}

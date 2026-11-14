@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../api/http";
+import type { ChannelListEntry } from "../api/tenkai.gen";
 import {
   admitBody,
   admitOutcome,
   admittable,
+  configuredPace,
   fetchPace,
   type PaceInstance,
   paceChannels,
   paceInstant,
   paceOutcome,
+  paceRows,
   paceStatus,
   paceText,
   parsePace,
@@ -115,6 +118,37 @@ describe("pace text", () => {
       undefined,
       undefined,
     ]);
+  });
+});
+
+describe("configured pace", () => {
+  const stable = { product: "api", channel: "stable" };
+  const entry = (name: string, upgrade_pace_ms?: number): ChannelListEntry => ({
+    id: `channel:api/${name}`,
+    product: "api",
+    name,
+    head: "api@1",
+    ...(upgrade_pace_ms === undefined ? {} : { upgrade_pace_ms }),
+  });
+
+  it("reads the channel's pace, off when omitted, and unknown on a server without the field", () => {
+    expect(configuredPace([entry("stable", 7_200_000)], stable)).toBe(7_200_000);
+    expect(configuredPace([entry("stable"), entry("beta", 60_000)], stable)).toBeNull();
+    expect(configuredPace([entry("stable")], stable)).toBeUndefined();
+  });
+
+  it("shows the pace in effect only when it differs from the configured one", () => {
+    expect(paceRows(7_200_000, 7_200_000)).toEqual([{ label: "configured", pace: "2h" }]);
+    expect(paceRows(null, null)).toEqual([{ label: "configured", pace: "off" }]);
+    expect(paceRows(3_600_000, 7_200_000)).toEqual([
+      { label: "configured", pace: "1h", note: "applies from the next promotion" },
+      { label: "in effect", pace: "2h" },
+    ]);
+    expect(paceRows(null, 7_200_000)).toEqual([
+      { label: "configured", pace: "off", note: "applies from the next promotion" },
+      { label: "in effect", pace: "2h" },
+    ]);
+    expect(paceRows(undefined, 7_200_000)).toEqual([{ label: "current head", pace: "2h" }]);
   });
 });
 

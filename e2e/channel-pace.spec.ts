@@ -32,6 +32,17 @@ const CHANNELS: ChannelPage = {
   ],
 };
 
+/** The channel list from a server that reports configured paces. */
+const listed = (pace: number | null): ChannelPage => ({
+  items: CHANNELS.items.map((item) =>
+    item.product === "web"
+      ? { ...item, upgrade_pace_ms: 60_000 }
+      : item.name === "stable" && pace !== null
+        ? { ...item, upgrade_pace_ms: pace }
+        : item,
+  ),
+});
+
 const MANAGER = ["read", "publish", "management"];
 const ok = (body: unknown): Reply => ({ status: 200, body });
 const PACE = /^\/v1\/products\/([^/]+)\/channels\/([^/]+)\/pace$/;
@@ -40,6 +51,12 @@ const ADMIT = "/v1/products/api/channels/stable/admit";
 type Options = {
   /** Pace on `api/stable` in ms; `null` for none. */
   pace?: number | null;
+  /**
+   * Configured pace on `api/stable` in the channel list; `null` for off.
+   * Omitted for a server without the field. When set, writes change it and
+   * leave the pace in effect alone, as a newer server does.
+   */
+  configured?: number | null;
   /** The pace each accepted write leaves, in order: what the server applied. */
   writes?: (number | null)[];
   capabilities?: string[];
@@ -63,6 +80,7 @@ const paceRead = (ms: number | null, instances: PaceInstanceProgress[]): Reply =
 /** A server whose `api/stable` pace follows the writes it accepts. */
 const server = ({
   pace = null,
+  configured,
   writes = [],
   capabilities = ["read"],
   read,
@@ -72,6 +90,7 @@ const server = ({
   admit,
 }: Options): Routes => {
   let current = pace;
+  let config = configured;
   const pending = [...writes];
   let progress = [...reads];
   return (path, request) => {
@@ -93,7 +112,12 @@ const server = ({
         return write;
       }
       if (pending.length > 0) {
-        current = pending.shift() ?? null;
+        const next = pending.shift() ?? null;
+        if (config === undefined) {
+          current = next;
+        } else {
+          config = next;
+        }
       }
       return ok({ version: 1, operation: "channel_configure", message: "upgrade pace set" });
     }
@@ -120,7 +144,7 @@ const server = ({
       return ok({ events: [], next_cursor: "0" });
     }
     if (path === "/v1/channels") {
-      return ok(CHANNELS);
+      return ok(config === undefined ? CHANNELS : listed(config));
     }
     return undefined;
   };
@@ -128,6 +152,8 @@ const server = ({
 
 const section = (page: Page) => page.getByRole("region", { name: "Upgrade pace" });
 const value = (page: Page) => section(page).getByRole("definition");
+const paceList = (page: Page) => section(page).getByRole("definition").locator("xpath=..");
+const NOTE = "A changed pace applies from the next promotion.";
 
 const openPace = async (page: Page, app: MockBackend, channel = "api/stable") => {
   await page.goto(app.url);
@@ -278,6 +304,98 @@ test.describe("channel upgrade pace", () => {
   });
 });
 
+test.describe("configured upgrade pace", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+  let app: MockBackend;
+  test.afterEach(async () => {
+    await app.close();
+  });
+
+  test("shows one pace when the configured pace is in effect", async ({ page }) => {
+    app = await serveConsole(
+      server({ pace: 7_200_000, configured: 7_200_000, capabilities: MANAGER }),
+    );
+    await openPace(page, app);
+    await expect(paceList(page)).toHaveText("configured2h");
+    await expect(section(page)).not.toContainText(NOTE);
+    await page.screenshot({ path: test.info().outputPath("configured-same.png"), fullPage: true });
+    await expectDesignRules(page);
+  });
+
+  test("shows the pace in effect when the configured pace differs", async ({ page }) => {
+    app = await serveConsole(
+      server({ pace: 7_200_000, configured: 3_600_000, capabilities: MANAGER }),
+    );
+    await openPace(page, app);
+    await expect(paceList(page)).toHaveText(
+      "configured1h applies from the next promotionin effect2h",
+    );
+    await expect(section(page)).not.toContainText(NOTE);
+    await page.screenshot({
+      path: test.info().outputPath("configured-differs.png"),
+      fullPage: true,
+    });
+    await expectDesignRules(page);
+  });
+
+  test("shows pacing off", async ({ page }) => {
+    app = await serveConsole(server({ configured: null, capabilities: MANAGER }));
+    await openPace(page, app);
+    await expect(paceList(page)).toHaveText("configuredoff");
+    await expect(section(page).getByRole("button", { name: "Turn off" })).toHaveCount(0);
+    await page.screenshot({ path: test.info().outputPath("configured-off.png"), fullPage: true });
+    await expectDesignRules(page);
+  });
+
+  test("keeps the pace on the current head and the note on a server without the field", async ({
+    page,
+  }) => {
+    app = await serveConsole(server({ pace: 7_200_000, capabilities: MANAGER }));
+    await openPace(page, app);
+    await expect(paceList(page)).toHaveText("current head2h");
+    await expect(section(page)).toContainText(NOTE);
+    await page.screenshot({
+      path: test.info().outputPath("configured-absent.png"),
+      fullPage: true,
+    });
+    await expectDesignRules(page);
+  });
+
+  test("updates the configured pace at once after each write", async ({ page }) => {
+    app = await serveConsole(
+      server({
+        pace: 7_200_000,
+        configured: 7_200_000,
+        writes: [3_600_000, null],
+        capabilities: MANAGER,
+      }),
+    );
+    await openPace(page, app);
+    await expect(paceList(page)).toHaveText("configured2h");
+    const lists = app.sent.filter(({ path }) => path === "/v1/channels").length;
+    await section(page).getByRole("textbox", { name: "Pace" }).fill("1h");
+    await section(page).getByRole("button", { name: "Set pace" }).click();
+    await section(page).getByRole("button", { name: "Set api/stable pace to 1h" }).click();
+    await expect(section(page).getByRole("status")).toHaveText("Pace set to 1h and audited.");
+    await expect(paceList(page)).toHaveText(
+      "configured1h applies from the next promotionin effect2h",
+    );
+    expect(app.sent.filter(({ path }) => path === "/v1/channels").length).toBeGreaterThan(lists);
+
+    // A configured pace not yet in effect can still be turned off.
+    await section(page).getByRole("button", { name: "Turn off" }).click();
+    await section(page).getByRole("button", { name: "Turn off api/stable pace" }).click();
+    await expect(paceList(page)).toHaveText(
+      "configuredoff applies from the next promotionin effect2h",
+    );
+    await page.screenshot({
+      path: test.info().outputPath("configured-after-set.png"),
+      fullPage: true,
+    });
+    await expectDesignRules(page);
+  });
+});
+
 test.describe("channel upgrade pace on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
   let app: MockBackend;
@@ -286,6 +404,20 @@ test.describe("channel upgrade pace on a phone", () => {
   });
 
   // The top bar already overflows a phone, so overflow is checked on this section only.
+  test("keeps a differing configured pace inside the viewport", async ({ page }) => {
+    app = await serveConsole(
+      server({ pace: 7_200_000, configured: 3_600_000, capabilities: MANAGER }),
+    );
+    await openPace(page, app);
+    await expect(section(page)).toContainText("applies from the next promotion");
+    const box = await section(page).boundingBox();
+    expect(box && box.x >= 0 && box.x + box.width <= 390).toBe(true);
+    await page.screenshot({
+      path: test.info().outputPath("configured-differs-phone.png"),
+      fullPage: true,
+    });
+  });
+
   test("keeps the editor inside the viewport", async ({ page }) => {
     app = await serveConsole(server({ pace: 7_200_000, capabilities: MANAGER }));
     await openPace(page, app);

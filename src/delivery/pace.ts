@@ -10,7 +10,8 @@ import type { Outcome } from "../management/use-management";
 /**
  * Channel upgrade pace: the duration over which a promotion's upgrades start.
  * Read from `GET .../pace` (the pace frozen on the current head and where each
- * subscribed instance stands in it), set or cleared with `POST .../pace`, and
+ * subscribed instance stands in it) and the channel list (the configured
+ * pace), set or cleared with `POST .../pace`, and
  * one instance admitted early with `POST .../admit`. Only upgrades are paced:
  * rollbacks and recall removals never appear in the progress.
  */
@@ -98,6 +99,45 @@ export const paceText = (ms: number | null): string => {
   const unit = UNITS.find(([, size]) => ms % size === 0);
   return unit ? `${ms / unit[1]}${unit[0]}` : `${ms}ms`;
 };
+
+/**
+ * A channel's configured pace from the channel list (`upgrade_pace_ms`,
+ * omitted when off), or undefined when the server does not report it. Off
+ * and an older server look the same on one entry, so the field counts as
+ * reported once any listed channel carries it.
+ */
+export const configuredPace = (
+  items: readonly ChannelListEntry[],
+  { product, channel }: PaceChannel,
+): number | null | undefined =>
+  items.some((item) => item.upgrade_pace_ms !== undefined)
+    ? (items.find((item) => item.product === product && item.name === channel)?.upgrade_pace_ms ??
+      null)
+    : undefined;
+
+export type PaceRow = { label: string; pace: string; note?: string };
+
+/**
+ * The pace rows to show: the configured pace, and the pace in effect on the
+ * current head when they differ, since a change applies from the next
+ * promotion. Without a configured pace, only the pace on the current head.
+ */
+export const paceRows = (
+  configured: number | null | undefined,
+  inEffect: number | null,
+): PaceRow[] =>
+  configured === undefined
+    ? [{ label: "current head", pace: paceText(inEffect) }]
+    : configured === inEffect
+      ? [{ label: "configured", pace: paceText(configured) }]
+      : [
+          {
+            label: "configured",
+            pace: paceText(configured),
+            note: "applies from the next promotion",
+          },
+          { label: "in effect", pace: paceText(inEffect) },
+        ];
 
 const DURATION = /^(\d+)(ms|h|m|s)?$/;
 
