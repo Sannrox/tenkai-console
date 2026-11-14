@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai commit cc673d1e4e91739734b893913c18a03c6f97ff7f tenkai-http-v1.schema.json (sha256 1359f5a30fb8b6937484ecb0ba0444637b24e260b28bc0ace25e42fe2f7ded77, contract tenkai.http.v1).
+// Generated from Sannrox/tenkai commit e134e372b318ab757e539e7813e57d0188c43f85 tenkai-http-v1.schema.json (sha256 ad3b9818779e97742e9c5caacc1a03df6318642441273e67a7c9d347b3116888, contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -514,6 +514,7 @@ EnvironmentDeclaredCriticality?: EnvironmentDeclaredCriticality
 EnvironmentDependencies?: EnvironmentDependencies
 EnvironmentDerivedCriticality?: EnvironmentDerivedCriticality
 EnvironmentExposure?: EnvironmentExposure
+EnvironmentGrace?: EnvironmentGrace
 EnvironmentInspectReport?: EnvironmentInspectReport
 EnvironmentLeaseInspect?: EnvironmentLeaseInspect
 EnvironmentListEntry?: EnvironmentListEntry
@@ -543,6 +544,8 @@ ExposureQueryRequest?: ExposureQueryRequest
 ExposureQueryResult?: ExposureQueryResult
 ExposureWaiver?: ExposureWaiver
 ExposureWaiverClearRequest?: ExposureWaiverClearRequest
+ExposureWaiverList?: ExposureWaiverList
+ExposureWaiverListQuery?: ExposureWaiverListQuery
 ExposureWaiverRequest?: ExposureWaiverRequest
 FailureThreshold?: FailureThreshold1
 FeedbackEvent?: FeedbackEvent
@@ -708,10 +711,27 @@ export interface MatchedExposure {
 advisory_id: string
 component: string
 component_version: string
+/**
+ * Grace per environment that runs or subscribes to this release, for
+ * findings with a first-seen stamp. Omitted when no grace applies.
+ */
+grace?: EnvironmentGrace[]
 release: string
 release_id: string
 severity: Severity
 waiver?: ExposureWaiver
+}
+/**
+ * Grace on one open finding in one environment. `grace_ends_at` is the
+ * first-seen stamp plus the environment's (or its channel's) grace window.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EnvironmentGrace".
+ */
+export interface EnvironmentGrace {
+environment: string
+grace_ends_at: number
+in_grace: boolean
 }
 /**
  * Active waiver plus the fields query and inspect show.
@@ -1254,6 +1274,11 @@ version: number
  * via the `definition` "ChannelListEntry".
  */
 export interface ChannelListEntry {
+/**
+ * Exposure grace window declared on this channel, in milliseconds.
+ * An environment's own grace takes precedence. Omitted when unset.
+ */
+exposure_grace_ms?: number
 head: string
 hold?: DeliveryHold
 id: string
@@ -2212,6 +2237,11 @@ description: string
  * Execution ownership note: Tenkai never prints runtime bearer tokens.
  */
 execution_note: string
+/**
+ * Exposure grace window declared on this environment, in milliseconds.
+ * Omitted when unset; a subscribed channel may still declare its own.
+ */
+exposure_grace_ms?: number
 facts: {
 [k: string]: string
 }
@@ -3022,6 +3052,28 @@ scope: string
 version: number
 }
 /**
+ * Waivers returned by `GET /v1/exposures/waivers`, active ones only unless
+ * expired ones were requested.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ExposureWaiverList".
+ */
+export interface ExposureWaiverList {
+waivers: ExposureWaiver[]
+}
+/**
+ * Query parameters for `GET /v1/exposures/waivers`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ExposureWaiverListQuery".
+ */
+export interface ExposureWaiverListQuery {
+/**
+ * Also return waivers whose expiry has passed but are not yet cleared.
+ */
+include_expired?: boolean
+}
+/**
  * Body of `POST /v1/exposures/waivers`.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -3119,6 +3171,15 @@ export interface OpenEnvironmentExposure {
 advisory_id: string
 age_ms: number
 first_seen_at: number
+/**
+ * First-seen plus the environment's (or its channel's) exposure grace.
+ * Omitted when no grace applies.
+ */
+grace_ends_at?: number
+/**
+ * True while `grace_ends_at` is in the future.
+ */
+in_grace?: boolean
 /**
  * True when `age_ms` exceeds `exposure.max_age_ms.<severity>` on the environment.
  */

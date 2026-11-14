@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type { ChannelListEntry, ManagementLifecycleResult } from "../api/tenkai.gen";
 import { useAuthSession } from "../auth/identity";
+import { graceWindow } from "../delivery/grace";
 import {
   admitBody,
   admitOutcome,
@@ -49,8 +50,9 @@ const LOAD_TEXT = {
 /**
  * Upgrade pace on the Releases screen: pick a channel with a head, read the
  * pace and progress on its current head, set or turn off the pace, and admit
- * one instance early. Loaded lazily, and one
- * read per picked channel, so a large catalog costs nothing up front.
+ * one instance early. The picked channel's declared exposure grace shows
+ * too. Loaded lazily, and one read per picked channel, so a large catalog
+ * costs nothing up front.
  */
 const ChannelPace = ({ token, items }: { token: string; items: readonly ChannelListEntry[] }) => {
   const channels = paceChannels(items);
@@ -75,6 +77,17 @@ const ChannelPace = ({ token, items }: { token: string; items: readonly ChannelL
           </option>
         ))}
       </select>
+      {target && (
+        <p aria-label="Channel grace" className="mt-2 mb-0 text-xs">
+          <span className="text-muted">exposure grace </span>
+          <span className="font-mono">
+            {graceWindow(
+              items.find((item) => item.product === target.product && item.name === target.channel)
+                ?.exposure_grace_ms,
+            )}
+          </span>
+        </p>
+      )}
       {target && <Pace key={picked} token={token} target={target} />}
     </section>
   );

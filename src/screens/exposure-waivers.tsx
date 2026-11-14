@@ -9,6 +9,8 @@ import { useAuthSession } from "../auth/identity";
 import {
   WAIVER_CATEGORIES,
   WAIVER_SCOPES,
+  inGrace,
+  minuteUtc,
   scopeLabel,
   scopeTarget,
   waiverClearBody,
@@ -29,7 +31,8 @@ const matchKey = (match: MatchedExposure): string =>
 const describe = (result: ManagementLifecycleResult): string => result.message;
 
 /**
- * Advisory-feed matches with their waiver (#121). Waive and remove are
+ * Advisory-feed matches with their waiver (#121) and the environments still
+ * within grace, with the server's grace end (#164). Waive and remove are
  * catalog-wide management writes: hidden when `/v1/auth/me` lacks management
  * or after a credential refusal, confirmed once per send, never retried.
  */
@@ -60,6 +63,7 @@ export const Findings = ({ token, matches }: { token: string; matches: MatchedEx
               <th className={th}>Severity</th>
               <th className={th}>Release</th>
               <th className={th}>Component</th>
+              <th className={th}>Grace</th>
               <th className={th}>Waiver</th>
               {permitted && <th className={th} aria-label="Actions" />}
             </tr>
@@ -67,7 +71,7 @@ export const Findings = ({ token, matches }: { token: string; matches: MatchedEx
           <tbody>
             {matches.length === 0 ? (
               <tr>
-                <td className={`${td} text-muted`} colSpan={permitted ? 6 : 5}>
+                <td className={`${td} text-muted`} colSpan={permitted ? 7 : 6}>
                   no findings
                 </td>
               </tr>
@@ -75,6 +79,7 @@ export const Findings = ({ token, matches }: { token: string; matches: MatchedEx
               matches.map((match) => {
                 const state = waiverState(match.waiver, now);
                 const key = matchKey(match);
+                const grace = inGrace(match.grace);
                 return (
                   <tr key={key}>
                     <td className={`${td} font-mono`}>{match.advisory_id}</td>
@@ -82,6 +87,17 @@ export const Findings = ({ token, matches }: { token: string; matches: MatchedEx
                     <td className={`${td} font-mono`}>{match.release}</td>
                     <td className={`${td} font-mono`}>
                       {match.component} {match.component_version}
+                    </td>
+                    <td className={td}>
+                      {grace.length === 0 ? (
+                        <span className="text-muted">·</span>
+                      ) : (
+                        grace.map((entry) => (
+                          <div key={entry.environment}>
+                            {entry.environment} until {minuteUtc(entry.grace_ends_at)}
+                          </div>
+                        ))
+                      )}
                     </td>
                     <td className={`${td} ${state === "expiring" ? "text-warning" : ""}`}>
                       {state === "none" || match.waiver === undefined ? (

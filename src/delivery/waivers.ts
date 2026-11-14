@@ -1,4 +1,7 @@
+import { type } from "arktype";
+import { ApiError, request } from "../api/http";
 import type {
+  EnvironmentGrace,
   ExposureWaiver,
   ExposureWaiverClearRequest,
   ExposureWaiverRequest,
@@ -11,6 +14,8 @@ import type {
  * Advisory waivers on advisory-feed matches (Sannrox/tenkai#1064). The server
  * attaches only unexpired waivers to `GET /v1/advisory-feed` matches; the
  * console adds the expiring-soon highlight and builds set and clear bodies.
+ * `GET /v1/exposures/waivers` lists every stored waiver, and grace ends and
+ * windows come from the server as sent (Sannrox/tenkai#1277).
  */
 
 /** Console choice, not server policy: a waiver ending within a week is highlighted. */
@@ -96,6 +101,68 @@ export const waiverClearBody = (
   product: waiver.product ?? null,
 });
 
+/** A server instant to the minute, in UTC. */
+export const minuteUtc = (ms: number): string => `${new Date(ms).toISOString().slice(0, 16)}Z`;
+
 /** One table cell: scope, category, expiry, and who set it. */
 export const waiverLine = (waiver: ExposureWaiver): string =>
-  `${scopeLabel(waiver.scope, waiver)} · ${waiver.category.replaceAll("_", " ")} · until ${new Date(waiver.expires_at).toISOString().slice(0, 16)}Z · by ${waiver.actor}`;
+  `${scopeLabel(waiver.scope, waiver)} · ${waiver.category.replaceAll("_", " ")} · until ${minuteUtc(waiver.expires_at)} · by ${waiver.actor}`;
+
+const Waiver = type({
+  actor: "string",
+  advisory_id: "string",
+  category: type.enumerated(...WAIVER_CATEGORIES),
+  "component?": "string",
+  expires_at: "number",
+  "product?": "string",
+  reason: "string",
+  "release_id?": "string",
+  scope: type.enumerated(...WAIVER_SCOPES),
+});
+const WaiverList = type({ waivers: Waiver.array() });
+
+export type WaiverListLoad =
+  | { kind: "ok"; waivers: ExposureWaiver[] }
+  | { kind: "unavailable" }
+  | { kind: "forbidden" }
+  | { kind: "error" };
+
+export const waiverListPath = (includeExpired: boolean): string =>
+  includeExpired ? "v1/exposures/waivers?include_expired=true" : "v1/exposures/waivers";
+
+/**
+ * Stored waivers, soonest expiry first. The server returns expired ones only
+ * when asked. 403 is no permission; 405 (the route predates the list) or a
+ * bare 404 is an older server; nothing raw is shown.
+ */
+export const fetchWaivers = async (
+  includeExpired: boolean,
+  token: string,
+  fetcher: typeof fetch = fetch,
+): Promise<WaiverListLoad> => {
+  let raw: unknown;
+  try {
+    raw = await request<unknown>(waiverListPath(includeExpired), { token }, fetcher);
+  } catch (error) {
+    if (error instanceof ApiError) {
+      if (error.status === 403) {
+        return { kind: "forbidden" };
+      }
+      if (error.status === 405 || error.status === 404) {
+        return { kind: "unavailable" };
+      }
+    }
+    return { kind: "error" };
+  }
+  const list = WaiverList(raw);
+  return list instanceof type.errors
+    ? { kind: "error" }
+    : {
+        kind: "ok",
+        waivers: list.waivers.toSorted((a, b) => a.expires_at - b.expires_at),
+      };
+};
+
+/** Environments where a finding is still within grace, as the server reports them. */
+export const inGrace = (grace: readonly EnvironmentGrace[] | undefined): EnvironmentGrace[] =>
+  (grace ?? []).filter((entry) => entry.in_grace);
