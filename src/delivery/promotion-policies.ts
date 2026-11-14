@@ -144,10 +144,19 @@ export const evidenceLine = (evidence: PolicyView["evidence"]): string =>
     evidence.evaluation && "evaluation",
     `healthy >= ${share(evidence.healthy_min_share ?? 1)}`,
     `failing <= ${share(evidence.failing_max_share ?? 0)}`,
-    evidence.recall_on_failing && "recall on failing",
   ]
     .filter(Boolean)
     .join(" · ");
+
+/**
+ * The recall rule: with `recall_on_failing`, a soak whose failing time share
+ * exceeds `failing_max_share` recalls the soaking release instead of only
+ * resetting the soak. Instances without health evidence never count.
+ */
+export const recallRule = (view: PolicyView): string =>
+  view.evidence.recall_on_failing
+    ? `when failing > ${share(view.evidence.failing_max_share ?? 0)} of ${ageMs(view.soak_duration_ms)} soak`
+    : "off, a failing soak only resets";
 
 /** A 0..1 time share as a whole percent. */
 export const share = (value: number): string => `${Math.round(value * 100)}%`;

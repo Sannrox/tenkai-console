@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai commit 818aad60aaf9b47e2a3c8dda0da4e265f0e87f7b tenkai-http-v1.schema.json (sha256 28dd61753a68c8b245e402796318b14a49271405fb92b224b159a0c544fe5f1a, contract tenkai.http.v1).
+// Generated from Sannrox/tenkai commit f06b88569882f92001bd003f511067766763f57b tenkai-http-v1.schema.json (sha256 5aa0f24344ec06183ea490dd81fc77e5350c7454bb5702fc19e972d5985680ca, contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -608,8 +608,12 @@ PublishRequest?: PublishRequest
 QuorumPurpose?: QuorumPurpose
 QuorumRule?: QuorumRule
 RecallRangeCloseRequest?: RecallRangeCloseRequest
+RecallRangePage?: RecallRangePage
 RecallRangeRequest?: RecallRangeRequest
+RecallRangeView?: RecallRangeView
+RecallRemovalProgress?: RecallRemovalProgress
 RecallRequest?: RecallRequest
+RecallView?: RecallView
 RecipientWrap?: RecipientWrap
 RegisterEnvironmentRequest?: RegisterEnvironmentRequest
 ReleaseContent?: ReleaseContent
@@ -3841,6 +3845,30 @@ product: string
 version: number
 }
 /**
+ * Recorded recall ranges for one product.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RecallRangePage".
+ */
+export interface RecallRangePage {
+items: RecallRangeView[]
+}
+/**
+ * Operator-visible recall range for `GET /v1/products/{product}/recall-ranges`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RecallRangeView".
+ */
+export interface RecallRangeView {
+actor: string
+before?: string
+covers_future: boolean
+from: string
+product: string
+reason: string
+recorded_at: number
+}
+/**
  * Body of `POST /v1/products/{product}/recall-range`.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -3855,12 +3883,43 @@ reason: string
 version: number
 }
 /**
+ * One environment instance still holding a recalled release.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RecallRemovalProgress".
+ */
+export interface RecallRemovalProgress {
+deployed: string
+environment: string
+instance: string
+remaining: boolean
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "RecallRequest".
  */
 export interface RecallRequest {
 operation: string
 version: number
+}
+/**
+ * Recorded recall of one published release for `GET /v1/releases/{release}/recall`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RecallView".
+ */
+export interface RecallView {
+covers_future: boolean
+failing_instances?: string[]
+policy_id?: string
+policy_version?: string
+principal_kind?: string
+range?: string
+reason?: string
+recalled_at?: number
+recalled_by?: string
+release: string
+removal_progress?: RecallRemovalProgress[]
 }
 /**
  * A wrap a runtime made for an approved recipient (ADR 0045 §5), for one

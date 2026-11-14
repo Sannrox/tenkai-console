@@ -93,7 +93,8 @@ const EXTRA: Record<string, Partial<ChannelPromotionPolicyView>> = {
 const VIEWS: Record<string, ChannelPromotionPolicyView> = Object.fromEntries(
   POLICIES.map((row) => {
     const key = `${row.product}/${row.target_channel}`;
-    return [key, { ...row, soak_duration_ms: 3_600_000, evidence: RULES, ...EXTRA[key] }];
+    const evidence = key === "api/stable" ? { ...RULES, recall_on_failing: true } : RULES;
+    return [key, { ...row, soak_duration_ms: 3_600_000, evidence, ...EXTRA[key] }];
   }),
 );
 
@@ -231,11 +232,24 @@ test.describe("promotion policy detail", () => {
       "channel-promotion-policy:api/candidate v2",
       "1h",
       "health SLO · healthy >= 95% · failing <= 5%",
+      "off, a failing soak only resets",
       "no",
       "api@1.4.0 · 12m of 1h · healthy 98% · failing 1%",
     ]);
     await expect(detail(page).getByRole("button", { name: "Pause" })).toBeVisible();
     await page.screenshot({ path: test.info().outputPath("policy-soaking.png"), fullPage: true });
+    await expectDesignRules(page);
+  });
+
+  test("shows a recall rule that recalls on a failing soak", async ({ page }) => {
+    app = await serveConsole(server({ ...FLEET, promotion_policies: POLICIES }));
+    await openReleases(page, app);
+    await openDetail(page, "api", "stable");
+    await expect(rules(page).nth(3)).toHaveText("when failing > 5% of 1h soak");
+    await page.screenshot({
+      path: test.info().outputPath("policy-recall-rule.png"),
+      fullPage: true,
+    });
     await expectDesignRules(page);
   });
 
@@ -267,7 +281,7 @@ test.describe("promotion policy detail", () => {
     });
     await openReleases(page, app);
     await openDetail(page, "billing", "stable");
-    await expect(rules(page).nth(3)).toHaveText("by oidc:alice at 2026-11-14T09:30Z");
+    await expect(rules(page).nth(4)).toHaveText("by oidc:alice at 2026-11-14T09:30Z");
     await page.screenshot({ path: test.info().outputPath("policy-paused.png"), fullPage: true });
     await detail(page).getByRole("button", { name: "Resume" }).click();
     await detail(page)

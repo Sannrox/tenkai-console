@@ -10,6 +10,7 @@ import {
   policyPath,
   promotedBy,
   promotionPolicies,
+  recallRule,
   resetCause,
   soakLine,
 } from "./promotion-policies";
@@ -118,6 +119,18 @@ describe("policy detail lines", () => {
     expect(pauseBody("pause")).toEqual({ version: 1, operation: "channel_policy_pause" });
     expect(pauseBody("resume")).toEqual({ version: 1, operation: "channel_policy_resume" });
     expect(evidenceLine(view({}).evidence)).toBe("health SLO · healthy >= 95% · failing <= 5%");
+  });
+
+  it("reads the recall rule from the evidence", () => {
+    expect(recallRule(view({}))).toBe("off, a failing soak only resets");
+    expect(
+      recallRule(
+        view({
+          evidence: { failing_max_share: 0.05, recall_on_failing: true },
+          soak_duration_ms: 3_600_000,
+        }),
+      ),
+    ).toBe("when failing > 5% of 1h soak");
   });
 
   it("shows elapsed soak, the reset cause, and the policy as promoter", () => {

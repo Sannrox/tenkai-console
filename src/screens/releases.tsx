@@ -19,7 +19,7 @@ import {
   type Outcome,
 } from "../management/use-management";
 import { expectedGeneration, holdBody, releaseHoldBody } from "../plan/requests";
-import { Card, ConfirmButton, Notice } from "../ui/kit";
+import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { td } from "../ui/posture";
 import { Compatibility } from "./compatibility";
 import { Migrations } from "./migrations";
@@ -28,6 +28,8 @@ import { PromotionPolicies } from "./promotion-policies";
 const ReleaseLabels = lazy(() => import("./release-labels"));
 // Product owners and endpoints load on first visit to this screen.
 const ProductOwners = lazy(() => import("./product-owners"));
+// Who recalled, why, the range, and removal progress load on the first Detail click.
+const RecallDetail = lazy(() => import("./recall-detail"));
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 
@@ -254,8 +256,9 @@ const Catalog = ({ token, channels }: { token: string; channels: string[] }) => 
 };
 
 /**
- * Pick A (#41): recall proposal state from change events, and a cohort table
- * whose Stop/Resume are environment holds so the table shows server state.
+ * Pick A (#41): recalled releases from change events, each with a Detail that
+ * reads the recorded recall, and a cohort table whose Stop/Resume are
+ * environment holds so the table shows server state.
  */
 const RecallFollow = ({ token, fleet }: { token: string; fleet: FleetTableRow[] }) => {
   const events = useQuery({
@@ -263,7 +266,10 @@ const RecallFollow = ({ token, fleet }: { token: string; fleet: FleetTableRow[] 
     queryFn: () => request<ChangeEventPage>("v1/events?limit=100", { token }),
     retry: false,
   });
-  const recalled = events.data ? recallEvents(events.data.events) : [];
+  const recalled = events.data
+    ? [...new Set(recallEvents(events.data.events).map((event) => event.resource))]
+    : [];
+  const [selected, setSelected] = useState<string>();
   const [cohort, setCohort] = useState("");
   const names = cohortNames(cohort);
   const byName = new Map(fleet.map((row) => [row.name, row]));
@@ -271,16 +277,31 @@ const RecallFollow = ({ token, fleet }: { token: string; fleet: FleetTableRow[] 
   return (
     <>
       <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Recall follow-through</h2>
-      <p className="m-0 mb-2 text-xs text-muted">
-        {events.error
-          ? events.error.message
-          : recalled.length === 0
-            ? "no recall events"
-            : recalled
-                .slice(0, 8)
-                .map((event) => `${event.resource} ${new Date(event.occurred_at).toISOString()}`)
-                .join(" · ")}
-      </p>
+      {events.error ? (
+        <p className="m-0 mb-2 text-xs text-muted">Recalls could not be read.</p>
+      ) : events.data === undefined ? null : recalled.length === 0 ? (
+        <p className="m-0 mb-2 text-xs text-muted">No recalls.</p>
+      ) : (
+        <ul aria-label="Recalled releases" className="m-0 mb-2 flex list-none flex-wrap gap-2 p-0">
+          {recalled.slice(0, 8).map((release) => (
+            <li key={release}>
+              <Button
+                variant={selected === release ? "primary" : "plain"}
+                aria-label={`Detail ${release}`}
+                aria-pressed={selected === release}
+                onClick={() => setSelected(selected === release ? undefined : release)}
+              >
+                <span className="font-mono">{release}</span>
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {selected !== undefined && (
+        <Suspense fallback={null}>
+          <RecallDetail token={token} release={selected} />
+        </Suspense>
+      )}
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <input
           aria-label="Cohort"
