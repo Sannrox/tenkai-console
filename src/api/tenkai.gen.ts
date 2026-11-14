@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai commit f06b88569882f92001bd003f511067766763f57b tenkai-http-v1.schema.json (sha256 5aa0f24344ec06183ea490dd81fc77e5350c7454bb5702fc19e972d5985680ca, contract tenkai.http.v1).
+// Generated from Sannrox/tenkai commit cc673d1e4e91739734b893913c18a03c6f97ff7f tenkai-http-v1.schema.json (sha256 1359f5a30fb8b6937484ecb0ba0444637b24e260b28bc0ace25e42fe2f7ded77, contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -396,6 +396,11 @@ export type ImportState = (("running" | "succeeded" | "failed") | "previewed")
 export type MigrationStatus = ("admitted" | "running" | "succeeded" | "failed" | "rolled_back" | "recovery_required")
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "PaceInstanceState".
+ */
+export type PaceInstanceState = ("started" | "admitted" | "waiting" | "paused")
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "PublishInputKind".
  */
 export type PublishInputKind = ("file" | "dir")
@@ -584,6 +589,10 @@ OidcGrantRule?: OidcGrantRule
 OpenEnvironmentExposure?: OpenEnvironmentExposure
 OperationalEvent?: OperationalEvent
 OwnerView?: OwnerView2
+PaceAdmitAudit?: PaceAdmitAudit
+PaceInstanceProgress?: PaceInstanceProgress
+PaceInstanceState?: PaceInstanceState
+PaceProgress?: PaceProgress
 PackageMigrationApplyRequest?: PackageMigrationApplyRequest
 PackageMigrationMutateRequest?: PackageMigrationMutateRequest
 PackageMigrationPreviewRequest?: PackageMigrationPreviewRequest
@@ -3591,6 +3600,68 @@ contact: string
  * Configured notification URLs. Empty means no reachable endpoint.
  */
 endpoints?: string[]
+}
+/**
+ * One immutable early-admission event.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "PaceAdmitAudit".
+ */
+export interface PaceAdmitAudit {
+action: string
+actor: string
+at: number
+reason: string
+}
+/**
+ * Where one subscribed instance stands in the pace.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "PaceInstanceProgress".
+ */
+export interface PaceInstanceProgress {
+early_admission?: PaceAdmitAudit1
+/**
+ * Server time the instance may start, while `waiting` or `paused`:
+ * its remaining counted time projected through the maintenance
+ * windows. Omitted when the windows cannot be projected.
+ */
+eligible_at_ms?: number
+environment: string
+instance: string
+/**
+ * When the closed maintenance window next opens, while `paused` and known.
+ */
+next_opens_at_ms?: number
+state: PaceInstanceState
+}
+/**
+ * One immutable early-admission event.
+ */
+export interface PaceAdmitAudit1 {
+action: string
+actor: string
+at: number
+reason: string
+}
+/**
+ * Upgrade pacing on a channel's current head (#1276). Only upgrades wait;
+ * rollbacks, recall removals, installs, and restarts are never paced.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "PaceProgress".
+ */
+export interface PaceProgress {
+/**
+ * Counted maintenance-window time over which all instances start.
+ */
+duration_ms: number
+instances: PaceInstanceProgress[]
+promoted_at_ms: number
+/**
+ * Release id of the channel head being paced.
+ */
+release: string
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema

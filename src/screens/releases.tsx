@@ -30,12 +30,14 @@ const ReleaseLabels = lazy(() => import("./release-labels"));
 const ProductOwners = lazy(() => import("./product-owners"));
 // Who recalled, why, the range, and removal progress load on the first Detail click.
 const RecallDetail = lazy(() => import("./recall-detail"));
+// Upgrade pace reads one channel at a time, after a pick.
+const ChannelPace = lazy(() => import("./channel-pace"));
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 
 /**
  * The software catalog. Channels (decision 4D): the head each channel points
- * to, from the channel catalog; below it, promotion policy status, a release's
+ * to, from the channel catalog; below it, upgrade pace, promotion policy status, a release's
  * compatibility per environment, product owners, publish, promote, recall,
  * release labels, and package migrations.
  */
@@ -91,6 +93,11 @@ export const Releases = () => {
           </tbody>
         </table>
       </Card>
+      {token !== undefined && (
+        <Suspense fallback={null}>
+          <ChannelPace token={token} items={delivery.channels?.items ?? []} />
+        </Suspense>
+      )}
       <PromotionPolicies fleet={delivery.fleet} loading={delivery.loading} token={token} />
       {token !== undefined && <Compatibility token={token} environments={names} />}
       {token !== undefined && (
