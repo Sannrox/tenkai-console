@@ -56,7 +56,14 @@ export type HealthCheck = { name: string; state: string; message?: string };
 
 export type HealthCheckView = { name: string; state: string; message: string; tone: HealthTone };
 
-export type InstanceHealthView = InstanceHealth & { checks: HealthCheckView[] };
+/** `observed` is the latest observation time; absent when the server sent none. */
+export type InstanceHealthView = InstanceHealth & { checks: HealthCheckView[]; observed?: string };
+
+// Minute-precision UTC; a value no date can hold reads as no observation.
+const observedLabel = (ms: number | undefined): string | undefined => {
+  const date = new Date(ms ?? Number.NaN);
+  return Number.isNaN(date.getTime()) ? undefined : `${date.toISOString().slice(0, 16)}Z`;
+};
 
 // Check states, mildest first. A state this build does not know reads as a warning.
 const CHECK_STATES = ["healthy", "repairing", "warning", "failing"];
@@ -70,12 +77,14 @@ const BASE_RANK: Record<HealthTone, number> = { muted: -1, ok: 0, warn: 2, bad: 
 /**
  * Instance state from a status row: the reported health, raised to the worst
  * reported check (a `truncated` output is one more warning). `unknown` stays
- * unknown; the server sends no checks for a stale observation.
+ * unknown; the server sends no checks for a stale observation but still sends
+ * its time. Older servers and apply-time health send no time.
  */
 export const instanceHealthView = (row: {
   health?: string | null | undefined;
   error?: string | null | undefined;
   health_checks?: readonly HealthCheck[] | undefined;
+  health_observed_at_ms?: number | undefined;
 }): InstanceHealthView => {
   const checks = (row.health_checks ?? [])
     .map((check) => ({
@@ -92,7 +101,12 @@ export const instanceHealthView = (row: {
   const worst = checks[0];
   // `unknown` and `failing` are `bad`, which no check outranks.
   const raise = worst !== undefined && checkRank(worst.state) > BASE_RANK[base.tone];
-  return raise ? { label: worst.state, tone: worst.tone, checks } : { ...base, checks };
+  const observed = observedLabel(row.health_observed_at_ms);
+  return {
+    ...(raise ? { label: worst.state, tone: worst.tone } : base),
+    checks,
+    ...(observed === undefined ? {} : { observed }),
+  };
 };
 
 type HealthRow = Parameters<typeof instanceHealthView>[0] & { product: string; instance?: string };

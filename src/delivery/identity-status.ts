@@ -24,6 +24,7 @@ const Row = type({
   "health?": "string | null",
   "error?": "string | null",
   "health_checks?": HealthCheck.array(),
+  "health_observed_at_ms?": "number",
   "owner?": "string",
   "+": "delete",
 });

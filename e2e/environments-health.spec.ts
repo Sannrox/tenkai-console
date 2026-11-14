@@ -10,7 +10,10 @@ import {
 } from "./mock-backend";
 
 type Check = { name: string; state: string; message?: string };
-type Instance = { name: string; health: string; checks?: Check[] };
+/** `observed` is the status row's `health_observed_at_ms`; omitted as an older server would. */
+type Instance = { name: string; health: string; checks?: Check[]; observed?: number };
+
+const OBSERVED = Date.UTC(2026, 10, 14, 9, 12, 45);
 
 const HOST_ME = {
   principal: "host:uid:1000",
@@ -103,6 +106,9 @@ const server = (
           instances.map((instance) => ({
             ...subscription(instance),
             ...(instance.checks ? { health_checks: instance.checks } : {}),
+            ...(instance.observed === undefined
+              ? {}
+              : { health_observed_at_ms: instance.observed }),
           })),
         )
       );
@@ -147,6 +153,7 @@ const FAILING: Instance[] = [
   {
     name: "api",
     health: "unhealthy",
+    observed: OBSERVED,
     checks: [
       { name: "disk", state: "failing", message: "97% full on /var" },
       { name: "cert", state: "warning", message: "expires in 3 days" },
@@ -183,6 +190,8 @@ test.describe("environment instance health", () => {
     await page.getByRole("link", { name: "Environments" }).click();
     await expect(instanceRow(page, "api").getByRole("cell", { name: "healthy" })).toBeVisible();
     await expect(rollup(page)).toHaveText("2 healthy");
+    // This server sends no observation time: none is shown.
+    await expect(page.getByText(/^observed /)).toHaveCount(0);
     await capture(page, "health-all-healthy");
     await expectDesignRules(page);
     expect(app.sent.every((sent) => sent.method === "GET")).toBe(true);
@@ -212,8 +221,8 @@ test.describe("environment instance health", () => {
     app = await serveConsole(
       server(
         [
-          { name: "api", health: "unknown" },
-          { name: "web", health: "healthy" },
+          { name: "api", health: "unknown", observed: OBSERVED - 3_600_000 },
+          { name: "web", health: "healthy", observed: OBSERVED },
         ],
         "unknown",
       ),
@@ -226,14 +235,53 @@ test.describe("environment instance health", () => {
     const api = instanceRow(page, "api");
     await expect(api.getByRole("cell", { name: "unknown", exact: true })).toBeVisible();
     await expect(api).not.toContainText("healthy");
+    await expect(api).toContainText("observed 2026-11-14T08:12Z");
+    await expect(instanceRow(page, "web")).toContainText("observed 2026-11-14T09:12Z");
     await expect(rollup(page)).toHaveText("1 unknown · 1 healthy");
     await capture(page, "health-stale");
     await expectDesignRules(page);
   });
 
+  test("a repairing check is listed with the others", async ({ page }) => {
+    app = await serveConsole(
+      server(
+        [
+          {
+            name: "api",
+            health: "healthy",
+            observed: OBSERVED,
+            checks: [{ name: "pool", state: "repairing", message: "reconnecting to primary" }],
+          },
+          {
+            name: "web",
+            health: "unhealthy",
+            observed: OBSERVED,
+            checks: [
+              { name: "disk", state: "failing", message: "97% full on /var" },
+              { name: "cache", state: "repairing" },
+            ],
+          },
+        ],
+        "error",
+      ),
+    );
+    await page.goto(app.url);
+    await page.getByRole("link", { name: "Environments" }).click();
+    const api = instanceRow(page, "api");
+    await expect(api.getByRole("cell", { name: /^repairing/ })).toBeVisible();
+    await expect(api).toContainText("pool repairing: reconnecting to primary");
+    await expect(api).toContainText("observed 2026-11-14T09:12Z");
+    const web = instanceRow(page, "web");
+    await expect(web).toContainText("disk failing: 97% full on /var");
+    await expect(web).toContainText("cache repairing");
+    await expect(rollup(page)).toHaveText("1 failing · 1 repairing");
+    await capture(page, "health-repairing");
+    await expectDesignRules(page);
+  });
+
   test("a healthy instance turns unknown on the next read, without a reload", async ({ page }) => {
-    const fresh = server([{ name: "api", health: "healthy" }], "ok");
-    const stale = server([{ name: "api", health: "unknown" }], "unknown");
+    const fresh = server([{ name: "api", health: "healthy", observed: OBSERVED }], "ok");
+    const stale = server([{ name: "api", health: "unknown", observed: OBSERVED }], "unknown");
     let reads = 0;
     app = await serveConsole((path, request) => {
       if (path === "/v1/environments/prod/status") {
@@ -252,6 +300,7 @@ test.describe("environment instance health", () => {
     await page.waitForLoadState("networkidle");
     await page.clock.runFor(31_000);
     await expect(rollup(page)).toHaveText("1 unknown");
+    await expect(instanceRow(page, "api")).toContainText("observed 2026-11-14T09:12Z");
     expect(reads).toBeGreaterThanOrEqual(2);
   });
 

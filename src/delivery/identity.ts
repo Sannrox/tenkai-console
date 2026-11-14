@@ -35,6 +35,8 @@ export type StatusRow = {
   health?: string | null;
   error?: string | null;
   health_checks?: HealthCheck[];
+  /** Latest health observation in Unix ms, also when stale (Tenkai #1273). */
+  health_observed_at_ms?: number;
   /** Product owner contact when set (Tenkai #1066). */
   owner?: string;
 };
