@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 import type {
   ConnectivityClass,
   DeliveryHoldView,
@@ -20,8 +20,9 @@ const field =
   "min-w-0 rounded-md border border-field bg-white/4 px-2.5 py-1.5 text-xs text-fg placeholder:text-muted";
 const message = (result: ManagementLifecycleResult) => result.message;
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const EnvironmentLabels = lazy(() => import("./environment-labels"));
 
-const Input = ({
+export const Input = ({
   label,
   value,
   onChange,
@@ -117,7 +118,8 @@ export const AddEnvironment = ({ token }: { token: string }) => {
  * with a reason and the generation this view shows; a stale generation is
  * refused by the server, not retried, so an edit never overwrites a change
  * this page did not show. Read-only credentials see no Edit once the server
- * has refused them. The failure threshold shows once the hold view loads.
+ * has refused them. The failure threshold shows once the hold view loads;
+ * labels load lazily, last.
  */
 export const ConfigSections = ({
   report,
@@ -180,6 +182,14 @@ export const ConfigSections = ({
           />
         </Section>
       )}
+      <Suspense>
+        <EnvironmentLabels
+          {...props}
+          environment={report.name}
+          token={token}
+          allowed={call.allowed}
+        />
+      </Suspense>
       {call.outcome && (
         <div className="mt-2">
           <Notice tone={call.outcome.tone}>{call.outcome.text}</Notice>
@@ -189,7 +199,7 @@ export const ConfigSections = ({
   );
 };
 
-type FormProps = {
+export type FormProps = {
   pending: boolean;
   /** The generation the report shows now. */
   generation: number;
@@ -203,13 +213,13 @@ type FormProps = {
  * so a stale draft is refused by the server instead of overwriting a change
  * made since.
  */
-const useDraftGeneration = (generation: number) => {
+export const useDraftGeneration = (generation: number) => {
   const [draft, setDraft] = useState(generation);
   return [draft, () => setDraft(generation)] as const;
 };
 
 /** A section header with its own Edit, which opens its form. */
-const Section = ({
+export const Section = ({
   title,
   allowed,
   summary,
