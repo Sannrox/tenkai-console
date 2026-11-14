@@ -102,11 +102,11 @@ export const failureLines = (failures: CompatibilityFailure[]): string[] =>
 const SatisfiedBy = type("Record<string, string>");
 
 /**
- * Additive `satisfied_by` from Tenkai #1005. The pinned contract omits it;
- * a missing or malformed map reads as empty.
+ * Additive `satisfied_by` from Tenkai #1005. Older servers omit it; a missing
+ * or malformed map reads as empty.
  */
 export const satisfiedBy = (report: CompatibilityReport): Record<string, string> => {
-  const extra = (report as CompatibilityReport & { satisfied_by?: unknown }).satisfied_by;
+  const extra: unknown = report.satisfied_by;
   if (extra === undefined) {
     return {};
   }

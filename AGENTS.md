@@ -9,7 +9,7 @@ Tenkai ADR 0031 (`docs/decisions/0031-web-console.md` in Sannrox/tenkai).
 ## Project Structure & Module Organization
 
 - `src/api/`: HTTP client and `tenkai.gen.ts`, generated from the vendored
-  contract `api/tenkai-http-v1.schema.json` (release tag and SHA-256 pinned in `api/tenkai.pin`).
+  contract `api/tenkai-http-v1.schema.json` (release tag or `main` commit, and SHA-256, pinned in `api/tenkai.pin`).
 - `src/auth/`: OIDC sign-in, session renewal, and sign-out.
 - `src/screens/`, `src/delivery/`, `src/management/`, `src/plan/`,
   `src/workflows/`, `src/ui/`: screens, management actions, and shared UI.

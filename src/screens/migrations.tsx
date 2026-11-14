@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ApiError, request } from "../api/http";
 import type {
-  ApprovalEnvelope,
+  ApprovalStatementEnvelope,
   MigrationListEntry,
   PackageMigrationResult,
 } from "../api/tenkai.gen";
@@ -130,7 +130,7 @@ export const Migrations = ({ token, environments }: { token: string; environment
     const pendingForTarget =
       (stored?.name === targetName ? pendingPlan(stored) : undefined) ??
       (record?.name === targetName ? pending : undefined);
-    let planApproval: ApprovalEnvelope | undefined;
+    let planApproval: ApprovalStatementEnvelope | undefined;
     if (planText.trim() && pendingForTarget) {
       const parsed = parsePlanApproval(planText);
       if (typeof parsed === "string") {
