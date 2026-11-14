@@ -3,6 +3,7 @@ import { ApiError, request } from "../api/http";
 import type {
   EnvironmentInspectReport,
   OwnerView,
+  ReachabilityVerdict,
   SetOwnerRequest,
   WebhookEndpoint,
 } from "../api/tenkai.gen";
@@ -10,7 +11,8 @@ import type { StatusRow } from "./identity";
 import { statusInstance } from "./identity";
 
 // Owners and notification routing (Tenkai #1066): who an environment or
-// product belongs to, which URLs it notifies, and the raw webhook deliveries.
+// product belongs to, which URLs it notifies, the raw webhook deliveries, and
+// whether notifications reach the owner (Tenkai #1279).
 
 export type Load<T> =
   | { kind: "ok"; value: T }
@@ -108,6 +110,53 @@ export const unrouted = (report: Pick<EnvironmentInspectReport, "owner" | "webho
 export const statusOwners = (rows: StatusRow[]): { instance: string; owner: string }[] =>
   rows.map((row) => ({ instance: statusInstance(row), owner: row.owner?.trim() || "none" }));
 
+export type Tone = "ok" | "warn" | "bad" | "muted";
+
+const VERDICT_TONE: Partial<Record<string, Tone>> = {
+  reachable: "ok",
+  unreachable: "bad",
+  unknown: "warn",
+  unconfigured: "warn",
+} satisfies Record<ReachabilityVerdict, Tone>;
+
+export type EndpointRow = {
+  url: string;
+  /** As the server sent it; a verdict this console does not know reads as is. */
+  verdict: string;
+  tone: Tone;
+  failures: number;
+  /** Latest recorded success, or `·` when none is recorded. */
+  lastSuccess: string;
+};
+
+export type OwnerReach = { verdict: string; tone: Tone; endpoints: EndpointRow[] };
+
+/**
+ * The server's reachability verdict for an owner and each of its endpoints.
+ * Undefined when the server does not report one (older servers, or reads
+ * other than environment inspect): the console never derives a verdict.
+ */
+export const ownerReach = (owner: OwnerView | null | undefined): OwnerReach | undefined => {
+  const reach = owner?.reachability;
+  if (reach === undefined) {
+    return undefined;
+  }
+  return {
+    verdict: reach.verdict,
+    tone: VERDICT_TONE[reach.verdict] ?? "muted",
+    endpoints: (reach.endpoints ?? []).map((endpoint) => ({
+      url: endpoint.url,
+      verdict: endpoint.verdict,
+      tone: VERDICT_TONE[endpoint.verdict] ?? "muted",
+      failures: endpoint.consecutive_failures,
+      lastSuccess:
+        endpoint.last_success_at === undefined
+          ? "·"
+          : new Date(endpoint.last_success_at).toISOString(),
+    })),
+  };
+};
+
 /** The owner contact, or `none`. */
 export const ownerLine = (owner: OwnerView | null | undefined): string =>
   owner ? owner.contact : "none";
@@ -120,6 +169,10 @@ export const setOwnerBody = (contact: string): SetOwnerRequest => ({ contact: co
 
 export const productPath = (product: string, leaf: "owner" | "webhooks"): string =>
   `v1/products/${encodeURIComponent(product)}/${leaf}`;
+
+/** `DELETE` target that removes one product endpoint and keeps the others. */
+export const productEndpointPath = (product: string, url: string): string =>
+  `${productPath(product, "webhooks")}?url=${encodeURIComponent(url)}`;
 
 export type ProductRouting = { owner: OwnerView | null; webhooks: WebhookEndpoint[] };
 

@@ -7,6 +7,7 @@ import {
   type Load,
   ownerLine,
   type ProductRouting,
+  productEndpointPath,
   productPath,
   setOwnerBody,
 } from "../delivery/owners";
@@ -31,7 +32,7 @@ const LOAD_TEXT = {
 /**
  * Product owners and their own notification endpoints, one row per product
  * in the catalog. Product writes carry no generation or reason: the last
- * write wins. Each confirmed click is one request; a lost answer reads as
+ * write wins. One endpoint is removed by URL; the others stay. Each confirmed click is one request; a lost answer reads as
  * unknown and is not resent.
  */
 export const ProductOwners = ({ token, products }: { token: string; products: string[] }) => {
@@ -248,6 +249,14 @@ const ProductForms = ({
           } satisfies WebhookEndpoint)
         }
       />
+      {configured && (
+        <ConfirmButton
+          label="Remove webhook"
+          confirm={`Remove ${product} webhook ${url.trim()}`}
+          disabled={pending}
+          onConfirm={() => send(productEndpointPath(product, url.trim()), "DELETE")}
+        />
+      )}
       {routing.webhooks.length > 0 && (
         <ConfirmButton
           label="Remove all webhooks"
