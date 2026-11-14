@@ -36,6 +36,10 @@ const serve = (reply: (call: Call) => { status?: number; body: unknown }) => {
         path: url.pathname.replace(/^\//, ""),
         body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
       };
+      // Reads (labels, identity) answer empty; these tests assert writes only.
+      if (call.method === "GET") {
+        return new Response("{}");
+      }
       calls.push(call);
       const answer = reply(call);
       return new Response(JSON.stringify(answer.body), { status: answer.status ?? 200 });
