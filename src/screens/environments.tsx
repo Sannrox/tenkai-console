@@ -11,8 +11,8 @@ import type {
 import { useSession } from "../auth/session";
 import { channelMatrix, fleetTableRows } from "../delivery/configuration";
 import { deployedLabel, heldAtLine, heldProducts, waitingLine } from "../delivery/dependencies";
-import type { StatusLoad } from "../delivery/identity";
-import { instanceHealth, instanceName } from "../delivery/instances";
+import type { StatusRow } from "../delivery/identity";
+import { healthRollup, instanceName, withHealth } from "../delivery/instances";
 import {
   maintenanceDetail,
   maintenanceRefreshAt,
@@ -45,6 +45,7 @@ import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { AddEnvironment, ConfigSections } from "./environment-config";
 import { SubscriptionHold } from "./environment-hold";
 import { FleetTable } from "./fleet-table";
+import { HealthChecks } from "./health-checks";
 
 const EnvironmentDependencies = lazy(() => import("./environment-dependencies"));
 const EnvironmentHistory = lazy(() => import("./environment-history"));
@@ -178,6 +179,11 @@ const Detail = ({
     }
   }
   useRefreshAt(identityRefreshAt, now, ["status", report.name, token]);
+  const instances = withHealth(
+    report.subscriptions,
+    status.data?.kind === "ok" ? status.data.value : undefined,
+  );
+  const rollup = healthRollup(instances.map((item) => item.health));
 
   return (
     <>
@@ -212,10 +218,11 @@ const Detail = ({
                 </tr>
               </thead>
               <tbody>
-                {report.subscriptions.map((subscription) => {
-                  const instance = instanceName(subscription);
-                  const health = instanceHealth(subscription);
-                  const identity = identityLabel(status.data, instance, nowSecs);
+                {instances.map(({ subscription, instance, row, health }) => {
+                  const identity =
+                    status.data?.kind === "ok"
+                      ? identityLabel(row, nowSecs)
+                      : { label: "n/a", tone: "muted" as const };
                   const held = waiting.has(instance) || waiting.has(subscription.product);
                   return (
                     <tr key={instance} className="[&:last-child>td]:border-b-0">
@@ -228,7 +235,10 @@ const Detail = ({
                         {deployedLabel(subscription.deployed, held)}
                       </td>
                       <td className={`${td} font-mono`}>{subscription.head}</td>
-                      <td className={`${td} ${HEALTH_TONE[health.tone]}`}>{health.label}</td>
+                      <td className={`${td} ${HEALTH_TONE[health.tone]}`}>
+                        {health.label}
+                        <HealthChecks checks={health.checks} />
+                      </td>
                       <td className={`${td} ${HEALTH_TONE[identity.tone]}`}>{identity.label}</td>
                       <td className={`${td} font-mono text-muted`}>
                         {previousRelease(report, subscription.product) ?? "none"}
@@ -310,6 +320,8 @@ const Detail = ({
                 <dd className="m-0">{value}</dd>
               </div>
             ))}
+            <dt className="text-muted">health</dt>
+            <dd className={`m-0 ${HEALTH_TONE[rollup.tone]}`}>{rollup.label}</dd>
             <dt className="text-muted">lease</dt>
             <dd className="m-0">
               {report.lease.held ? `held, generation ${report.lease.generation ?? 0}` : "free"}
@@ -490,17 +502,9 @@ const HEALTH_TONE = {
 
 /** Status `certificate` on the instance list; kept here so identity GET stays lazy. */
 const identityLabel = (
-  load: StatusLoad | undefined,
-  instance: string,
+  row: StatusRow | undefined,
   nowSecs: number,
 ): { label: string; tone: keyof typeof HEALTH_TONE } => {
-  if (load?.kind !== "ok") {
-    return { label: "n/a", tone: "muted" };
-  }
-  const row = load.value.find((item) => {
-    const name = item.instance?.trim() ?? "";
-    return (name === "" ? item.product : name) === instance;
-  });
   const certificate = row?.certificate;
   if (certificate === null || certificate === undefined) {
     return { label: "none", tone: "muted" };

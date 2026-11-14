@@ -9,10 +9,21 @@ const CertificateStatus = type({
   "+": "delete",
 });
 
+// State stays a string so a check state added later reads as a warning, not a bad body.
+const HealthCheck = type({
+  name: "string",
+  state: "string",
+  "message?": "string",
+  "+": "delete",
+});
+
 const Row = type({
   product: "string",
   "instance?": "string",
   "certificate?": CertificateStatus.or("null"),
+  "health?": "string | null",
+  "error?": "string | null",
+  "health_checks?": HealthCheck.array(),
   "+": "delete",
 });
 
@@ -45,7 +56,7 @@ const visibleError = (error: ApiError): StatusLoad => {
   };
 };
 
-/** Read instance status. Older servers may omit the route or the certificate field. */
+/** Read instance status. Older servers may omit the route, the certificate, or health checks. */
 export const fetchStatus = async (
   environment: string,
   token: string,
