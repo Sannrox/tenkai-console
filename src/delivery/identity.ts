@@ -35,6 +35,8 @@ export type StatusRow = {
   health?: string | null;
   error?: string | null;
   health_checks?: HealthCheck[];
+  /** Product owner contact when set (Tenkai #1066). */
+  owner?: string;
 };
 
 export type StatusLoad =

@@ -91,12 +91,13 @@ export const FleetTable = ({
               <th className={th}>Health</th>
               <th className={th}>Last apply</th>
               <th className={th}>Drift</th>
+              <th className={th}>Owner</th>
             </tr>
           </thead>
           <tbody>
             {top > 0 && (
               <tr aria-hidden="true">
-                <td colSpan={6} className="p-0" style={{ height: top }} />
+                <td colSpan={7} className="p-0" style={{ height: top }} />
               </tr>
             )}
             {slice.map((row) => (
@@ -112,11 +113,12 @@ export const FleetTable = ({
                 <td className={`${td} ${TEXT[row.healthTone]}`}>{row.health}</td>
                 <td className={td}>{row.lastApply}</td>
                 <td className={`${td} font-mono`}>{row.drift}</td>
+                <td className={`${td} ${row.owner === "·" ? "text-muted" : ""}`}>{row.owner}</td>
               </tr>
             ))}
             {bottom > 0 && (
               <tr aria-hidden="true">
-                <td colSpan={6} className="p-0" style={{ height: bottom }} />
+                <td colSpan={7} className="p-0" style={{ height: bottom }} />
               </tr>
             )}
           </tbody>

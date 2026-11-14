@@ -41,6 +41,8 @@ export type FleetTableRow = {
   healthTone: Tone;
   lastApply: string;
   drift: number;
+  /** Environment owner contact, or `·` when none is set. */
+  owner: string;
 };
 
 const releaseLabel = (row: FleetEnvironmentRow): string =>
@@ -67,6 +69,7 @@ export const fleetTableRows = (
         // Fleet status leaves plan state empty; "·" is unavailable, not "no apply".
         lastApply: row.latest_plan_state?.trim() || "·",
         drift: row.products_behind,
+        owner: row.owner?.trim() || "·",
       };
     });
 };

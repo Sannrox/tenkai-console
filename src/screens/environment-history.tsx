@@ -1,5 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import type { EnvironmentInspectReport } from "../api/tenkai.gen";
 import {
   type AttemptCause,
   type DeploymentAttempt,
@@ -24,6 +25,7 @@ import EnvironmentDrift from "./environment-drift";
 import EnvironmentIdentity from "./environment-identity";
 import EnvironmentIssuer from "./environment-issuer";
 import EnvironmentOverlays from "./environment-overlays";
+import EnvironmentOwner from "./environment-owner";
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2 align-top";
@@ -46,7 +48,7 @@ const STATUS_TONE: Record<string, string> = {
 /**
  * Newest-first attempt list for the selected environment.
  * GET `/v1/environments/{environment}/history`.
- * Overlays, drift, identity, and the identity issuer share this lazy chunk so the initial bundle stays on budget.
+ * Overlays, drift, identity, the identity issuer, and the owner share this lazy chunk so the initial bundle stays on budget.
  */
 export const EnvironmentHistory = ({
   environment,
@@ -63,7 +65,7 @@ export const EnvironmentHistory = ({
   instances: string[];
   instance?: string;
   onInstance: (instance: string | undefined) => void;
-  report?: unknown;
+  report?: EnvironmentInspectReport;
   identity?: StatusLoad;
   now?: number;
 }) => {
@@ -162,6 +164,11 @@ export const EnvironmentHistory = ({
       )}
       <div className="mt-[18px] mb-2 flex flex-wrap items-baseline gap-2">
         <h2 className="m-0 text-[13px] font-semibold">History</h2>
+        {first?.kind === "ok" && (
+          <span aria-label="History owner" className="text-xs text-muted">
+            owner {first.value.owner?.contact ?? "none"}
+          </span>
+        )}
         <label className="ml-auto flex items-center gap-2 text-xs font-medium text-muted">
           Instance
           <select
@@ -182,6 +189,7 @@ export const EnvironmentHistory = ({
         </label>
       </div>
       <Card className="max-w-full min-w-0 overflow-x-auto">{body}</Card>
+      {report !== undefined && <EnvironmentOwner report={report} token={token} />}
     </>
   );
 };

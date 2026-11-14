@@ -42,9 +42,13 @@ const DeploymentAttempt = type({
   "+": "delete",
 });
 
+const HistoryOwner = type({ contact: "string", "endpoints?": "string[]", "+": "delete" });
+
 const DeploymentHistoryPage = type({
   items: DeploymentAttempt.array(),
   "next_cursor?": "string",
+  // Environment owner (Tenkai #1066); omitted when unset or by older servers.
+  "owner?": HistoryOwner,
 });
 
 export type AttemptCause = typeof DeploymentCause.infer;
@@ -55,6 +59,7 @@ export type DeploymentAttempt = typeof DeploymentAttempt.infer & {
 export type DeploymentHistoryPage = {
   items: DeploymentAttempt[];
   next_cursor?: string;
+  owner?: typeof HistoryOwner.infer;
 };
 
 export type HistoryLoad =
