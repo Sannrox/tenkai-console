@@ -51,6 +51,14 @@ describe("parseStatus", () => {
     ]);
   });
 
+  it("keeps the health observation time", () => {
+    expect(
+      parseStatus([
+        { product: "api", health: "unknown", health_observed_at_ms: 1_700_000_000_000 },
+      ]),
+    ).toEqual([{ product: "api", health: "unknown", health_observed_at_ms: 1_700_000_000_000 }]);
+  });
+
   it("rejects a non-array body", () => {
     expect(parseStatus({ product: "api" })).toBeUndefined();
   });

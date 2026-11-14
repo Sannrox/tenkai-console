@@ -157,6 +157,41 @@ describe("instanceHealthView", () => {
       checks: [],
     });
   });
+
+  it("names the last observation time, also for a stale report", () => {
+    const at = Date.UTC(2026, 10, 14, 9, 12, 45);
+    expect(instanceHealthView({ health: "healthy", health_observed_at_ms: at }).observed).toBe(
+      "2026-11-14T09:12Z",
+    );
+    expect(instanceHealthView({ health: "unknown", health_observed_at_ms: at })).toEqual({
+      label: "unknown",
+      tone: "bad",
+      checks: [],
+      observed: "2026-11-14T09:12Z",
+    });
+  });
+
+  it("shows no time when the server sends none or one no date can hold", () => {
+    expect(instanceHealthView({ health: "healthy" })).not.toHaveProperty("observed");
+    expect(
+      instanceHealthView({ health: "healthy", health_observed_at_ms: 1e20 }),
+    ).not.toHaveProperty("observed");
+  });
+
+  it("lists a repairing check with the others, below a warning", () => {
+    const view = instanceHealthView({
+      health: "healthy",
+      health_checks: [
+        { name: "pool", state: "repairing", message: "reconnecting" },
+        { name: "cert", state: "warning" },
+      ],
+    });
+    expect(view.label).toBe("warning");
+    expect(view.checks.map((check) => `${check.name} ${check.state} ${check.tone}`)).toEqual([
+      "cert warning warn",
+      "pool repairing warn",
+    ]);
+  });
 });
 
 describe("healthRollup", () => {

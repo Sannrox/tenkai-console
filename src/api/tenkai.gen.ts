@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai commit 18299c19076eaacaedce4d582425f392ff871a40 tenkai-http-v1.schema.json (sha256 91ce6fe418bfdece861d656c60fc20c2668f2d2c2a923c8bac830315f51c47e4, contract tenkai.http.v1).
+// Generated from Sannrox/tenkai commit 693cef8fe7c3322d130c4e17b7d43bbcf0a7470c tenkai-http-v1.schema.json (sha256 2a374ee49ea33d70254df6e7fcc7f4f8bf0bc874583070193bb0880844d64839, contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -4357,10 +4357,17 @@ error?: (string | null)
 head: string
 health?: (string | null)
 /**
- * Failing and warning checks from the latest health observation (#1057).
- * Empty when none were reported or the observation is stale.
+ * Repairing, warning, and failing checks from the latest health
+ * observation (#1057, #1273), plus secret rotation warnings. Empty when
+ * none were reported or the observation is stale.
  */
 health_checks?: HealthCheck[]
+/**
+ * Unix milliseconds of the latest health observation for the deployed
+ * release (#1273), also when it is stale and `health` reads `unknown`.
+ * Omitted when health is the apply-time value.
+ */
+health_observed_at_ms?: number
 /**
  * Instance this row describes. Equals `product` when unnamed (ADR 0044 §1).
  */

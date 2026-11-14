@@ -253,7 +253,7 @@ const Detail = ({
                       </td>
                       <td className={`${td} ${HEALTH_TONE[health.tone]}`}>
                         {health.label}
-                        <HealthChecks checks={health.checks} />
+                        <HealthChecks health={health} />
                       </td>
                       <td className={`${td} ${HEALTH_TONE[identity.tone]}`}>{identity.label}</td>
                       <td className={`${td} font-mono text-muted`}>
