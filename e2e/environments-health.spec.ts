@@ -246,6 +246,10 @@ test.describe("environment instance health", () => {
     await page.goto(app.url);
     await page.getByRole("link", { name: "Environments" }).click();
     await expect(rollup(page)).toHaveText("1 healthy");
+    // Inspect already shows healthy; let the first status read settle so the
+    // interval tick starts a new read instead of joining the one in flight.
+    await expect.poll(() => reads).toBe(1);
+    await page.waitForLoadState("networkidle");
     await page.clock.runFor(31_000);
     await expect(rollup(page)).toHaveText("1 unknown");
     expect(reads).toBeGreaterThanOrEqual(2);
