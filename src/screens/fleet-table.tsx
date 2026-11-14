@@ -13,7 +13,10 @@ const TEXT: Record<Tone, string> = {
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "h-8 border-b border-line px-3.5 py-0 align-middle whitespace-nowrap overflow-hidden";
 
-/** Environments table from bulk fleet rows (issue #45 pick A). */
+/**
+ * Environments table from bulk fleet rows (issue #45 pick A). Environments the
+ * server marks unrouted are counted above the table and flagged in Owner.
+ */
 export const FleetTable = ({
   rows,
   selected,
@@ -72,58 +75,70 @@ export const FleetTable = ({
   const slice = rows.slice(start, end);
   const top = start * ROW_HEIGHT;
   const bottom = (rows.length - end) * ROW_HEIGHT;
+  const unrouted = rows.filter((row) => row.unrouted).length;
 
   return (
-    <Card className="overflow-hidden">
-      <div
-        ref={scroller}
-        role="region"
-        aria-label={label}
-        className="max-h-[min(70vh,40rem)] overflow-auto"
-        onScroll={onScroll}
-      >
-        <table className="w-full border-collapse text-xs">
-          <thead className="sticky top-0 bg-card">
-            <tr>
-              <th className={th}>Name</th>
-              <th className={th}>Status</th>
-              <th className={th}>Release</th>
-              <th className={th}>Health</th>
-              <th className={th}>Last apply</th>
-              <th className={th}>Drift</th>
-              <th className={th}>Owner</th>
-            </tr>
-          </thead>
-          <tbody>
-            {top > 0 && (
-              <tr aria-hidden="true">
-                <td colSpan={7} className="p-0" style={{ height: top }} />
+    <>
+      {unrouted > 0 && (
+        <p aria-label="Unrouted environments" className="mt-0 mb-1 text-xs text-warning">
+          {unrouted} unrouted: no owner and no webhook endpoint, so failures notify no one
+        </p>
+      )}
+      <Card className="overflow-hidden">
+        <div
+          ref={scroller}
+          role="region"
+          aria-label={label}
+          className="max-h-[min(70vh,40rem)] overflow-auto"
+          onScroll={onScroll}
+        >
+          <table className="w-full border-collapse text-xs">
+            <thead className="sticky top-0 bg-card">
+              <tr>
+                <th className={th}>Name</th>
+                <th className={th}>Status</th>
+                <th className={th}>Release</th>
+                <th className={th}>Health</th>
+                <th className={th}>Last apply</th>
+                <th className={th}>Drift</th>
+                <th className={th}>Owner</th>
               </tr>
-            )}
-            {slice.map((row) => (
-              <tr
-                key={row.name}
-                aria-selected={onSelect ? row.name === selected : undefined}
-                onClick={onSelect ? () => onSelect(row.name) : undefined}
-                className={`h-8 ${onSelect ? "cursor-pointer" : ""} ${row.name === selected ? "bg-selected" : ""}`}
-              >
-                <td className={`${td} font-semibold`}>{row.name}</td>
-                <td className={`${td} ${TEXT[row.statusTone]}`}>{row.status}</td>
-                <td className={`${td} font-mono`}>{row.release}</td>
-                <td className={`${td} ${TEXT[row.healthTone]}`}>{row.health}</td>
-                <td className={td}>{row.lastApply}</td>
-                <td className={`${td} font-mono`}>{row.drift}</td>
-                <td className={`${td} ${row.owner === "·" ? "text-muted" : ""}`}>{row.owner}</td>
-              </tr>
-            ))}
-            {bottom > 0 && (
-              <tr aria-hidden="true">
-                <td colSpan={7} className="p-0" style={{ height: bottom }} />
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+            </thead>
+            <tbody>
+              {top > 0 && (
+                <tr aria-hidden="true">
+                  <td colSpan={7} className="p-0" style={{ height: top }} />
+                </tr>
+              )}
+              {slice.map((row) => (
+                <tr
+                  key={row.name}
+                  aria-selected={onSelect ? row.name === selected : undefined}
+                  onClick={onSelect ? () => onSelect(row.name) : undefined}
+                  className={`h-8 ${onSelect ? "cursor-pointer" : ""} ${row.name === selected ? "bg-selected" : ""}`}
+                >
+                  <td className={`${td} font-semibold`}>{row.name}</td>
+                  <td className={`${td} ${TEXT[row.statusTone]}`}>{row.status}</td>
+                  <td className={`${td} font-mono`}>{row.release}</td>
+                  <td className={`${td} ${TEXT[row.healthTone]}`}>{row.health}</td>
+                  <td className={td}>{row.lastApply}</td>
+                  <td className={`${td} font-mono`}>{row.drift}</td>
+                  <td
+                    className={`${td} ${row.unrouted ? "text-warning" : row.owner === "·" ? "text-muted" : ""}`}
+                  >
+                    {row.unrouted ? "unrouted" : row.owner}
+                  </td>
+                </tr>
+              ))}
+              {bottom > 0 && (
+                <tr aria-hidden="true">
+                  <td colSpan={7} className="p-0" style={{ height: bottom }} />
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </>
   );
 };

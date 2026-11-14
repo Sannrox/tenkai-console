@@ -5,11 +5,11 @@ import type {
   EnvironmentInspectReport,
   ManagementLifecycleResult,
 } from "../api/tenkai.gen";
+import { attributed, failureGroups, type Source } from "../delivery/attribution";
 import {
   deliveryRows,
   endpointsLine,
   fetchDeliveries,
-  type OwnerReach,
   ownerLine,
   ownerReach,
   statusOwners,
@@ -20,17 +20,12 @@ import { configCall } from "../management/environment-config";
 import { useManagementCall } from "../management/use-management";
 import { expectedGeneration } from "../plan/requests";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
+import { DeliveryFailures, Endpoints, TONE } from "./notification-routing";
 
 const field =
   "min-w-0 rounded-md border border-field bg-white/4 px-2.5 py-1.5 text-xs text-fg placeholder:text-muted";
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2 align-top";
-const TONE = {
-  ok: "text-ok",
-  warn: "text-warning",
-  bad: "text-danger",
-  muted: "text-muted",
-} as const;
 
 const COPY = {
   unrouted: "No owner and no webhooks",
@@ -42,8 +37,8 @@ const COPY = {
 
 /**
  * Environment owner, the server's reachability verdict for it and each
- * endpoint, the product owners its status reports, and the raw webhook
- * deliveries by URL. Lazily loaded with history. An owner change is
+ * endpoint, the product owners its status reports, failing deliveries by
+ * source and owner, and the raw webhook deliveries by URL. Lazily loaded with history. An owner change is
  * one request with a reason and the generation the form opened on; a lost
  * answer reads as unknown and is not resent. Webhooks keep their own editor
  * in the configuration sections.
@@ -69,6 +64,17 @@ export const EnvironmentOwner = ({
   const status = useEnvironmentStatus(token, report.name);
   const owners = status.data?.kind === "ok" ? statusOwners(status.data.value) : [];
   const reach = ownerReach(report.owner);
+  // Owners this page knows: its own, and product owners from status rows.
+  const ownerOf = ({ kind, name }: Source): string | undefined => {
+    if (kind === "environment") {
+      return name === report.name ? ownerLine(report.owner) : undefined;
+    }
+    const row =
+      status.data?.kind === "ok"
+        ? status.data.value.find((item) => item.product === name)
+        : undefined;
+    return kind === "product" && row ? row.owner?.trim() || "none" : undefined;
+  };
   return (
     <section aria-label="Owner" className="min-w-0">
       <div className="mt-[18px] mb-1 flex items-center gap-2">
@@ -110,7 +116,7 @@ export const EnvironmentOwner = ({
           </div>
         ))}
       </dl>
-      {reach && reach.endpoints.length > 0 && <Endpoints reach={reach} />}
+      {reach && reach.endpoints.length > 0 && <Endpoints rows={reach.endpoints} />}
       {allowed && open && (
         <Card className="mt-1 flex flex-wrap items-center gap-2 px-3.5 py-3 text-xs">
           <OwnerForm
@@ -126,7 +132,7 @@ export const EnvironmentOwner = ({
           <Notice tone={call.outcome.tone}>{call.outcome.text}</Notice>
         </div>
       )}
-      <Deliveries environment={report.name} token={token} />
+      <Deliveries environment={report.name} token={token} ownerOf={ownerOf} />
     </section>
   );
 };
@@ -181,34 +187,16 @@ const OwnerForm = ({
   );
 };
 
-/** One row per endpoint, as the server judged it from recorded deliveries. */
-const Endpoints = ({ reach }: { reach: OwnerReach }) => (
-  <Card className="mt-1 overflow-x-auto">
-    <table aria-label="Endpoint reachability" className="w-full border-collapse text-xs">
-      <thead>
-        <tr>
-          <th className={th}>Endpoint</th>
-          <th className={th}>Reachability</th>
-          <th className={th}>Failures</th>
-          <th className={th}>Last success</th>
-        </tr>
-      </thead>
-      <tbody>
-        {reach.endpoints.map((row) => (
-          <tr key={row.url} className="[&:last-child>td]:border-b-0">
-            <td className={`${td} font-mono whitespace-nowrap`}>{row.url}</td>
-            <td className={`${td} ${TONE[row.tone]}`}>{row.verdict}</td>
-            <td className={`${td} font-mono`}>{row.failures}</td>
-            <td className={`${td} font-mono whitespace-nowrap`}>{row.lastSuccess}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </Card>
-);
-
 /** Raw deliveries, newest first per kind. Read only; the server retries, not the console. */
-const Deliveries = ({ environment, token }: { environment: string; token: string }) => {
+const Deliveries = ({
+  environment,
+  token,
+  ownerOf,
+}: {
+  environment: string;
+  token: string;
+  ownerOf: (source: Source) => string | undefined;
+}) => {
   const query = useQuery({
     queryKey: ["webhook-deliveries", environment, token],
     queryFn: () => fetchDeliveries(environment, token),
@@ -258,6 +246,9 @@ const Deliveries = ({ environment, token }: { environment: string; token: string
   }
   return (
     <>
+      {load?.kind === "ok" && attributed(load.value) && (
+        <DeliveryFailures groups={failureGroups(load.value, ownerOf)} />
+      )}
       <h3 className="mt-3 mb-1 text-xs font-semibold">Webhook deliveries</h3>
       <Card className="overflow-x-auto">{body}</Card>
     </>

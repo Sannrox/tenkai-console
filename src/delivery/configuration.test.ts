@@ -200,6 +200,18 @@ describe("fleet table rows", () => {
       "·",
     ]);
   });
+
+  it("flags only rows the server marks unrouted; absent reads as not flagged", () => {
+    const fleet: FleetStatusReport = {
+      environment_count: 2,
+      environments: [fleetRow("edge", { unrouted: true }), fleetRow("lab")],
+      environments_behind: 0,
+      environments_current: 2,
+      environments_empty: 0,
+      environments_unhealthy: 0,
+    };
+    expect(fleetTableRows(fleet, []).map((row) => row.unrouted)).toStrictEqual([true, false]);
+  });
 });
 
 describe("fleet attention", () => {

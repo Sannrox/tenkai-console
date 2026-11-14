@@ -43,6 +43,8 @@ export type FleetTableRow = {
   drift: number;
   /** Environment owner contact, or `·` when none is set. */
   owner: string;
+  /** Server says: no owner and no webhook endpoint of its own. Absent reads false. */
+  unrouted: boolean;
 };
 
 const releaseLabel = (row: FleetEnvironmentRow): string =>
@@ -70,6 +72,7 @@ export const fleetTableRows = (
         lastApply: row.latest_plan_state?.trim() || "·",
         drift: row.products_behind,
         owner: row.owner?.trim() || "·",
+        unrouted: row.unrouted === true,
       };
     });
 };

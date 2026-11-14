@@ -102,7 +102,7 @@ export const Releases = () => {
       {token !== undefined && <Compatibility token={token} environments={names} />}
       {token !== undefined && (
         <Suspense fallback={null}>
-          <ProductOwners token={token} products={table.products} />
+          <ProductOwners token={token} products={table.products} fleet={delivery.fleet} />
         </Suspense>
       )}
       {token !== undefined && <Catalog token={token} channels={table.channels} />}
