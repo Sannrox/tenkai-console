@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai commit e134e372b318ab757e539e7813e57d0188c43f85 tenkai-http-v1.schema.json (sha256 ad3b9818779e97742e9c5caacc1a03df6318642441273e67a7c9d347b3116888, contract tenkai.http.v1).
+// Generated from Sannrox/tenkai commit 498ace59b5a8b2ea4794a3d350323d0ba7e87f47 tenkai-http-v1.schema.json (sha256 9dedee4f36819640cd9e61a8916949b6528ea8a7bf4d9fb288aaab4c60121b7c, contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -145,6 +145,13 @@ export type ConnectivityClass = ("connected" | "intermittent" | "isolated")
  * via the `definition` "CriticalityLevel".
  */
 export type CriticalityLevel = ("low" | "medium" | "high" | "critical")
+/**
+ * Whether an owner or one endpoint receives notifications.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ReachabilityVerdict".
+ */
+export type ReachabilityVerdict = ("unconfigured" | "unreachable" | "reachable" | "unknown")
 /**
  * Purpose a quorum rule applies to. Derived from the plan and apply flags;
  * the v1 envelope purpose stays `execute_plan`.
@@ -467,6 +474,7 @@ ChannelRemoveRequest?: ChannelRemoveRequest
 CheckpointClass?: CheckpointClass
 CheckpointDecl?: CheckpointDecl
 CheckpointReceipt?: CheckpointReceipt
+ClearProductWebhooksQuery?: ClearProductWebhooksQuery
 ClockHealth?: ClockHealth
 CollectedApproval?: CollectedApproval
 CommandRefusalReason?: CommandRefusalReason
@@ -505,6 +513,7 @@ DrillEvidence?: DrillEvidence
 EffectiveApprovalPolicy?: EffectiveApprovalPolicy
 EffectiveCriticality?: EffectiveCriticality
 EligibleApprover?: EligibleApprover
+EndpointReachability?: EndpointReachability
 EntryProgress?: EntryProgress
 EnvironmentConfigChange?: EnvironmentConfigChange
 EnvironmentConfigRequest?: EnvironmentConfigRequest
@@ -591,6 +600,7 @@ OidcClientDiscovery?: OidcClientDiscovery
 OidcGrantRule?: OidcGrantRule
 OpenEnvironmentExposure?: OpenEnvironmentExposure
 OperationalEvent?: OperationalEvent
+OwnerReachability?: OwnerReachability1
 OwnerView?: OwnerView2
 PaceAdmitAudit?: PaceAdmitAudit
 PaceInstanceProgress?: PaceInstanceProgress
@@ -619,6 +629,7 @@ PublishInputKind?: PublishInputKind
 PublishRequest?: PublishRequest
 QuorumPurpose?: QuorumPurpose
 QuorumRule?: QuorumRule
+ReachabilityVerdict?: ReachabilityVerdict
 RecallRangeCloseRequest?: RecallRangeCloseRequest
 RecallRangePage?: RecallRangePage
 RecallRangeRequest?: RecallRangeRequest
@@ -1284,6 +1295,11 @@ hold?: DeliveryHold
 id: string
 name: string
 product: string
+/**
+ * Configured upgrade pace in milliseconds. Omitted means pacing is off.
+ * A changed duration applies from the next promotion.
+ */
+upgrade_pace_ms?: number
 }
 /**
  * Durable evidence that delivery is paused for a scope.
@@ -1426,6 +1442,16 @@ effect: string
 fence_generation: number
 plan_id?: string
 result: string
+}
+/**
+ * Query of `DELETE /v1/products/{product}/webhooks`: one endpoint by `url`,
+ * or every endpoint when omitted.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ClearProductWebhooksQuery".
+ */
+export interface ClearProductWebhooksQuery {
+url?: string
 }
 /**
  * The last clock reading, as health reports it.
@@ -1893,6 +1919,33 @@ contact: string
  * Configured notification URLs. Empty means no reachable endpoint.
  */
 endpoints?: string[]
+reachability?: OwnerReachability
+}
+/**
+ * Whether notifications reach this owner, from recorded deliveries.
+ * Present where delivery records are readable (environment inspect).
+ */
+export interface OwnerReachability {
+endpoints?: EndpointReachability[]
+verdict: ReachabilityVerdict
+}
+/**
+ * Delivery health of one notification URL.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "EndpointReachability".
+ */
+export interface EndpointReachability {
+/**
+ * Failed attempts on this URL's longest-retrying outstanding delivery.
+ */
+consecutive_failures: number
+/**
+ * Latest successful delivery to this URL among the recorded ones.
+ */
+last_success_at?: number
+url: string
+verdict: ReachabilityVerdict
 }
 /**
  * Query parameters for `GET /v1/environments/{environment}/history`.
@@ -2589,6 +2642,7 @@ contact: string
  * Configured notification URLs. Empty means no reachable endpoint.
  */
 endpoints?: string[]
+reachability?: OwnerReachability
 }
 /**
  * Present only for preview environments bound to a branch pin.
@@ -3647,6 +3701,16 @@ issuer: string
 scopes: string[]
 }
 /**
+ * Owner verdict plus one row per notification endpoint.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "OwnerReachability".
+ */
+export interface OwnerReachability1 {
+endpoints?: EndpointReachability[]
+verdict: ReachabilityVerdict
+}
+/**
  * Contact and notification URLs as inspect, status, and history show them.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -3661,6 +3725,7 @@ contact: string
  * Configured notification URLs. Empty means no reachable endpoint.
  */
 endpoints?: string[]
+reachability?: OwnerReachability
 }
 /**
  * One immutable early-admission event.
@@ -4803,7 +4868,9 @@ id: string
 last_error?: string
 next_attempt_at: number
 /**
- * `pending`, `retrying` or `delivered`.
+ * `pending`, `retrying` or `delivered`. The environment list also shows
+ * one synthetic `unconfigured` row (event `owner.unconfigured`) while
+ * the environment owner has no notification endpoint.
  */
 state: string
 url: string

@@ -17,6 +17,42 @@ const OWNER: OwnerView = {
   endpoints: ["https://hooks.example.test/a"],
 };
 const HOOK: WebhookEndpoint = { url: "https://hooks.example.test/a", secret_env: "HOOK_SECRET" };
+const HOOK_B: WebhookEndpoint = { url: "https://hooks.example.test/b", secret_env: "HOOK_SECRET" };
+
+// Verdicts as environment inspect types them (Tenkai #1279).
+const REACHABLE: OwnerView = {
+  ...OWNER,
+  reachability: {
+    verdict: "reachable",
+    endpoints: [
+      {
+        url: "https://hooks.example.test/a",
+        verdict: "reachable",
+        consecutive_failures: 0,
+        last_success_at: Date.UTC(2026, 10, 14, 11),
+      },
+    ],
+  },
+};
+const UNREACHABLE: OwnerView = {
+  ...OWNER,
+  reachability: {
+    verdict: "unreachable",
+    endpoints: [
+      {
+        url: "https://hooks.example.test/a",
+        verdict: "unreachable",
+        consecutive_failures: 5,
+        last_success_at: Date.UTC(2026, 10, 13, 9),
+      },
+    ],
+  },
+};
+const UNCONFIGURED_OWNER: OwnerView = {
+  contact: "ops@example.test",
+  endpoints: [],
+  reachability: { verdict: "unconfigured", endpoints: [] },
+};
 
 const RETRYING: WebhookDelivery = {
   id: "d1",
@@ -229,6 +265,47 @@ test.describe("owners and notification routing", () => {
     await expectDesignRules(page);
   });
 
+  test("owner reachable shows each endpoint's verdict and last success", async ({ page }) => {
+    app = await serve({ owner: REACHABLE, webhooks: [HOOK] });
+    await open(page, app);
+    await expect(owner(page).getByLabel("Owner reachability")).toHaveText("reachable");
+    const rows = owner(page).getByRole("table", { name: "Endpoint reachability" }).getByRole("row");
+    await expect(rows.nth(1)).toHaveText(
+      /https:\/\/hooks\.example\.test\/areachable02026-11-14T11:00:00\.000Z/,
+    );
+    await capture(page, "owner-reachable");
+    await expectDesignRules(page);
+  });
+
+  test("owner unreachable is flagged with failures and last success", async ({ page }) => {
+    app = await serve({ owner: UNREACHABLE, webhooks: [HOOK], deliveries: ok([RETRYING]) });
+    await open(page, app);
+    await expect(owner(page).getByLabel("Owner reachability")).toHaveText("unreachable");
+    await expect(owner(page).getByLabel("Owner reachability")).toHaveClass(/text-danger/);
+    const rows = owner(page).getByRole("table", { name: "Endpoint reachability" }).getByRole("row");
+    await expect(rows.nth(1)).toHaveText(
+      /https:\/\/hooks\.example\.test\/aunreachable52026-11-13T09:00:00\.000Z/,
+    );
+    await capture(page, "owner-unreachable");
+    await expectDesignRules(page);
+  });
+
+  test("owner unconfigured reads unconfigured with no endpoint rows", async ({ page }) => {
+    app = await serve({ owner: UNCONFIGURED_OWNER, deliveries: ok([UNCONFIGURED]) });
+    await open(page, app);
+    await expect(owner(page).getByLabel("Owner reachability")).toHaveText("unconfigured");
+    await expect(owner(page).getByRole("table", { name: "Endpoint reachability" })).toHaveCount(0);
+    await capture(page, "owner-unconfigured");
+    await expectDesignRules(page);
+  });
+
+  test("a server without verdicts shows none and the console infers none", async ({ page }) => {
+    app = await serve({ owner: OWNER, webhooks: [HOOK], deliveries: ok([RETRYING]) });
+    await open(page, app);
+    await expect(owner(page).getByLabel("Owner reachability")).toHaveCount(0);
+    await expect(owner(page).getByRole("table", { name: "Endpoint reachability" })).toHaveCount(0);
+  });
+
   test("tenant mode reads unavailable without the server's text", async ({ page }) => {
     app = await serve({
       deliveries: {
@@ -354,6 +431,52 @@ test.describe("product owners", () => {
   });
 });
 
+test.describe("remove one product endpoint", () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+  let app: MockBackend;
+  test.afterEach(async () => {
+    await app.close();
+  });
+
+  const pick = async (page: Page) => {
+    await page.getByRole("button", { name: HOOK_B.url, exact: true }).click();
+    await page.getByRole("button", { name: "Remove webhook", exact: true }).click();
+    await page.getByRole("button", { name: `Remove api webhook ${HOOK_B.url}` }).click();
+  };
+
+  test("is one DELETE naming that URL", async ({ page }) => {
+    app = await serve({
+      productOwner: OWNER,
+      productWebhooks: [HOOK, HOOK_B],
+      productWrite: ok("removed api webhook"),
+    });
+    await openReleases(page, app);
+    await expect(page.getByRole("button", { name: "Remove webhook", exact: true })).toHaveCount(0);
+    await pick(page);
+    await expect(page.getByRole("status").filter({ hasText: "removed api webhook" })).toBeVisible();
+    expect(writes(app).map((sent) => [sent.method, sent.path, sent.search])).toStrictEqual([
+      ["DELETE", "/v1/products/api/webhooks", `?url=${encodeURIComponent(HOOK_B.url)}`],
+    ]);
+    await capture(page, "product-endpoint-removed");
+    await expectDesignRules(page);
+  });
+
+  test("a lost response reads as unknown and is not retried", async ({ page }) => {
+    app = await serve({ productOwner: OWNER, productWebhooks: [HOOK, HOOK_B] });
+    let attempts = 0;
+    await page.route("**/v1/products/api/webhooks?url=*", async (route) => {
+      attempts += 1;
+      await route.abort("connectionreset");
+    });
+    await openReleases(page, app);
+    await pick(page);
+    await expect(page.getByRole("status").filter({ hasText: /outcome is unknown/ })).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    expect(attempts).toBe(1);
+    await expectDesignRules(page);
+  });
+});
+
 test.describe("owners on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
   let app: MockBackend;
@@ -362,7 +485,7 @@ test.describe("owners on a phone", () => {
   });
 
   test("the owner section stays inside the viewport", async ({ page }) => {
-    app = await serve({ owner: OWNER, webhooks: [HOOK], deliveries: ok([RETRYING]) });
+    app = await serve({ owner: UNREACHABLE, webhooks: [HOOK], deliveries: ok([RETRYING]) });
     await open(page, app);
     await owner(page).scrollIntoViewIfNeeded();
     await capture(page, "owner-phone");

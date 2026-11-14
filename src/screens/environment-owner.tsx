@@ -9,7 +9,9 @@ import {
   deliveryRows,
   endpointsLine,
   fetchDeliveries,
+  type OwnerReach,
   ownerLine,
+  ownerReach,
   statusOwners,
   unrouted,
 } from "../delivery/owners";
@@ -23,7 +25,12 @@ const field =
   "min-w-0 rounded-md border border-field bg-white/4 px-2.5 py-1.5 text-xs text-fg placeholder:text-muted";
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2 align-top";
-const TONE = { ok: "text-ok", warn: "text-warning", muted: "text-muted" } as const;
+const TONE = {
+  ok: "text-ok",
+  warn: "text-warning",
+  bad: "text-danger",
+  muted: "text-muted",
+} as const;
 
 const COPY = {
   unrouted: "No owner and no webhooks",
@@ -34,8 +41,9 @@ const COPY = {
 } as const;
 
 /**
- * Environment owner, the product owners its status reports, and the raw
- * webhook deliveries by URL. Lazily loaded with history. An owner change is
+ * Environment owner, the server's reachability verdict for it and each
+ * endpoint, the product owners its status reports, and the raw webhook
+ * deliveries by URL. Lazily loaded with history. An owner change is
  * one request with a reason and the generation the form opened on; a lost
  * answer reads as unknown and is not resent. Webhooks keep their own editor
  * in the configuration sections.
@@ -60,6 +68,7 @@ export const EnvironmentOwner = ({
   const [open, setOpen] = useState(false);
   const status = useEnvironmentStatus(token, report.name);
   const owners = status.data?.kind === "ok" ? statusOwners(status.data.value) : [];
+  const reach = ownerReach(report.owner);
   return (
     <section aria-label="Owner" className="min-w-0">
       <div className="mt-[18px] mb-1 flex items-center gap-2">
@@ -84,6 +93,14 @@ export const EnvironmentOwner = ({
         <dd className={`m-0 break-all ${report.owner?.endpoints?.length ? "" : "text-muted"}`}>
           {endpointsLine(report.owner?.endpoints)}
         </dd>
+        {reach && (
+          <>
+            <dt className="text-muted">reachability</dt>
+            <dd aria-label="Owner reachability" className={`m-0 ${TONE[reach.tone]}`}>
+              {reach.verdict}
+            </dd>
+          </>
+        )}
         {owners.map((row) => (
           <div key={row.instance} className="contents">
             <dt className="truncate text-muted">{row.instance} owner</dt>
@@ -93,6 +110,7 @@ export const EnvironmentOwner = ({
           </div>
         ))}
       </dl>
+      {reach && reach.endpoints.length > 0 && <Endpoints reach={reach} />}
       {allowed && open && (
         <Card className="mt-1 flex flex-wrap items-center gap-2 px-3.5 py-3 text-xs">
           <OwnerForm
@@ -162,6 +180,32 @@ const OwnerForm = ({
     </>
   );
 };
+
+/** One row per endpoint, as the server judged it from recorded deliveries. */
+const Endpoints = ({ reach }: { reach: OwnerReach }) => (
+  <Card className="mt-1 overflow-x-auto">
+    <table aria-label="Endpoint reachability" className="w-full border-collapse text-xs">
+      <thead>
+        <tr>
+          <th className={th}>Endpoint</th>
+          <th className={th}>Reachability</th>
+          <th className={th}>Failures</th>
+          <th className={th}>Last success</th>
+        </tr>
+      </thead>
+      <tbody>
+        {reach.endpoints.map((row) => (
+          <tr key={row.url} className="[&:last-child>td]:border-b-0">
+            <td className={`${td} font-mono whitespace-nowrap`}>{row.url}</td>
+            <td className={`${td} ${TONE[row.tone]}`}>{row.verdict}</td>
+            <td className={`${td} font-mono`}>{row.failures}</td>
+            <td className={`${td} font-mono whitespace-nowrap`}>{row.lastSuccess}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </Card>
+);
 
 /** Raw deliveries, newest first per kind. Read only; the server retries, not the console. */
 const Deliveries = ({ environment, token }: { environment: string; token: string }) => {

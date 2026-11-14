@@ -4,6 +4,8 @@ import {
   deliveryRows,
   fetchDeliveries,
   fetchProductRouting,
+  ownerReach,
+  productEndpointPath,
   setOwnerBody,
   statusOwners,
   unrouted,
@@ -145,5 +147,51 @@ describe("product routing and status owners", () => {
       { instance: "api", owner: "ops" },
       { instance: "web-eu", owner: "none" },
     ]);
+  });
+});
+
+describe("ownerReach", () => {
+  it("shows the server's verdicts and reads an absent one as not reported", () => {
+    expect(ownerReach({ contact: "ops", endpoints: ["https://a"] })).toBeUndefined();
+    expect(ownerReach(null)).toBeUndefined();
+    expect(
+      ownerReach({
+        contact: "ops",
+        endpoints: ["https://a", "https://b"],
+        reachability: {
+          verdict: "reachable",
+          endpoints: [
+            { url: "https://a", verdict: "unreachable", consecutive_failures: 4 },
+            {
+              url: "https://b",
+              verdict: "reachable",
+              consecutive_failures: 0,
+              last_success_at: Date.UTC(2026, 10, 14, 12),
+            },
+          ],
+        },
+      }),
+    ).toStrictEqual({
+      verdict: "reachable",
+      tone: "ok",
+      endpoints: [
+        { url: "https://a", verdict: "unreachable", tone: "bad", failures: 4, lastSuccess: "·" },
+        {
+          url: "https://b",
+          verdict: "reachable",
+          tone: "ok",
+          failures: 0,
+          lastSuccess: "2026-11-14T12:00:00.000Z",
+        },
+      ],
+    });
+  });
+});
+
+describe("productEndpointPath", () => {
+  it("names the one endpoint in the query, encoded", () => {
+    expect(productEndpointPath("api", "https://hooks.example.test/a?x=1&y=2")).toBe(
+      "v1/products/api/webhooks?url=https%3A%2F%2Fhooks.example.test%2Fa%3Fx%3D1%26y%3D2",
+    );
   });
 });
