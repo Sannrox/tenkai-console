@@ -11,6 +11,7 @@ import {
   pauseOutcome,
   policyPath,
   promotedBy,
+  recallRule,
   resetCause,
   share,
   soakLine,
@@ -117,6 +118,9 @@ const Rules = ({ view }: { view: PolicyView }) => {
       </Item>
       <Item label="Minimum soak">{ageMs(view.soak_duration_ms)}</Item>
       <Item label="Evidence">{evidenceLine(view.evidence)}</Item>
+      <Item label="Recall" tone={view.evidence.recall_on_failing ? "text-warning" : ""}>
+        {recallRule(view)}
+      </Item>
       <Item label="Paused" tone={view.paused ? "text-warning" : ""}>
         {view.paused
           ? [
