@@ -1,6 +1,6 @@
 import type { FailureGroup } from "../delivery/attribution";
 import type { EndpointRow, Tone } from "../delivery/owners";
-import { Card } from "../ui/kit";
+import { Button, Card } from "../ui/kit";
 
 // Shared owner reachability and delivery failure tables, for environment and
 // product owners. Both lazily loaded with the sections that use them.
@@ -54,9 +54,23 @@ export const Endpoints = ({ rows }: { rows: (EndpointRow & { product?: string })
  * URL an environment and a product share is one row naming both; a delivery
  * the server named no source for reads unattributed.
  */
-export const DeliveryFailures = ({ groups }: { groups: FailureGroup[] }) => (
+export const DeliveryFailures = ({
+  groups,
+  partial,
+}: {
+  groups: FailureGroup[];
+  /** Deliveries counted, when more exist past them: the counts are not complete. */
+  partial?: number | undefined;
+}) => (
   <>
-    <h3 className="mt-3 mb-1 text-xs font-semibold">Delivery failures</h3>
+    <div className="mt-3 mb-1 flex flex-wrap items-baseline gap-2">
+      <h3 className="m-0 text-xs font-semibold">Delivery failures</h3>
+      {partial !== undefined && (
+        <span aria-label="Delivery failures partial" className="text-xs text-warning">
+          {partialLine(partial)}
+        </span>
+      )}
+    </div>
     <Card className="overflow-x-auto">
       {groups.length === 0 ? (
         <p className="m-0 px-3.5 py-3 text-xs text-muted">none</p>
@@ -114,4 +128,41 @@ export const DeliveryFailures = ({ groups }: { groups: FailureGroup[] }) => (
       )}
     </Card>
   </>
+);
+
+const partialLine = (shown: number) =>
+  `in the newest ${shown} ${shown === 1 ? "delivery" : "deliveries"}, more exist`;
+
+/**
+ * Says a delivery list is partial and offers its next page on request; nothing
+ * once the list is complete. A failed next page keeps what is shown, says so
+ * without the server's text, and the same button asks again.
+ */
+export const MoreDeliveries = ({
+  shown,
+  failed,
+  of,
+  loading,
+  onMore,
+}: {
+  shown: number;
+  /** The last next-page read failed, for the lists named in `of` where there are several. */
+  failed: boolean;
+  of?: string[];
+  loading: boolean;
+  onMore: () => void;
+}) => (
+  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+    <span aria-label="Deliveries partial" className="text-warning">
+      newest {shown} shown, more exist
+    </span>
+    <Button disabled={loading} onClick={onMore}>
+      {loading ? "Loading" : "Load more"}
+    </Button>
+    {failed && (
+      <span role="alert" className="text-danger">
+        Could not load more{of && of.length > 0 ? ` deliveries of ${of.join(", ")}` : ""}
+      </span>
+    )}
+  </div>
 );

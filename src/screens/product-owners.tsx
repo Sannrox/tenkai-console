@@ -7,6 +7,7 @@ import type {
   WebhookEvent,
 } from "../api/tenkai.gen";
 import { failureGroups, type Source } from "../delivery/attribution";
+import { useDeliveryLists } from "../delivery/delivery-pages";
 import {
   endpointsLine,
   fetchProductDeliveries,
@@ -21,7 +22,7 @@ import {
 } from "../delivery/owners";
 import { useManagementCall } from "../management/use-management";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
-import { DeliveryFailures, Endpoints, TONE } from "./notification-routing";
+import { DeliveryFailures, Endpoints, MoreDeliveries, TONE } from "./notification-routing";
 
 const field =
   "min-w-0 rounded-md border border-field bg-white/4 px-2.5 py-1.5 text-xs text-fg placeholder:text-muted";
@@ -178,7 +179,8 @@ export const ProductOwners = ({
 /**
  * Failing deliveries the products' endpoints routed, by source and owner.
  * Hidden where the server lists no product deliveries (older servers, tenant
- * hosts); a product the caller may not read is named, never guessed.
+ * hosts); a product the caller may not read is named, never guessed. Load
+ * more reads the next page of every product list that has one.
  */
 const MISSED = {
   forbidden: "No access to deliveries of",
@@ -196,23 +198,23 @@ const ProductFailures = ({
   routing: Record<string, Load<ProductRouting>> | undefined;
   fleet: FleetStatusReport | undefined;
 }) => {
-  const query = useQuery({
-    queryKey: ["product-deliveries", token, products],
-    queryFn: () =>
-      Promise.all(
-        products.map(
-          async (product) => [product, await fetchProductDeliveries(product, token)] as const,
-        ),
-      ),
-    retry: false,
-  });
-  const loads = query.data ?? [];
-  const listed = loads.flatMap(([, load]) => (load.kind === "ok" ? load.value : []));
+  const {
+    lists = [],
+    more,
+    loadingMore,
+  } = useDeliveryLists(["product-deliveries", token, products], products, (product, cursor) =>
+    fetchProductDeliveries(product, token, fetch, cursor),
+  );
+  const listed = lists.flatMap((list) => (list.load.kind === "ok" ? list.load.value : []));
   const missed = (kind: "forbidden" | "error") =>
-    loads.flatMap(([product, load]) => (load.kind === kind ? [product] : []));
-  if (!loads.some(([, load]) => load.kind !== "unavailable")) {
+    lists.flatMap((list) => (list.load.kind === kind ? [list.key] : []));
+  if (!lists.some((list) => list.load.kind !== "unavailable")) {
     return null;
   }
+  // A delivery two products routed is listed by both and counted once.
+  const shown = new Set(listed.map((delivery) => delivery.id)).size;
+  const partial = lists.some((list) => list.next !== undefined) ? shown : undefined;
+  const failedMore = lists.flatMap((list) => (list.moreFailed ? [list.key] : []));
   const ownerOf = ({ kind, name }: Source): string | undefined => {
     if (kind === "product") {
       const load = routing?.[name];
@@ -223,8 +225,17 @@ const ProductFailures = ({
   };
   return (
     <>
-      {loads.some(([, load]) => load.kind === "ok") && (
-        <DeliveryFailures groups={failureGroups(listed, ownerOf)} />
+      {lists.some((list) => list.load.kind === "ok") && (
+        <DeliveryFailures groups={failureGroups(listed, ownerOf)} partial={partial} />
+      )}
+      {partial !== undefined && (
+        <MoreDeliveries
+          shown={partial}
+          failed={failedMore.length > 0}
+          of={failedMore}
+          loading={loadingMore}
+          onMore={more}
+        />
       )}
       {(["forbidden", "error"] as const).map((kind) =>
         missed(kind).length > 0 ? (

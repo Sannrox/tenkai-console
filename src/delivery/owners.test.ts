@@ -54,7 +54,7 @@ describe("fetchDeliveries", () => {
       last_error: "owner ops has no notification endpoint",
     };
     const load = await fetchDeliveries("prod", "t", answering(200, [unconfigured]));
-    const rows = load.kind === "ok" ? deliveryRows(load.value) : [];
+    const rows = load.kind === "ok" ? deliveryRows(load.value.items) : [];
     expect(rows).toStrictEqual([
       {
         id: "o",
@@ -86,25 +86,35 @@ describe("fetchProductDeliveries", () => {
     const href =
       called instanceof URL ? called.href : called instanceof Request ? called.url : called;
     expect(href).toMatch(/v1\/products\/api\/webhooks\/deliveries$/);
-    expect(load.kind === "ok" ? load.value[0]?.sources : undefined).toStrictEqual([
+    expect(load.kind === "ok" ? load.value.items[0]?.sources : undefined).toStrictEqual([
       { kind: "environment", name: "prod" },
       { kind: "product", name: "api" },
     ]);
   });
 
   // Since Tenkai #1327 the list is a page; older servers send a bare array.
-  it("reads the first page of a paged list", async () => {
-    const load = await fetchProductDeliveries(
-      "api",
-      "t",
-      answering(200, { items: [RETRYING], next_cursor: "c2" }),
-    );
-    expect(load.kind === "ok" ? load.value.map((delivery) => delivery.id) : load).toStrictEqual([
-      RETRYING.id,
-    ]);
+  it("reads a page and its cursor, and asks for the page a cursor names", async () => {
+    const fetcher = answering(200, { items: [RETRYING], next_cursor: "c 2" });
+    expect(await fetchProductDeliveries("api", "t", fetcher, "c 1")).toStrictEqual({
+      kind: "ok",
+      value: { items: [RETRYING], next: "c 2" },
+    });
+    const called = fetcher.mock.calls[0]?.[0];
+    const href =
+      called instanceof URL ? called.href : called instanceof Request ? called.url : called;
+    expect(href).toMatch(/v1\/products\/api\/webhooks\/deliveries\?cursor=c%201$/);
     expect(await fetchProductDeliveries("api", "t", answering(200, { items: [{}] }))).toStrictEqual(
       { kind: "error", message: "Could not load" },
     );
+  });
+
+  it("reads a bare array or an empty cursor as the last page", async () => {
+    for (const body of [[RETRYING], { items: [RETRYING], next_cursor: " " }]) {
+      expect(await fetchProductDeliveries("api", "t", answering(200, body))).toStrictEqual({
+        kind: "ok",
+        value: { items: [RETRYING], next: undefined },
+      });
+    }
   });
 
   it("reads an older server as unavailable and 403 as no access", async () => {
