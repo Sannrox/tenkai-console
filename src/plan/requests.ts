@@ -217,16 +217,19 @@ export const approveBody = (
   ...evidence,
 });
 
+/** `noHoldReason` skips the hold a rollback-only plan sets; the server refuses it on other plans. */
 export const applyBody = (
   environment: string,
   generation: number,
   evidence: Evidence,
+  noHoldReason?: string,
 ): ApplyRequest => ({
   version: VERSION,
   operation: "apply",
   environment,
   expected_generation: generation,
   ...evidence,
+  ...(noHoldReason === undefined ? {} : { no_hold_reason: noHoldReason }),
 });
 
 /** The approver's command; the digest is a placeholder until it is known. */
