@@ -20,7 +20,13 @@ const FLEET: FleetStatusReport = {
 
 const CHANNELS: ChannelPage = {
   items: [
-    { id: "channel:api/stable", product: "api", name: "stable", head: "api@1.4.0" },
+    {
+      id: "channel:api/stable",
+      product: "api",
+      name: "stable",
+      head: "api@1.4.0",
+      exposure_grace_ms: 7 * 86_400_000,
+    },
     { id: "channel:api/dev", product: "api", name: "dev", head: "" },
     { id: "channel:web/stable", product: "web", name: "stable", head: "web@2.0.0" },
   ],
@@ -149,6 +155,15 @@ test.describe("channel upgrade pace", () => {
     ]);
     await expect(value(page)).toHaveText("off");
     await page.screenshot({ path: test.info().outputPath("pace-none.png"), fullPage: true });
+    await expectDesignRules(page);
+  });
+
+  test("shows the channel's declared exposure grace", async ({ page }) => {
+    app = await serveConsole(server({}));
+    await openPace(page, app);
+    await expect(section(page).getByLabel("Channel grace")).toHaveText("exposure grace 7d");
+    await section(page).getByRole("combobox", { name: "Channel" }).selectOption("web/stable");
+    await expect(section(page).getByLabel("Channel grace")).toHaveText("exposure grace not set");
     await expectDesignRules(page);
   });
 

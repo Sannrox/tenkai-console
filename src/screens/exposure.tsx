@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { request } from "../api/http";
 import type {
   AdvisoryFeedStatus,
@@ -27,6 +27,9 @@ import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { RefreshFailed, td, th } from "../ui/posture";
 import { Findings } from "./exposure-waivers";
 
+// The waiver list reads its own route, after the screen's first paint.
+const WaiverList = lazy(() => import("./exposure-waiver-list"));
+
 const field =
   "min-w-0 rounded-md border border-field bg-white/4 px-2.5 py-1.5 font-mono text-xs text-fg placeholder:text-muted";
 
@@ -46,7 +49,8 @@ const saveCsv = (fileName: string, text: string): void => {
  * Pick A (#41): advisory-feed status on the first line, query by component
  * and range, then environment/release/component/criticality/freshness.
  * Propose fix-forward recalls matching catalog releases over HTTP; Export CSV
- * is the result table. Feed findings and their waivers follow (#121).
+ * is the result table. Feed findings and their waivers follow (#121), then
+ * every stored waiver (#164).
  */
 export const Exposure = () => {
   const token = useSession((state) => state.session?.accessToken);
@@ -138,6 +142,9 @@ export const Exposure = () => {
         />
       )}
       {feed.data && <Findings token={token} matches={feed.data.matches} />}
+      <Suspense fallback={null}>
+        <WaiverList token={token} />
+      </Suspense>
     </>
   );
 };

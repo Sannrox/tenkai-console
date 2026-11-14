@@ -9,6 +9,7 @@ import type {
   WebhookEndpoint,
   WebhookEvent,
 } from "../api/tenkai.gen";
+import { graceWindow } from "../delivery/grace";
 import { thresholdLine } from "../delivery/hold";
 import { formatViewerInstant } from "../delivery/maintenance";
 import { configCall, nextOpening, registerBody } from "../management/environment-config";
@@ -119,7 +120,7 @@ export const AddEnvironment = ({ token }: { token: string }) => {
  * refused by the server, not retried, so an edit never overwrites a change
  * this page did not show. Read-only credentials see no Edit once the server
  * has refused them. The failure threshold shows once the hold view loads;
- * labels load lazily, last.
+ * the exposure grace window is read-only; labels load lazily, last.
  */
 export const ConfigSections = ({
   report,
@@ -182,6 +183,13 @@ export const ConfigSections = ({
           />
         </Section>
       )}
+      <Section
+        title="Exposure grace"
+        allowed={false}
+        summary={graceWindow(report.exposure_grace_ms)}
+      >
+        {null}
+      </Section>
       <Suspense>
         <EnvironmentLabels
           {...props}

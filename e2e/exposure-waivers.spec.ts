@@ -181,6 +181,11 @@ test.describe("exposure waivers", () => {
     app = await serve([MATCH]);
     let attempts = 0;
     await page.route("**/v1/exposures/waivers", async (route) => {
+      // The waiver list reads the same path; only the write is lost.
+      if (route.request().method() !== "POST") {
+        await route.fallback();
+        return;
+      }
       attempts += 1;
       await route.abort("connectionreset");
     });
