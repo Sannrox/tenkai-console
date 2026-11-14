@@ -1,24 +1,47 @@
 import { type } from "arktype";
 import { ApiError, request } from "../api/http";
-import type { ChannelConfigureRequest, ChannelListEntry } from "../api/tenkai.gen";
+import type {
+  ChannelAdmitRequest,
+  ChannelConfigureRequest,
+  ChannelListEntry,
+} from "../api/tenkai.gen";
 import type { Outcome } from "../management/use-management";
 
 /**
  * Channel upgrade pace: the duration over which a promotion's upgrades start.
- * Read from `GET .../pace` (`PaceProgress.duration_ms`, the pace frozen on the
- * current head), set or cleared with `POST .../pace`.
+ * Read from `GET .../pace` (the pace frozen on the current head and where each
+ * subscribed instance stands in it), set or cleared with `POST .../pace`, and
+ * one instance admitted early with `POST .../admit`. Only upgrades are paced:
+ * rollbacks and recall removals never appear in the progress.
  */
 
+const PaceInstance = type({
+  environment: "string",
+  instance: "string",
+  state: "'started' | 'admitted' | 'waiting' | 'paused'",
+  // Server times, shown as sent; the browser never projects them.
+  "eligible_at_ms?": "number",
+  "next_opens_at_ms?": "number",
+  "early_admission?": { actor: "string", reason: "string", at: "number" },
+});
+
+const PaceProgress = type({
+  release: "string",
+  duration_ms: "number > 0",
+  instances: PaceInstance.array(),
+});
+
+export type PaceInstance = typeof PaceInstance.infer;
+export type PaceProgress = typeof PaceProgress.infer;
+
+/** `progress` is null when the channel has no pace on its current head. */
 export type PaceLoad =
-  | { kind: "ok"; durationMs: number | null }
+  | { kind: "ok"; progress: PaceProgress | null }
   | { kind: "unavailable" }
   | { kind: "forbidden" }
   | { kind: "error" };
 
 export type PaceChannel = { product: string; channel: string };
-
-// Only the current pace is read here; progress fields are left to a later view.
-const PaceProgress = type({ duration_ms: "number > 0" });
 
 export const pacePath = ({ product, channel }: PaceChannel): string =>
   `v1/products/${encodeURIComponent(product)}/channels/${encodeURIComponent(channel)}/pace`;
@@ -46,7 +69,7 @@ export const fetchPace = async (
   } catch (error) {
     if (error instanceof ApiError) {
       if (error.status === 404) {
-        return { kind: "ok", durationMs: null };
+        return { kind: "ok", progress: null };
       }
       if (error.status === 405) {
         return { kind: "unavailable" };
@@ -58,9 +81,7 @@ export const fetchPace = async (
     return { kind: "error" };
   }
   const value = PaceProgress(raw);
-  return value instanceof type.errors
-    ? { kind: "error" }
-    : { kind: "ok", durationMs: value.duration_ms };
+  return value instanceof type.errors ? { kind: "error" } : { kind: "ok", progress: value };
 };
 
 const UNITS = [
@@ -121,4 +142,88 @@ export const paceOutcome = (pace: string, error: unknown): Outcome => {
     return { tone: "bad", text: "This server cannot set a pace." };
   }
   return { tone: "bad", text: "Pace change refused." };
+};
+
+/**
+ * Where the channel's pacing stands: complete once every instance runs the
+ * head, paused when every instance still to start waits on a closed
+ * maintenance window, otherwise in progress. Undefined without instances.
+ */
+export const paceStatus = (
+  instances: readonly PaceInstance[],
+): "complete" | "paused" | "in progress" | undefined => {
+  if (instances.length === 0) {
+    return undefined;
+  }
+  const pending = instances.filter(({ state }) => state !== "started");
+  if (pending.length === 0) {
+    return "complete";
+  }
+  return pending.every(({ state }) => state === "paused") ? "paused" : "in progress";
+};
+
+export const instanceName = ({ environment, instance }: PaceInstance): string =>
+  `${environment}/${instance}`;
+
+/** Instances still held by the pace and not already admitted early. */
+export const admittable = (instances: readonly PaceInstance[]): PaceInstance[] =>
+  instances.filter(
+    ({ state, early_admission }) =>
+      (state === "waiting" || state === "paused") && early_admission === undefined,
+  );
+
+/**
+ * A server time with its date, in the viewer's zone (or `timeZone` in tests):
+ * an eligible time may be days away, so a weekday alone would be ambiguous.
+ */
+export const paceInstant = (ms: number, timeZone?: string): string => {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone,
+  }).formatToParts(new Date(ms));
+  const part = (name: Intl.DateTimeFormatPartTypes) =>
+    parts.find((entry) => entry.type === name)?.value ?? "";
+  return `${part("weekday")} ${part("day")} ${part("month")} ${part("hour")}:${part("minute")}`;
+};
+
+export const admitPath = ({ product, channel }: PaceChannel): string =>
+  `v1/products/${encodeURIComponent(product)}/channels/${encodeURIComponent(channel)}/admit`;
+
+export const admitBody = (
+  { environment, instance }: PaceInstance,
+  reason: string,
+): ChannelAdmitRequest => ({
+  version: 1,
+  operation: "channel_admit",
+  environment,
+  instance,
+  reason,
+});
+
+/**
+ * What an early admission answer means, in fixed copy. No answer, or a 5xx
+ * that may have landed, is unknown and is never resent.
+ */
+export const admitOutcome = (name: string, error: unknown): Outcome => {
+  if (error === undefined) {
+    return { tone: "ok", text: `${name} admitted early and audited.` };
+  }
+  if (!(error instanceof ApiError) || error.status >= 500) {
+    return {
+      tone: "unknown",
+      text: "No answer from the server; the outcome is unknown until the next read.",
+    };
+  }
+  if (error.status === 403) {
+    return { tone: "bad", text: "Not permitted." };
+  }
+  if (error.status === 405) {
+    return { tone: "bad", text: "This server cannot admit early." };
+  }
+  return { tone: "bad", text: "Admission refused." };
 };
