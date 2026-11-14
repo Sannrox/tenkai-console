@@ -1,10 +1,8 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { request } from "../api/http";
 import type {
   EnvironmentInspectReport,
-  EnvironmentRuntimeReport,
   ManagementLifecycleResult,
   RetireEnvironmentRequest,
 } from "../api/tenkai.gen";
@@ -26,7 +24,6 @@ import {
   rollbackConfirmed,
   rollbackSummary,
 } from "../delivery/rollback";
-import { runtimeRows } from "../delivery/runtime";
 import {
   useDelivery,
   useEnvironmentDependencies,
@@ -44,11 +41,13 @@ import {
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { AddEnvironment, ConfigSections } from "./environment-config";
 import { SubscriptionHold } from "./environment-hold";
+import { Runtime } from "./environment-runtime";
 import { FleetTable } from "./fleet-table";
 import { HealthChecks } from "./health-checks";
 
 const EnvironmentDependencies = lazy(() => import("./environment-dependencies"));
 const EnvironmentHistory = lazy(() => import("./environment-history"));
+const InstanceExplain = lazy(() => import("./instance-explain"));
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2 align-top";
@@ -153,6 +152,7 @@ const Detail = ({
   const [holdReason, setHoldReason] = useState("");
   const [product, setProduct] = useState("");
   const [channel, setChannel] = useState("");
+  const [explain, setExplain] = useState<string | undefined>();
   const deployed = report.subscriptions.filter((subscription) => subscription.deployed);
   const [rollbackProduct, setRollbackProduct] = useState(deployed[0]?.product ?? "");
   const selectedProduct = deployed.some((subscription) => subscription.product === rollbackProduct)
@@ -234,7 +234,20 @@ const Detail = ({
                       >
                         {deployedLabel(subscription.deployed, held)}
                       </td>
-                      <td className={`${td} font-mono`}>{subscription.head}</td>
+                      <td className={`${td} font-mono whitespace-nowrap`}>
+                        {subscription.head}
+                        {subscription.state !== "current" && (
+                          <button
+                            type="button"
+                            className="ml-2 cursor-pointer font-sans font-semibold text-muted"
+                            aria-label={`Why is ${instance} behind`}
+                            aria-pressed={explain === instance}
+                            onClick={() => setExplain(explain === instance ? undefined : instance)}
+                          >
+                            Why
+                          </button>
+                        )}
+                      </td>
                       <td className={`${td} ${HEALTH_TONE[health.tone]}`}>
                         {health.label}
                         <HealthChecks checks={health.checks} />
@@ -466,6 +479,17 @@ const Detail = ({
           )}
         </Card>
       </div>
+      {explain !== undefined && (
+        <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
+          <InstanceExplain
+            key={explain}
+            environment={report.name}
+            instance={explain}
+            token={token}
+            onClose={() => setExplain(undefined)}
+          />
+        </Suspense>
+      )}
       <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
         <EnvironmentDependencies
           environment={report.name}
@@ -519,66 +543,6 @@ const identityLabel = (
     return { label: "renewing", tone: "warn" };
   }
   return { label: "valid", tone: "ok" };
-};
-
-/** Observed Docker and model runtime for the selected environment only. */
-const Runtime = ({ report, token }: { report: EnvironmentInspectReport; token: string }) => {
-  const runtime = useQuery({
-    queryKey: ["runtime", report.name, token],
-    queryFn: () =>
-      request<EnvironmentRuntimeReport>(
-        `v1/environments/${encodeURIComponent(report.name)}/runtime`,
-        { token },
-      ),
-    retry: false,
-  });
-  const rows = runtime.data ? runtimeRows(runtime.data) : [];
-
-  return (
-    <>
-      <div className="mt-[18px] mb-2 text-[13px] font-semibold">Runtime</div>
-      <Card className="overflow-x-auto">
-        {runtime.error ? (
-          <p role="alert" className="m-0 px-3.5 py-3 text-xs text-danger">
-            {runtime.error.message}
-          </p>
-        ) : runtime.isPending ? (
-          <p className="m-0 px-3.5 py-3 text-xs text-muted">Loading</p>
-        ) : rows.length === 0 ? (
-          <p className="m-0 px-3.5 py-3 text-xs text-muted">none</p>
-        ) : (
-          <table className="w-full border-collapse text-xs">
-            <thead>
-              <tr>
-                <th className={th}>Product</th>
-                <th className={th}>Executor</th>
-                <th className={th}>Health</th>
-                <th className={th}>Units</th>
-                <th className={th}>Init</th>
-                <th className={th}>Model</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.product} className="[&:last-child>td]:border-b-0">
-                  <td className={td}>{row.product}</td>
-                  <td className={td}>{row.executor}</td>
-                  <td className={`${td} ${HEALTH_TONE[row.healthTone]}`}>{row.health}</td>
-                  <td className={`${td} font-mono ${row.units === "none" ? "text-muted" : ""}`}>
-                    {row.units}
-                  </td>
-                  <td className={`${td} ${row.init === "none" ? "text-muted" : ""}`}>{row.init}</td>
-                  <td className={`${td} font-mono ${row.model === "none" ? "text-muted" : ""}`}>
-                    {row.model}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Card>
-    </>
-  );
 };
 
 /** Seven days of maintenance windows in local time, four slots a day. */
