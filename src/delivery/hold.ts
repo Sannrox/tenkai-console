@@ -1,4 +1,9 @@
-import type { DeliveryHold, FailureThreshold, HoldAuditEvent } from "../api/tenkai.gen";
+import type {
+  DeliveryHold,
+  FailureThreshold,
+  HoldAuditEvent,
+  HoldSelector,
+} from "../api/tenkai.gen";
 
 // Automatic environment holds (Sannrox/tenkai#1059). A declared failure
 // threshold lets the reconciler set the one environment hold with the
@@ -43,5 +48,14 @@ export const liftLine = (hold: DeliveryHold, threshold: FailureThreshold | undef
 export const recentAudit = (audit: HoldAuditEvent[], limit = 5): HoldAuditEvent[] =>
   audit.toSorted((left, right) => right.at - left.at).slice(0, limit);
 
+/** One audit line; a `set` placed by selector names it and what it resolved to. */
 export const auditLine = (event: HoldAuditEvent): string =>
-  `${event.action} by ${event.actor} at ${new Date(event.at).toISOString()}: ${event.reason}`;
+  `${event.action} by ${event.actor} at ${new Date(event.at).toISOString()}: ${event.reason}${event.selector ? ` (selector ${selectorLine(event.selector)})` : ""}`;
+
+/** `none`, or each matched environment once. */
+export const matchLine = (environments: readonly string[]): string =>
+  environments.length === 0 ? "none" : environments.join(", ");
+
+/** The selector a hold was placed by and every environment it resolved to then. */
+export const selectorLine = ({ selector, environments }: HoldSelector): string =>
+  `${selector}, matched ${matchLine(environments)}`;

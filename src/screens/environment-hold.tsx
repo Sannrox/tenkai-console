@@ -1,13 +1,14 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import type {
   DeliveryHold,
   DeliveryHoldView,
   EnvironmentInspectReport,
   ManagementLifecycleResult,
 } from "../api/tenkai.gen";
-import { auditLine, liftLine, recentAudit } from "../delivery/hold";
+import { useSession } from "../auth/session";
+import { auditLine, liftLine, recentAudit, selectorLine } from "../delivery/hold";
 import { holdLine } from "../delivery/model";
 import { useManagementCall } from "../management/use-management";
 import {
@@ -16,6 +17,8 @@ import {
   retryFailedTargetBody,
 } from "../plan/requests";
 import { ConfirmButton, Notice } from "../ui/kit";
+
+const SelectorHold = lazy(() => import("./selector-hold"));
 
 const field =
   "min-w-0 flex-1 rounded-md border border-field bg-white/4 px-2.5 py-1.5 text-xs text-fg placeholder:text-muted";
@@ -115,24 +118,40 @@ export const SubscriptionHold = ({
 };
 
 /**
- * Environment hold rows for the detail list: who holds it, whether it lifts
- * itself, and the latest set and clear events with their actors, so an
- * automatic hold and an operator hold stay apart.
+ * Environment hold rows for the detail list: who holds it, the selector it
+ * was placed by with the environments that matched, whether it lifts itself,
+ * and the latest set and clear events with their actors, so an automatic
+ * hold and an operator hold stay apart. Without a hold, an operator may hold
+ * by selector; its results stay once the hold lands.
  */
 export const HoldRows = ({
-  hold,
+  report,
   view,
 }: {
-  hold: DeliveryHold | undefined;
+  report: EnvironmentInspectReport;
   view: UseQueryResult<DeliveryHoldView>;
 }) => {
+  const hold: DeliveryHold | undefined = report.delivery_hold ?? undefined;
+  const token = useSession((state) => state.session?.accessToken);
   const audit = recentAudit(view.data?.audit ?? []);
+  const selector = hold?.selector ?? view.data?.hold?.selector;
   return (
     <>
       <dt className="text-muted">delivery hold</dt>
       <dd className={`m-0 wrap-anywhere ${hold ? "text-warning" : "text-muted"}`}>
         {hold ? holdLine(hold) : "none"}
       </dd>
+      {hold && selector && (
+        <>
+          <dt className="text-muted">selector</dt>
+          <dd className="m-0 wrap-anywhere">{selectorLine(selector)}</dd>
+        </>
+      )}
+      {token !== undefined && (
+        <Suspense fallback={null}>
+          <SelectorHold report={report} token={token} />
+        </Suspense>
+      )}
       {hold && view.data && (
         <>
           <dt className="text-muted">lifts</dt>

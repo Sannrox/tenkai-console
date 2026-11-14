@@ -61,16 +61,19 @@ export const rollbackBody = (
   recovery_reason: reason,
 });
 
+/** `selector` records the selector the hold is placed by; the server refuses it unless the environment matches. */
 export const holdBody = (
   environment: string,
   generation: number,
   reason: string,
+  selector?: string,
 ): DeliveryHoldRequest => ({
   version: VERSION,
   operation: "hold",
   environment,
   expected_generation: generation,
   reason,
+  ...(selector === undefined ? {} : { selector }),
 });
 
 /** `POST /v1/environments/{environment}/apply/cancel`; a blank reason lets the server default it. */
