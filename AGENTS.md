@@ -120,6 +120,8 @@ The workflow Skills (`advance-issue-frontier`, `assess-change-impact`,
 `capture-project-decision`, `deliver-ready-issue`, `prepare-release`,
 `refactor-docs`, `shape-work-item`, `technical-documentation`, `verify-change`)
 are canonical in [Sannrox/agent-kit](https://github.com/Sannrox/agent-kit).
+The opt-in `ci-audit` skill reports what each CI job costs and catches and
+gates every new job.
 The opt-in `ui-e2e` skill proves console UI work with mocks, a states gallery,
 browser tests, screenshots, and read-only live journeys.
 There is no pin: this repository always uses the latest `main`.
