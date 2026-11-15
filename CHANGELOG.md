@@ -10,6 +10,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0-rc.1] - 2026-11-15
+
+Release candidate for 0.4.0, the console for Tenkai 0.9.
+
+### Upgrade
+
+Tenkai pins the console in `ui/console.pin`, which takes only final tags, so this candidate is for manual review; Tenkai pins `v0.4.0`. Rollback is pinning the previous zip.
+
+The bundle still requires `/healthz` to list contract `tenkai.http.v1`. Types are generated from the signed Tenkai `v0.9.0` schema. Against a 0.8 server, the screens for 0.9 routes read as unavailable, a bare-array delivery list reads as the whole list, and a hold by selector reads as refused. Same-origin and air-gapped operation are unchanged.
+
+### Added
+
+- **Instance health** with checks, observed time, and repairing checks (#155, #172).
+- **Channel promotion policy** status, soak detail, and pause/resume (#157, #171).
+- **What blocks an instance's next change** (#159).
+- **Automatic environment holds** and the failure threshold (#160), and **hold by selector** with a live match preview (#185).
+- **Cancel a running apply**, with the cancel outcome, skipped steps, and rollback hold (#162, #174).
+- **Sealed secret age** and rotation due (#165).
+- **Advisory waivers** on exposure findings, the waiver list, and grace periods (#166, #180).
+- **Environment and release labels**, view and edit (#170).
+- **Owners and notification endpoints**, with owner reachability and single product endpoint removal (#169, #182).
+- **Rendered target changes** and the **approval brief** on plans and approvals (#173, #175).
+- **Health recall rule**: recall details, measured shares, removal progress, and editing the rule (#176, #189).
+- **Upgrade pace** for a channel from Releases, pacing progress with early admit, and the configured pace next to the pace in effect (#178, #179, #184).
+- **Attributed delivery failures** and the fleet route flag (#187).
+
+### Changed
+
+- Webhook delivery lists are paged (#191).
+- The Tenkai contract is pinned to the `v0.9.0` release (#195). `pnpm api:sync` also accepts a full commit on Tenkai `main` (#154).
+
 ## [0.3.1] - 2026-11-11
 
 ### Upgrade
