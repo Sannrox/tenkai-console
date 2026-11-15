@@ -620,6 +620,96 @@
       ],
       "type": "object"
     },
+    "CanaryCohort": {
+      "description": "The cohort of the active canary policy for one release and target\nchannel, and the selector it was configured by.",
+      "properties": {
+        "environments": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "policy_digest": {
+          "type": "string"
+        },
+        "selector": {
+          "$ref": "#/$defs/HoldSelector",
+          "description": "Omitted for a cohort configured by environment name."
+        }
+      },
+      "required": [
+        "policy_digest",
+        "environments"
+      ],
+      "type": "object"
+    },
+    "CanaryDesignation": {
+      "description": "One designated canary environment: who designated it, when, and the\nselector that chose it, when one did. Designations written before this\nprovenance existed read back with only the environment.",
+      "properties": {
+        "environment": {
+          "type": "string"
+        },
+        "selector": {
+          "$ref": "#/$defs/HoldSelector",
+          "description": "The selector and the environments it resolved to at write time."
+        },
+        "set_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "set_by": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "environment"
+      ],
+      "type": "object"
+    },
+    "CanaryDesignationRequest": {
+      "description": "`POST /v1/canaries`: designate or undesignate canary environments named\nby `environments`, or every environment `selector` matches now. Exactly\none of the two is given.",
+      "properties": {
+        "designated": {
+          "type": "boolean"
+        },
+        "environments": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "selector": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "designated"
+      ],
+      "type": "object"
+    },
+    "CanaryDesignationResult": {
+      "description": "The environments a designation request changed, by name.",
+      "properties": {
+        "designated": {
+          "type": "boolean"
+        },
+        "environments": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "selector": {
+          "$ref": "#/$defs/HoldSelector",
+          "description": "The selector record kept on each designation, when one was given."
+        }
+      },
+      "required": [
+        "designated",
+        "environments"
+      ],
+      "type": "object"
+    },
     "CertificateEntry": {
       "properties": {
         "days_left": {
@@ -1017,6 +1107,10 @@
     "ChannelPromotionPolicyView": {
       "description": "Policy rules, pause actor, and soak progress for `GET /v1/products/{product}/channels/{channel}/policy`.",
       "properties": {
+        "canary": {
+          "$ref": "#/$defs/CanaryCohort",
+          "description": "The canary cohort configured for `soaking_release` into this channel."
+        },
         "elapsed_ms": {
           "format": "int64",
           "type": "integer"
@@ -5473,6 +5567,77 @@
       ],
       "type": "object"
     },
+    "LabelAction": {
+      "description": "`set` or `clear`.",
+      "enum": [
+        "set",
+        "clear"
+      ],
+      "type": "string"
+    },
+    "LabelChange": {
+      "description": "One recorded label change, as the history read returns it.",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/LabelAction"
+        },
+        "actor": {
+          "type": "string"
+        },
+        "at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "id": {
+          "description": "Unique id of this change; replays of it record nothing new.",
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "sequence": {
+          "description": "Order among this subject's label changes, from 1. Two writers that\nrace on one subject can share a sequence; both changes are kept.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "value": {
+          "description": "The value set. Omitted on `clear`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "sequence",
+        "key",
+        "action",
+        "actor",
+        "at"
+      ],
+      "type": "object"
+    },
+    "LabelView": {
+      "description": "One label on a read: the value, and who set it and when. Labels set\nbefore provenance was recorded read back without `set_by` and `set_at`.",
+      "properties": {
+        "set_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "set_by": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "type": "object"
+    },
     "ManagementLifecycleResult": {
       "description": "Versioned result shared by catalog lifecycle routes. A client ignores\nfields it does not know, so a newer server can add one (#1172);\nrequests stay strict.",
       "properties": {
@@ -9619,6 +9784,29 @@
     {
       "auth": "read",
       "method": "GET",
+      "path": "/v1/canaries",
+      "request": null,
+      "response": {
+        "items": {
+          "$ref": "#/$defs/CanaryDesignation"
+        },
+        "type": "array"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/canaries",
+      "request": {
+        "$ref": "#/$defs/CanaryDesignationRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/CanaryDesignationResult"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
       "path": "/v1/products/{product}/owner",
       "request": null,
       "response": {
@@ -9707,11 +9895,35 @@
     {
       "auth": "read",
       "method": "GET",
+      "path": "/v1/environments/{environment}/labels/history",
+      "request": null,
+      "response": {
+        "items": {
+          "$ref": "#/$defs/LabelChange"
+        },
+        "type": "array"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/releases/{product}/{version}/labels/history",
+      "request": null,
+      "response": {
+        "items": {
+          "$ref": "#/$defs/LabelChange"
+        },
+        "type": "array"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
       "path": "/v1/environments/{environment}/labels",
       "request": null,
       "response": {
         "additionalProperties": {
-          "type": "string"
+          "$ref": "#/$defs/LabelView"
         },
         "type": "object"
       }
@@ -9745,7 +9957,7 @@
       "request": null,
       "response": {
         "additionalProperties": {
-          "type": "string"
+          "$ref": "#/$defs/LabelView"
         },
         "type": "object"
       }

@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai commit 7b055bafeca38f30c6aa7e3d44fd3cca6225d245 tenkai-http-v1.schema.json (sha256 13c6f449038273faaf1d690ecbaafc81dc60e6c48970a520f90b6dbfb856a5a0, contract tenkai.http.v1).
+// Generated from Sannrox/tenkai release v0.9.0 tenkai-http-v1.schema.json (sha256 ac59d13639972687390e500a66204f501905753647323a6536362ac16ba47ef3, contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -411,6 +411,13 @@ export type HealthCheckState = ("healthy" | "repairing" | "warning" | "failing")
  */
 export type ImportState = (("running" | "succeeded" | "failed") | "previewed")
 /**
+ * `set` or `clear`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "LabelAction".
+ */
+export type LabelAction = ("set" | "clear")
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "MigrationStatus".
  */
@@ -469,6 +476,10 @@ BackupHealth?: BackupHealth
 BackupManifest?: BackupManifest
 BackupStatus?: BackupStatus
 BindPreview?: BindPreview
+CanaryCohort?: CanaryCohort
+CanaryDesignation?: CanaryDesignation
+CanaryDesignationRequest?: CanaryDesignationRequest
+CanaryDesignationResult?: CanaryDesignationResult
 CertificateEntry?: CertificateEntry
 CertificateStatus?: CertificateStatus
 ChangeEvent?: ChangeEvent
@@ -585,7 +596,7 @@ GroupApprovers?: GroupApprovers
 HealthCheck?: HealthCheck
 HealthCheckState?: HealthCheckState
 HoldAuditEvent?: HoldAuditEvent
-HoldSelector?: HoldSelector2
+HoldSelector?: HoldSelector5
 ImpactRefusal?: ImpactRefusal
 ImportJob?: ImportJob
 ImportJobList?: ImportJobList
@@ -597,6 +608,9 @@ InstanceExplainReport?: InstanceExplainReport
 InstanceNextChange?: InstanceNextChange
 IssuerStatus?: IssuerStatus1
 IssuerSummary?: IssuerSummary
+LabelAction?: LabelAction
+LabelChange?: LabelChange
+LabelView?: LabelView
 ManagementLifecycleResult?: ManagementLifecycleResult
 MatchedExposure?: MatchedExposure
 MigrationApprovalStatement?: MigrationApprovalStatement
@@ -1181,6 +1195,77 @@ stdout_sha256: string
 summary: string
 }
 /**
+ * The cohort of the active canary policy for one release and target
+ * channel, and the selector it was configured by.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "CanaryCohort".
+ */
+export interface CanaryCohort {
+environments: string[]
+policy_digest: string
+selector?: HoldSelector
+}
+/**
+ * Omitted for a cohort configured by environment name.
+ */
+export interface HoldSelector {
+environments: string[]
+selector: string
+}
+/**
+ * One designated canary environment: who designated it, when, and the
+ * selector that chose it, when one did. Designations written before this
+ * provenance existed read back with only the environment.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "CanaryDesignation".
+ */
+export interface CanaryDesignation {
+environment: string
+selector?: HoldSelector1
+set_at?: number
+set_by?: string
+}
+/**
+ * The selector and the environments it resolved to at write time.
+ */
+export interface HoldSelector1 {
+environments: string[]
+selector: string
+}
+/**
+ * `POST /v1/canaries`: designate or undesignate canary environments named
+ * by `environments`, or every environment `selector` matches now. Exactly
+ * one of the two is given.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "CanaryDesignationRequest".
+ */
+export interface CanaryDesignationRequest {
+designated: boolean
+environments?: string[]
+selector?: string
+}
+/**
+ * The environments a designation request changed, by name.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "CanaryDesignationResult".
+ */
+export interface CanaryDesignationResult {
+designated: boolean
+environments: string[]
+selector?: HoldSelector2
+}
+/**
+ * The selector record kept on each designation, when one was given.
+ */
+export interface HoldSelector2 {
+environments: string[]
+selector: string
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "CertificateEntry".
  */
@@ -1331,13 +1416,13 @@ export interface DeliveryHold {
 actor: string
 held_at: number
 reason: string
-selector?: HoldSelector
+selector?: HoldSelector3
 }
 /**
  * The selector this hold was placed by, when it was. Omitted for a hold
  * placed on the environment by name.
  */
-export interface HoldSelector {
+export interface HoldSelector3 {
 environments: string[]
 selector: string
 }
@@ -1413,6 +1498,7 @@ target_channel: string
  * via the `definition` "ChannelPromotionPolicyView".
  */
 export interface ChannelPromotionPolicyView {
+canary?: CanaryCohort1
 elapsed_ms?: number
 evidence: ChannelPromotionEvidence
 failing_share?: number
@@ -1437,6 +1523,15 @@ source_channel: string
  */
 state: string
 target_channel: string
+}
+/**
+ * The cohort of the active canary policy for one release and target
+ * channel, and the selector it was configured by.
+ */
+export interface CanaryCohort1 {
+environments: string[]
+policy_digest: string
+selector?: HoldSelector
 }
 /**
  * Body of `PUT /v1/products/{product}/channels/{channel}/policy`: replace the
@@ -1895,12 +1990,12 @@ action: string
 actor: string
 at: number
 reason: string
-selector?: HoldSelector1
+selector?: HoldSelector4
 }
 /**
  * The selector a `set` was placed by. Omitted otherwise.
  */
-export interface HoldSelector1 {
+export interface HoldSelector4 {
 environments: string[]
 selector: string
 }
@@ -2465,7 +2560,7 @@ export interface DeliveryHold1 {
 actor: string
 held_at: number
 reason: string
-selector?: HoldSelector
+selector?: HoldSelector3
 }
 /**
  * The workload identity issuer, its requested generation and its
@@ -2759,7 +2854,7 @@ export interface DeliveryHold2 {
 actor: string
 held_at: number
 reason: string
-selector?: HoldSelector
+selector?: HoldSelector3
 }
 /**
  * Report-only live-spec comparison (#1028). Omitted when unknown.
@@ -3455,7 +3550,7 @@ state: HealthCheckState
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "HoldSelector".
  */
-export interface HoldSelector2 {
+export interface HoldSelector5 {
 environments: string[]
 selector: string
 }
@@ -3629,6 +3724,44 @@ previous?: (IssuerSummary | null)
  * The generation `prepare` asked a candidate for.
  */
 requested?: (number | null)
+}
+/**
+ * One recorded label change, as the history read returns it.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "LabelChange".
+ */
+export interface LabelChange {
+action: LabelAction
+actor: string
+at: number
+/**
+ * Unique id of this change; replays of it record nothing new.
+ */
+id: string
+key: string
+reason?: string
+/**
+ * Order among this subject's label changes, from 1. Two writers that
+ * race on one subject can share a sequence; both changes are kept.
+ */
+sequence: number
+/**
+ * The value set. Omitted on `clear`.
+ */
+value?: string
+}
+/**
+ * One label on a read: the value, and who set it and when. Labels set
+ * before provenance was recorded read back without `set_by` and `set_at`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "LabelView".
+ */
+export interface LabelView {
+set_at?: number
+set_by?: string
+value: string
 }
 /**
  * Versioned result shared by catalog lifecycle routes. A client ignores
@@ -4899,7 +5032,7 @@ export interface DeliveryHold3 {
 actor: string
 held_at: number
 reason: string
-selector?: HoldSelector
+selector?: HoldSelector3
 }
 /**
  * Dependency hold carried on a status row (no product; the row already names it).
