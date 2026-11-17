@@ -106,59 +106,10 @@ def bom_from_packages(packages: list[tuple[str, str]], version: str) -> dict:
     }
 
 
-def self_test() -> None:
-    lock = (
-        "lockfileVersion: '9.0'\n"
-        "importers:\n"
-        "  .:\n"
-        "    dependencies:\n"
-        "      react:\n"
-        "        specifier: ^19.3.0\n"
-        "        version: 19.3.0\n"
-        "packages:\n"
-        "\n"
-        "  '@tanstack/react-query@5.104.0':\n"
-        "    resolution: {integrity: sha512-aaa}\n"
-        "\n"
-        "  react@19.3.0:\n"
-        "    resolution: {integrity: sha512-bbb}\n"
-        "\n"
-        "  'zustand@5.0.15(react@19.3.0)':\n"
-        "    resolution: {integrity: sha512-ccc}\n"
-        "\n"
-        "snapshots:\n"
-        "  react@19.3.0:\n"
-        "    {}\n"
-    )
-    packages = packages_from_lockfile(lock)
-    assert packages == [
-        ("@tanstack/react-query", "5.104.0"),
-        ("react", "19.3.0"),
-        ("zustand", "5.0.15"),
-    ], packages
-    bom = bom_from_packages(packages, "0.2.0")
-    assert bom["bomFormat"] == "CycloneDX"
-    assert bom["specVersion"] == "1.5"
-    assert SERIAL_NUMBER.fullmatch(bom["serialNumber"]), bom["serialNumber"]
-    other = bom_from_packages(packages, "0.2.0")
-    assert other["serialNumber"] != bom["serialNumber"]
-    assert bom["metadata"]["component"]["name"] == "tenkai-console"
-    assert bom["metadata"]["component"]["version"] == "0.2.0"
-    assert bom["metadata"]["component"]["type"] == "application"
-    names = {item["name"] for item in bom["components"]}
-    assert names == {"@tanstack/react-query", "react", "zustand"}, names
-    scoped = next(item for item in bom["components"] if item["name"] == "@tanstack/react-query")
-    assert scoped["purl"] == "pkg:npm/%40tanstack/react-query@5.104.0", scoped
-    print("release-sbom self-test passed")
-
-
 def main(argv: list[str]) -> None:
-    if argv == ["--self-test"]:
-        self_test()
-        return
     if len(argv) != 1:
-        raise SystemExit("usage: release-sbom.py OUT")
-    root = Path(__file__).resolve().parent.parent
+        raise SystemExit("usage: sbom.py OUT")
+    root = Path(__file__).resolve().parents[2]
     lock = (root / "pnpm-lock.yaml").read_text()
     bom = bom_from_packages(packages_from_lockfile(lock), workspace_version(root))
     out = Path(argv[0])

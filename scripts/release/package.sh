@@ -4,11 +4,11 @@
 # artifacts to --out (default: release/).
 #
 # Usage:
-#   bash scripts/release-package.sh --out release [--tag vX.Y.Z] [--git-sha SHA]
+#   bash scripts/release/package.sh --out release [--tag vX.Y.Z] [--git-sha SHA]
 #        [--skip-build] [--skip-test] [--skip-github]
 set -euo pipefail
 
-ROOT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_PATH"
 
 OUT=""
@@ -19,7 +19,7 @@ SKIP_TEST=0
 SKIP_GITHUB=0
 
 fail() {
-  printf 'release-package: %s\n' "$1" >&2
+  printf 'package: %s\n' "$1" >&2
   exit 1
 }
 
@@ -67,10 +67,10 @@ if [[ "$SKIP_BUILD" -eq 0 ]]; then
 fi
 
 if [[ -n "$TAG" ]]; then
-  python3 "$ROOT_PATH/scripts/changelog-notes.py" "$VERSION" >"${OUT}/RELEASE_NOTES.md"
+  python3 "$ROOT_PATH/scripts/release/notes.py" "$VERSION" >"${OUT}/RELEASE_NOTES.md"
 fi
 
-python3 "$ROOT_PATH/scripts/release-sbom.py" "${OUT}/tenkai-console.cdx.json"
+python3 "$ROOT_PATH/scripts/release/sbom.py" "${OUT}/tenkai-console.cdx.json"
 
 python3 -c '
 import hashlib, pathlib, sys
@@ -82,13 +82,18 @@ for path in sorted(p for p in out.iterdir() if p.is_file() and p.name != "SHA256
 (out / "SHA256SUMS").write_text("\n".join(lines) + ("\n" if lines else ""))
 ' "$OUT"
 
-LABEL_ARGS=()
-if [[ -n "$TAG" && "$SKIP_GITHUB" -eq 0 ]] && command -v gh >/dev/null 2>&1; then
+GATE_ARGS=()
+if [[ -n "$TAG" && "$SKIP_GITHUB" -eq 0 ]]; then
+  # Empty gate flags would read as a release that passed no gates, so a
+  # tagged run fails closed when the merged pull requests cannot be read.
+  command -v gh >/dev/null 2>&1 || fail "gh is required to read gate flags for ${TAG}"
   # Gate flags cover exactly the pull requests merged into the release commit
   # since the nearest final tag before it: an rc tag never starts the range,
   # or a final release would drop gates first seen in its release candidates,
   # and a pull request merged after the tagged commit never counts, even when a
-  # retry runs days later.
+  # retry runs days later. manifest.py keeps only labels in the range.
+  gates="$(mktemp -d "${TMPDIR:-/tmp}/tenkai-console-gates.XXXXXX")"
+  trap 'rm -rf "$gates"' EXIT
   prev="$(git describe --tags --abbrev=0 --match 'v*' --exclude '*-*' "${GIT_SHA}^" 2>/dev/null || true)"
   range="$GIT_SHA"
   query="merged:<=$(TZ=UTC git log -1 --date=format-local:%Y-%m-%d --format=%cd "$GIT_SHA")"
@@ -96,14 +101,11 @@ if [[ -n "$TAG" && "$SKIP_GITHUB" -eq 0 ]] && command -v gh >/dev/null 2>&1; the
     range="${prev}..${GIT_SHA}"
     query="merged:>=$(TZ=UTC git log -1 --date=format-local:%Y-%m-%d --format=%cd "$prev") ${query}"
   fi
-  while IFS= read -r label; do
-    [[ -n "$label" ]] && LABEL_ARGS+=(--label "$label")
-  done < <(
-    gh pr list --state merged --limit 1000 --search "$query" --json mergeCommit,labels \
-      --jq '.[] | select(.mergeCommit != null) | .mergeCommit.oid as $oid | .labels[] | "\($oid)\t\(.name)"' 2>/dev/null \
-      | awk -F'\t' 'NR == FNR { in_range[$1] = 1; next } in_range[$1] { print $2 }' <(git rev-list "$range") - \
-      | sort -u || true
-  )
+  gh pr list --state merged --limit 1000 --search "$query" --json mergeCommit,labels \
+    --jq '.[] | select(.mergeCommit != null) | .mergeCommit.oid as $oid | .labels[] | "\($oid)\t\(.name)"' \
+    >"${gates}/merged-labels" || fail "cannot list merged pull requests for gate flags"
+  git rev-list "$range" >"${gates}/range-commits"
+  GATE_ARGS=(--merged-labels "${gates}/merged-labels" --range-commits "${gates}/range-commits")
 fi
 
 manifest_args=(
@@ -116,10 +118,10 @@ manifest_args=(
 if [[ -n "$TAG" ]]; then
   manifest_args+=(--tag "$TAG")
 fi
-if [[ ${#LABEL_ARGS[@]} -gt 0 ]]; then
-  manifest_args+=("${LABEL_ARGS[@]}")
+if [[ ${#GATE_ARGS[@]} -gt 0 ]]; then
+  manifest_args+=("${GATE_ARGS[@]}")
 fi
-python3 "$ROOT_PATH/scripts/release-manifest.py" "${manifest_args[@]}"
+python3 "$ROOT_PATH/scripts/release/manifest.py" "${manifest_args[@]}"
 
 echo "version=${VERSION}"
 echo "artifacts in ${OUT}:"

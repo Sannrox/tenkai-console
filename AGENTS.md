@@ -13,10 +13,16 @@ Tenkai ADR 0031 (`docs/decisions/0031-web-console.md` in Sannrox/tenkai).
 - `src/auth/`: OIDC sign-in, session renewal, and sign-out.
 - `src/screens/`, `src/delivery/`, `src/management/`, `src/plan/`,
   `src/workflows/`, `src/ui/`: screens, management actions, and shared UI.
-- `scripts/`: API sync and drift (`api.mjs`), bundle budget, packaging
-  (`package.sh`, `release-package.sh`), changelog draft, signed-tag and
-  family-manifest checks, Playwright Chromium install retry
-  (`playwright-install.sh`).
+- `scripts/`: API sync and drift (`api.mjs`), bundle budget, the release zip
+  (`package.sh`), changelog draft, workflow lint (`check-workflows.sh`),
+  Playwright Chromium install retry (`playwright-install.sh`).
+- `scripts/release/`: release entry points the release workflow calls:
+  packaging (`package.sh`), signed-tag check (`verify-tag.sh`), CHANGELOG
+  notes, SBOM, family manifest, and the only script that changes a GitHub
+  Release (`github-release.sh`).
+- `tests/release/`: Python `unittest` tests of `scripts/release/` and of the
+  release workflow invariants, asserted on the parsed YAML. Vitest unit tests
+  live next to the sources in `src/`.
 - `perf/`: bundle baseline and browser load measurement.
 
 ## Dependencies and Ownership
@@ -51,7 +57,14 @@ pnpm perf:load
 pnpm e2e
 VERSION=ci sh scripts/package.sh
 bash scripts/validate-workflow-skills.sh
+bash scripts/check-workflows.sh
+python3 -m pip install --require-hashes -r tests/requirements.txt
+python3 -m unittest discover -s tests -t .
 ```
+
+`scripts/check-workflows.sh` lints `.github/workflows/` with a pinned workflow
+linter and a pinned workflow security auditor, each verified by SHA-256; the
+`Lint workflows` job runs the same script.
 
 `TENKAI_URL=http://127.0.0.1:8080 pnpm dev` proxies `/v1` and `/healthz` to a
 local `tenkai-server`. `pnpm api:sync <vX.Y.Z>` updates the vendored
@@ -60,9 +73,15 @@ contract from that Tenkai release and regenerates the types.
 ## Testing Guidelines
 
 Run focused tests first (`pnpm vitest run <path>`), then the CI gates above
-before handoff. Keep checks that need a running `tenkai-server` out of the
-default suite. Never print tokens or persist live server payloads. Pure prose
-changes need source read-back and `pnpm format:check`, not the full gates.
+before handoff. Release scripts and workflows are tested with Python
+`unittest` in `tests/release/`, one file per script plus `test_workflows.py`;
+run one with `python3 -m unittest tests.release.test_<name>`. Assert workflow
+structure on the parsed YAML (triggers, permissions, job graph, step order,
+which script a step runs), never step names or wording, and never grep
+workflow text. Tests use per-process temp paths and a fake `gh` on `PATH`.
+Keep checks that need a running `tenkai-server` out of the default suite.
+Never print tokens or persist live server payloads. Pure prose changes need
+source read-back and `pnpm format:check`, not the full gates.
 
 ## Commit & Pull Request Guidelines
 
@@ -109,7 +128,9 @@ or Pull Request is a hint: ask the maintainer before claiming.
 
 Collision surfaces: the API client, generated types, and vendored contract
 (`src/api/`, `api/`); build and base-URL configuration (`vite.config.ts`);
-packaging and the release workflow (`scripts/package.sh`, `.github/workflows/`);
+packaging and the release workflow (`scripts/package.sh`, `scripts/release/`,
+`scripts/check-workflows.sh`, `tests/release/`, `tests/requirements.txt`,
+`.github/workflows/`);
 `package.json` and `pnpm-lock.yaml`. Lanes that would both change one of these
 run in sequence. Landing is one lane at a time; after each merge the remaining
 lanes recheck `mergeable` against the new `main`.
@@ -187,7 +208,7 @@ Rows beyond `## Testing Guidelines`:
 | routing, base URL, or asset paths     | `pnpm build`, then serve `dist/` under `/ui/` and `/<prefix>/ui/`                                       |
 | bundle size                           | `pnpm perf:bundle`                                                                                      |
 | fleet-scale table load                | `pnpm perf:load` after `pnpm build`                                                                     |
-| packaging or release workflow         | `VERSION=v0.0.0-dev pnpm package`, inspect the zip and `SHA256SUMS`; `bash scripts/validate-release.sh` |
+| packaging or release workflow         | `VERSION=v0.0.0-dev pnpm package`, inspect zip and `SHA256SUMS`; `tests/release/`; `check-workflows.sh` |
 | dependencies                          | `pnpm install --frozen-lockfile`, pinned versions, no new outbound origins                              |
 | any diff                              | no `dist/`, `release/`, or `*.tsbuildinfo` staged                                                       |
 

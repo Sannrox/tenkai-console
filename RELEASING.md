@@ -56,16 +56,18 @@ runs **main's** `release.yml`, never the copy at the tagged commit.
 `release.yml` refuses a tagged run that does not start from `main`. It then:
 
 - checks out the tag and fetches the annotated tag object
-- verifies the signed tag with main's `scripts/verify-release-tag.sh` and
+- verifies the signed tag with main's `scripts/release/verify-tag.sh` and
   main's allowed keys against the tagged commit's `package.json`
 - requires the tagged commit to be on `main`
-- runs the CI gate, builds, packages, and writes the manifest `git_sha` from
-  that commit
+- runs the release tests (`tests/release/`) and the CI gate, builds, packages,
+  and writes the manifest `git_sha` from that commit; a tagged run fails when
+  the merged pull requests behind the manifest gate flags cannot be read
 - writes an SBOM and attests provenance
 - drafts the GitHub Release from the matching CHANGELOG section with
-  `gh release create <tag> --verify-tag`, attaches the zip, `SHA256SUMS`,
-  SBOM, and family release manifest (component, version, git SHA, zip digest,
-  attestation URLs, gate flags), then publishes it
+  `scripts/release/github-release.sh` (`gh release create <tag> --verify-tag`),
+  attaches the zip, `SHA256SUMS`, SBOM, and family release manifest
+  (component, version, git SHA, zip digest, attestation URLs, gate flags),
+  then publishes it
 
 tenkai-console does not publish a container image, so there is no `latest`
 tag.
@@ -80,10 +82,12 @@ gh workflow run release.yml --ref main -f tag=vX.Y.Z
 A retry picks up fixes to `release.yml` and to the tag verifier and keys.
 Everything else (the release and packaging scripts, `CHANGELOG.md`, and the
 sources) comes from the tagged commit, so a bug there needs a new rc or patch
-version.
+version. A tag cut before the release scripts moved to `scripts/release/`
+cannot be re-run this way; it fails before anything is published.
 
 A re-run resumes the draft release and replaces its assets. Every job that
-attests, uploads, or publishes refuses a release that is already published, so
+attests, uploads, or publishes first runs `github-release.sh guard`, which
+refuses a release that is already published or that it cannot read, so
 neither a new run nor "Re-run failed jobs" on an old one can change it; cut a
 new version instead. One run per tag executes at a time.
 
