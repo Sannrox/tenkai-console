@@ -47,6 +47,7 @@ import { rollbackHoldChoice, rollbackOnly } from "../plan/rollback-hold";
 import { Button, Card } from "../ui/kit";
 import { ApplyCancel } from "./apply-cancel";
 import { ApprovalBrief } from "./approval-brief";
+import { ArtifactAvailability } from "./artifact-availability";
 import { EnvironmentOverlays } from "./environment-overlays";
 import { RollbackHold } from "./rollback-hold";
 import { TargetChanges } from "./target-changes";
@@ -193,6 +194,7 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
           </div>
 
           {plan && <ApprovalBrief plan={plan} />}
+          {plan && <ArtifactAvailability plan={plan} />}
 
           {plan && (
             <div className="mb-4 flex overflow-hidden rounded-md border border-line">
