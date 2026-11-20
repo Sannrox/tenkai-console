@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { configCall } from "./environment-config";
-import { fetchLabels, labelLine, releaseLabelCall } from "./labels";
+import {
+  environmentLabelHistoryPath,
+  fetchLabelHistory,
+  fetchLabels,
+  historyLine,
+  labelLine,
+  releaseLabelCall,
+  releaseLabelHistoryPath,
+} from "./labels";
 
 const answer = (status: number, body: unknown) => async () =>
   new Response(JSON.stringify(body), { status });
+
+const AT = Date.UTC(2026, 10, 14, 10, 0, 0);
 
 describe("labels", () => {
   it("routes environment label changes to the labels resource with the generation", () => {
@@ -51,8 +61,8 @@ describe("labels", () => {
     expect(ok).toStrictEqual({
       kind: "ok",
       labels: [
-        ["region", "eu"],
-        ["zone", "b"],
+        { key: "region", value: "eu" },
+        { key: "zone", value: "b" },
       ],
     });
     expect(labelLine(ok.kind === "ok" ? ok.labels : [])).toBe("region=eu · zone=b");
@@ -67,6 +77,81 @@ describe("labels", () => {
       await fetchLabels("v1/x", "t", answer(404, { error: "release api@9 is not published" })),
     ).toStrictEqual({ kind: "error", message: "release api@9 is not published" });
     expect(await fetchLabels("v1/x", "t", answer(200, { zone: 1 }))).toStrictEqual({
+      kind: "error",
+      message: "Could not load",
+    });
+  });
+
+  it("reads LabelView maps, including labels set before provenance", async () => {
+    const ok = await fetchLabels(
+      "v1/x",
+      "t",
+      answer(200, {
+        region: { value: "eu", set_by: "alice", set_at: AT },
+        zone: { value: "b" },
+      }),
+    );
+    expect(ok).toStrictEqual({
+      kind: "ok",
+      labels: [
+        { key: "region", value: "eu", set_by: "alice", set_at: AT },
+        { key: "zone", value: "b" },
+      ],
+    });
+    expect(labelLine(ok.kind === "ok" ? ok.labels : [])).toBe(
+      `region=eu, alice at ${new Date(AT).toISOString()} · zone=b`,
+    );
+    expect(
+      await fetchLabels("v1/x", "t", answer(200, { region: { value: "eu", extra: true } })),
+    ).toMatchObject({ kind: "ok" });
+  });
+
+  it("reads history newest first and names no permission, no route, and empty", async () => {
+    expect(environmentLabelHistoryPath("prod")).toBe("v1/environments/prod/labels/history");
+    expect(releaseLabelHistoryPath("api@1.2.0")).toBe("v1/releases/api/1.2.0/labels/history");
+    const older = {
+      id: "a",
+      sequence: 1,
+      key: "region",
+      action: "set",
+      actor: "alice",
+      at: AT,
+      value: "eu",
+      reason: "ring",
+    };
+    const newer = {
+      id: "b",
+      sequence: 2,
+      key: "region",
+      action: "clear",
+      actor: "bob",
+      at: AT + 1_000,
+      reason: "retired",
+    };
+    const ok = await fetchLabelHistory("v1/x/history", "t", answer(200, [older, newer]));
+    expect(ok).toStrictEqual({ kind: "ok", changes: [newer, older] });
+    expect(ok.kind === "ok" ? ok.changes.map(historyLine) : []).toEqual([
+      `clear region by bob at ${new Date(AT + 1_000).toISOString()}: retired`,
+      `set region=eu by alice at ${new Date(AT).toISOString()}: ring`,
+    ]);
+    expect(await fetchLabelHistory("v1/x/history", "t", answer(200, []))).toStrictEqual({
+      kind: "ok",
+      changes: [],
+    });
+    expect(
+      await fetchLabelHistory("v1/x/history", "t", answer(403, { error: "no" })),
+    ).toStrictEqual({
+      kind: "forbidden",
+    });
+    expect(await fetchLabelHistory("v1/x/history", "t", answer(404, null))).toStrictEqual({
+      kind: "unavailable",
+    });
+    expect(
+      await fetchLabelHistory("v1/x/history", "t", answer(405, { error: "no" })),
+    ).toStrictEqual({
+      kind: "unavailable",
+    });
+    expect(await fetchLabelHistory("v1/x/history", "t", answer(200, { items: [] }))).toStrictEqual({
       kind: "error",
       message: "Could not load",
     });

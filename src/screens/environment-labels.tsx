@@ -1,9 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuthSession } from "../auth/identity";
-import { environmentLabelsPath, fetchLabels, labelLine } from "../management/labels";
+import {
+  environmentLabelHistoryPath,
+  environmentLabelsPath,
+  fetchLabelHistory,
+  fetchLabels,
+  labelLine,
+} from "../management/labels";
 import { ConfirmButton } from "../ui/kit";
 import { type FormProps, Input, Section, useDraftGeneration } from "./environment-config";
+import { LabelHistory } from "./label-history";
 
 const COPY = { unavailable: "This server does not report labels.", forbidden: "No access" };
 
@@ -11,7 +18,8 @@ const COPY = { unavailable: "This server does not report labels.", forbidden: "N
  * Labels on one environment, loaded lazily from `ConfigSections` and sent
  * through its call: one `set_label` or `clear_label` with a reason and the
  * draft's generation. The read lives under the `environment` query key, so
- * every settled call refreshes it. Hidden editor without management.
+ * every settled call refreshes it, including history. Hidden editor without
+ * management.
  */
 const EnvironmentLabels = ({
   environment,
@@ -22,6 +30,11 @@ const EnvironmentLabels = ({
   const query = useQuery({
     queryKey: ["environment", environment, "labels", token],
     queryFn: () => fetchLabels(environmentLabelsPath(environment), token),
+    retry: false,
+  });
+  const history = useQuery({
+    queryKey: ["environment", environment, "label-history", token],
+    queryFn: () => fetchLabelHistory(environmentLabelHistoryPath(environment), token),
     retry: false,
   });
   const me = useAuthSession(token);
@@ -45,6 +58,7 @@ const EnvironmentLabels = ({
               ? load.message
               : COPY[load.kind]
       }
+      detail={<LabelHistory load={history.data} />}
     >
       <LabelsForm {...form} />
     </Section>
