@@ -36,9 +36,9 @@ const serve = (reply: (call: Call) => { status?: number; body: unknown }) => {
         path: url.pathname.replace(/^\//, ""),
         body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
       };
-      // Reads (labels, identity) answer empty; these tests assert writes only.
+      // Reads (labels, identity) answer empty; history is a list; these tests assert writes only.
       if (call.method === "GET") {
-        return new Response("{}");
+        return new Response(call.path.endsWith("/labels/history") ? "[]" : "{}");
       }
       calls.push(call);
       const answer = reply(call);

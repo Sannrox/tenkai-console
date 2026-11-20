@@ -3,9 +3,17 @@ import { useState } from "react";
 import type { ManagementLifecycleResult } from "../api/tenkai.gen";
 import { useAuthSession } from "../auth/identity";
 import { isReleaseSpec } from "../management/catalog";
-import { fetchLabels, labelLine, releaseLabelCall, releaseLabelsPath } from "../management/labels";
+import {
+  fetchLabelHistory,
+  fetchLabels,
+  labelLine,
+  releaseLabelCall,
+  releaseLabelHistoryPath,
+  releaseLabelsPath,
+} from "../management/labels";
 import { useManagementCall } from "../management/use-management";
 import { ConfirmButton, Notice } from "../ui/kit";
+import { LabelHistory } from "./label-history";
 
 const field =
   "min-w-0 rounded-md border border-field bg-white/4 px-2.5 py-1.5 font-mono text-xs text-fg placeholder:text-muted";
@@ -32,6 +40,12 @@ const ReleaseLabels = ({ token }: { token: string }) => {
     enabled: valid,
     retry: false,
   });
+  const history = useQuery({
+    queryKey: ["release-labels", spec, "history", token],
+    queryFn: () => fetchLabelHistory(releaseLabelHistoryPath(spec), token),
+    enabled: valid,
+    retry: false,
+  });
   const load = valid ? query.data : undefined;
   const grants = me.data?.capabilities;
   const permitted =
@@ -42,7 +56,10 @@ const ReleaseLabels = ({ token }: { token: string }) => {
   const ready = !call.isPending && key.trim() !== "" && reason.trim() !== "";
   const send = (next?: string) =>
     call.mutate(releaseLabelCall(spec, reason, key, next), {
-      onSettled: () => void query.refetch(),
+      onSettled: () => {
+        void query.refetch();
+        void history.refetch();
+      },
     });
   return (
     <section aria-label="Release labels">
@@ -67,6 +84,7 @@ const ReleaseLabels = ({ token }: { token: string }) => {
           </p>
         )}
       </div>
+      {valid && <LabelHistory load={history.data} />}
       {permitted && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input

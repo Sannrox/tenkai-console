@@ -39,11 +39,19 @@ const RESULT = ok({ version: 1, operation: "configure", message: "label set" });
 type Fixture = {
   environment?: Reply;
   release?: Reply;
+  environmentHistory?: Reply;
+  releaseHistory?: Reply;
   capabilities?: string[];
 };
 
 /** `environment` and `release` answer the two label reads; writes answer `RESULT`. */
-const serve = ({ environment = ok({}), release = ok({}), capabilities }: Fixture) =>
+const serve = ({
+  environment = ok({}),
+  release = ok({}),
+  environmentHistory,
+  releaseHistory,
+  capabilities,
+}: Fixture) =>
   serveConsole((path, request) => {
     if (path === "/v1/auth/oidc") {
       return { status: 404, body: { error: "no oidc client" } };
@@ -78,6 +86,12 @@ const serve = ({ environment = ok({}), release = ok({}), capabilities }: Fixture
         subscriptions: [],
       });
     }
+    if (path === "/v1/environments/prod/labels/history") {
+      return environmentHistory;
+    }
+    if (path === "/v1/releases/api/1.2.0/labels/history") {
+      return releaseHistory;
+    }
     if (path === "/v1/environments/prod/labels") {
       return request.method === "GET" ? environment : RESULT;
     }
@@ -90,6 +104,10 @@ const serve = ({ environment = ok({}), release = ok({}), capabilities }: Fixture
 const writes = (app: MockBackend) => app.sent.filter((sent) => sent.method !== "GET");
 const envLabels = (page: Page) => page.getByLabel("Labels configured");
 const releaseLabels = (page: Page) => page.getByLabel("Release labels configured");
+const history = (page: Page) => page.getByLabel("Label history");
+const AT = Date.UTC(2026, 10, 14, 10, 0, 0);
+const ISO = new Date(AT).toISOString();
+const OLDER = "This server does not report label history.";
 const capture = (page: Page, name: string) =>
   page.screenshot({ path: test.info().outputPath(`${name}.png`), fullPage: true });
 
@@ -122,6 +140,7 @@ test.describe("environment labels", () => {
     app = await serve({});
     await openEnvironment(page, app);
     await expect(envLabels(page)).toHaveText("none");
+    await expect(history(page)).toHaveText(OLDER);
     await capture(page, "environment-empty");
     await expectDesignRules(page);
   });
@@ -159,9 +178,13 @@ test.describe("environment labels", () => {
   });
 
   test("no permission", async ({ page }) => {
-    app = await serve({ environment: { status: 403, body: { error: "forbidden" } } });
+    app = await serve({
+      environment: { status: 403, body: { error: "forbidden" } },
+      environmentHistory: { status: 403, body: { error: "forbidden" } },
+    });
     await openEnvironment(page, app);
     await expect(envLabels(page)).toHaveText("No access");
+    await expect(history(page)).toHaveText("No access");
     await expect(
       page.getByRole("heading", { name: "Labels" }).locator("..").getByRole("button"),
     ).toHaveCount(0);
@@ -189,6 +212,90 @@ test.describe("environment labels", () => {
     await expect(page.getByRole("status")).toHaveText(/outcome is unknown/);
     await page.waitForLoadState("networkidle");
     expect(attempts).toBe(1);
+    await expectDesignRules(page);
+  });
+
+  test("actor and time on current labels, mixed with a value set before provenance", async ({
+    page,
+  }) => {
+    app = await serve({
+      environment: ok({
+        region: { value: "eu", set_by: "alice", set_at: AT },
+        zone: { value: "b" },
+      }),
+      environmentHistory: ok([]),
+    });
+    await openEnvironment(page, app);
+    await expect(envLabels(page)).toHaveText(`region=eu, alice at ${ISO} · zone=b`);
+    await expect(history(page)).toHaveText("none");
+    await capture(page, "environment-provenance");
+    await expectDesignRules(page);
+  });
+
+  test("label history lists set and clear with actor, time and reason", async ({ page }) => {
+    app = await serve({
+      environment: ok({ region: { value: "eu", set_by: "alice", set_at: AT } }),
+      environmentHistory: ok([
+        {
+          id: "1",
+          sequence: 1,
+          key: "region",
+          action: "set",
+          actor: "alice",
+          at: AT,
+          value: "eu",
+          reason: "ring",
+        },
+        {
+          id: "2",
+          sequence: 2,
+          key: "tier",
+          action: "clear",
+          actor: "bob",
+          at: AT + 1_000,
+          reason: "retired",
+        },
+      ]),
+    });
+    await openEnvironment(page, app);
+    const rows = history(page).locator("li");
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toHaveText(
+      `clear tier by bob at ${new Date(AT + 1_000).toISOString()}: retired`,
+    );
+    await expect(rows.nth(1)).toHaveText(`set region=eu by alice at ${ISO}: ring`);
+    expect(
+      app.sent.some(
+        (sent) => sent.method === "GET" && sent.path === "/v1/environments/prod/labels/history",
+      ),
+    ).toBe(true);
+    await capture(page, "environment-history");
+    await expectDesignRules(page);
+  });
+
+  test("a long label history lists every change without overflow", async ({ page }) => {
+    const changes = Array.from({ length: 24 }, (_, index) => ({
+      id: `c${index}`,
+      sequence: index + 1,
+      key: "ring",
+      action: "set" as const,
+      actor: "alice",
+      at: AT + index * 1_000,
+      value: `n${index}`,
+      reason: "rollout",
+    }));
+    app = await serve({
+      environment: ok({ ring: { value: "n23", set_by: "alice", set_at: AT + 23_000 } }),
+      environmentHistory: ok(changes),
+    });
+    await openEnvironment(page, app);
+    const rows = history(page).locator("li");
+    await expect(rows).toHaveCount(24);
+    await expect(rows.first()).toHaveText(
+      `set ring=n23 by alice at ${new Date(AT + 23_000).toISOString()}: rollout`,
+    );
+    await expect(rows.last()).toHaveText(`set ring=n0 by alice at ${ISO}: rollout`);
+    await capture(page, "environment-history-long");
     await expectDesignRules(page);
   });
 });
@@ -233,6 +340,7 @@ test.describe("release labels", () => {
     app = await serve({});
     await openRelease(page, app);
     await expect(releaseLabels(page)).toHaveText("none");
+    await expect(history(page)).toHaveText(OLDER);
     await expectDesignRules(page);
   });
 
@@ -268,6 +376,34 @@ test.describe("release labels", () => {
     await capture(page, "release-unknown");
     await expectDesignRules(page);
   });
+
+  test("actor, time and history on a release, including a value set before provenance", async ({
+    page,
+  }) => {
+    app = await serve({
+      release: ok({
+        tier: { value: "gold", set_by: "ci", set_at: AT },
+        ring: { value: "canary" },
+      }),
+      releaseHistory: ok([
+        {
+          id: "r1",
+          sequence: 1,
+          key: "tier",
+          action: "set",
+          actor: "ci",
+          at: AT,
+          value: "gold",
+          reason: "promote",
+        },
+      ]),
+    });
+    await openRelease(page, app);
+    await expect(releaseLabels(page)).toHaveText(`ring=canary · tier=gold, ci at ${ISO}`);
+    await expect(history(page).locator("li")).toHaveText(`set tier=gold by ci at ${ISO}: promote`);
+    await capture(page, "release-history");
+    await expectDesignRules(page);
+  });
 });
 
 test.describe("labels on a phone", () => {
@@ -290,5 +426,28 @@ test.describe("labels on a phone", () => {
     expect(await page.locator("body").textContent()).not.toMatch(
       /\bADR\b|#\d+|HTTP \d{3}|\/v1\/|\bat \w+ \(|Error:|—/,
     );
+  });
+
+  test("provenance and a long history fit the viewport", async ({ page }) => {
+    const changes = Array.from({ length: 12 }, (_, index) => ({
+      id: `p${index}`,
+      sequence: index + 1,
+      key: "region",
+      action: "set" as const,
+      actor: "alice",
+      at: AT + index * 1_000,
+      value: "eu",
+      reason: "ring",
+    }));
+    app = await serve({
+      environment: ok({
+        region: { value: "eu", set_by: "alice", set_at: AT + 11_000 },
+      }),
+      environmentHistory: ok(changes),
+    });
+    await openEnvironment(page, app);
+    await expect(history(page).locator("li")).toHaveCount(12);
+    await capture(page, "environment-history-phone");
+    await expectDesignRules(page);
   });
 });

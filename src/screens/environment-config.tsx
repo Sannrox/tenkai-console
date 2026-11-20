@@ -231,12 +231,15 @@ export const Section = ({
   title,
   allowed,
   summary,
+  detail,
   children,
 }: {
   title: string;
   allowed: boolean;
   /** What is configured now, shown whether or not the form is open. */
   summary?: string;
+  /** Always-visible follow-on, such as history under the current values. */
+  detail?: ReactNode;
   children: ReactNode;
 }) => {
   const [open, setOpen] = useState(false);
@@ -255,6 +258,7 @@ export const Section = ({
           {summary}
         </p>
       )}
+      {detail}
       {allowed && open && (
         <Card className="mt-1 flex flex-wrap items-center gap-2 px-3.5 py-3 text-xs">
           {children}
