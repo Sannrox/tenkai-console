@@ -51,6 +51,7 @@ const EnvironmentHistory = lazy(() => import("./environment-history"));
 const EnvironmentSecrets = lazy(() => import("./environment-secrets"));
 const InstanceExplain = lazy(() => import("./instance-explain"));
 const RecalledUpgrade = lazy(() => import("./environment-recalled-upgrade"));
+const EnvironmentAdopt = lazy(() => import("./environment-adopt"));
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2 align-top";
@@ -183,11 +184,19 @@ const Detail = ({
     }
   }
   useRefreshAt(identityRefreshAt, now, ["status", report.name, token]);
+  const unmanaged =
+    status.data?.kind === "ok"
+      ? status.data.value.flatMap((row) => (row.unmanaged === undefined ? [] : [row.unmanaged]))
+      : [];
+  const unmanagedNames = new Set(unmanaged.map((workload) => workload.name));
   const instances = withHealth(
-    report.subscriptions,
+    report.subscriptions.filter((subscription) => !unmanagedNames.has(instanceName(subscription))),
     status.data?.kind === "ok" ? status.data.value : undefined,
   );
   const rollup = healthRollup(instances.map((item) => item.health));
+  const showAdopt =
+    unmanaged.length > 0 ||
+    Boolean(report.latest_plan?.steps?.some((step) => step.action === "adopt"));
 
   return (
     <>
@@ -483,6 +492,11 @@ const Detail = ({
       {report.subscriptions.some((subscription) => subscription.state === "behind") && (
         <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
           <RecalledUpgrade report={report} token={token} />
+        </Suspense>
+      )}
+      {showAdopt && (
+        <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
+          <EnvironmentAdopt report={report} token={token} unmanaged={unmanaged} />
         </Suspense>
       )}
       {explain !== undefined && (

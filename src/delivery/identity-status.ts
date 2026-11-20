@@ -17,6 +17,12 @@ const HealthCheck = type({
   "+": "delete",
 });
 
+const LiveWorkload = type({
+  kind: "string",
+  name: "string",
+  "+": "delete",
+});
+
 const Row = type({
   product: "string",
   "instance?": "string",
@@ -26,6 +32,7 @@ const Row = type({
   "health_checks?": HealthCheck.array(),
   "health_observed_at_ms?": "number",
   "owner?": "string",
+  "unmanaged?": LiveWorkload,
   "+": "delete",
 });
 
