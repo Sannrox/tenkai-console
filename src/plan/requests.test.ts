@@ -49,6 +49,14 @@ describe("lifecycle requests", () => {
       environment: "prod-eu",
       expected_generation: 0,
     });
+    expect(planBody("prod-eu", 0, "  lower libfoo exposure ")).toEqual({
+      version: 1,
+      operation: "plan",
+      environment: "prod-eu",
+      expected_generation: 0,
+      recalled_upgrade_reason: "lower libfoo exposure",
+    });
+    expect(planBody("prod-eu", 0, " ")).not.toHaveProperty("recalled_upgrade_reason");
     expect(subscribeBody("prod-eu", 41, "api", "stable")).toEqual({
       version: 1,
       operation: "subscribe",

@@ -50,6 +50,7 @@ const EnvironmentDependencies = lazy(() => import("./environment-dependencies"))
 const EnvironmentHistory = lazy(() => import("./environment-history"));
 const EnvironmentSecrets = lazy(() => import("./environment-secrets"));
 const InstanceExplain = lazy(() => import("./instance-explain"));
+const RecalledUpgrade = lazy(() => import("./environment-recalled-upgrade"));
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2 align-top";
@@ -479,6 +480,11 @@ const Detail = ({
           )}
         </Card>
       </div>
+      {report.subscriptions.some((subscription) => subscription.state === "behind") && (
+        <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
+          <RecalledUpgrade report={report} token={token} />
+        </Suspense>
+      )}
       {explain !== undefined && (
         <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
           <InstanceExplain

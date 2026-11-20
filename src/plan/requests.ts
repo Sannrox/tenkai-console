@@ -26,12 +26,21 @@ const VERSION = 1;
 export const expectedGeneration = (lease: EnvironmentLeaseInspect): number =>
   lease.held ? (lease.generation ?? 0) : 0;
 
-export const planBody = (environment: string, generation: number): PlanRequest => ({
-  version: VERSION,
-  operation: "plan",
-  environment,
-  expected_generation: generation,
-});
+/** `recalledUpgradeReason` is the #1068 admission; omit it when empty. */
+export const planBody = (
+  environment: string,
+  generation: number,
+  recalledUpgradeReason?: string,
+): PlanRequest => {
+  const reason = recalledUpgradeReason?.trim() ?? "";
+  return {
+    version: VERSION,
+    operation: "plan",
+    environment,
+    expected_generation: generation,
+    ...(reason === "" ? {} : { recalled_upgrade_reason: reason }),
+  };
+};
 
 /** Same spec as `tenkaictl env subscribe <env> <product>=<channel>`. */
 export const subscribeBody = (
