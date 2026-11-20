@@ -185,6 +185,94 @@ describe("PlanPage approvals", () => {
   });
 });
 
+describe("PlanPage artifact availability", () => {
+  it("shows unverifiable digests before the approval controls", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async (input) => {
+        const url =
+          input instanceof Request ? input.url : input instanceof URL ? input.href : input;
+        const body = url.includes("/approvals")
+          ? APPROVALS
+          : url.endsWith("/approval-policy")
+            ? { configured: true, mode: "human" }
+            : {
+                ...REPORT,
+                latest_plan: {
+                  ...REPORT.latest_plan,
+                  artifact_availability: [
+                    {
+                      digest:
+                        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                      registry: "mirror.internal",
+                      state: "unverifiable",
+                    },
+                  ],
+                },
+              };
+        return new Response(JSON.stringify(body));
+      }),
+    );
+    await render();
+    const artifacts = container.querySelector('[aria-label="Artifacts"]');
+    expect(artifacts?.textContent).toContain("unverifiable");
+    expect(artifacts?.textContent).toContain("mirror.internal");
+    expect(artifacts?.textContent).toContain("apply checks it");
+    const approval = [...container.querySelectorAll("h2")].find(
+      (heading) => heading.textContent === "Approval",
+    );
+    expect(
+      artifacts &&
+        approval &&
+        Boolean(artifacts.compareDocumentPosition(approval) & Node.DOCUMENT_POSITION_FOLLOWING),
+    ).toBe(true);
+  });
+
+  it("names the digest and registry when planning refuses a missing artifact", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async (input, init) => {
+        const url =
+          input instanceof Request ? input.url : input instanceof URL ? input.href : input;
+        const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+        if (typeof url === "string" && url.includes("/plans") && method === "POST") {
+          return new Response(
+            JSON.stringify({
+              error:
+                "artifact digest sha256:dead is missing from registry mirror.internal; publish it there before planning",
+            }),
+            { status: 409 },
+          );
+        }
+        if (typeof url === "string" && url.includes("/approvals")) {
+          return new Response(JSON.stringify(APPROVALS));
+        }
+        if (typeof url === "string" && url.endsWith("/approval-policy")) {
+          return new Response(JSON.stringify({ configured: true, mode: "human" }));
+        }
+        return new Response(JSON.stringify(REPORT));
+      }),
+    );
+    await render();
+    const plan = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Plan again",
+    );
+    await act(async () => {
+      plan?.click();
+    });
+    for (let round = 0; round < 5; round += 1) {
+      await act(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
+      });
+    }
+    const status = container.querySelector('[role="status"]');
+    expect(status?.textContent).toContain("sha256:dead");
+    expect(status?.textContent).toContain("mirror.internal");
+  });
+});
+
 describe("PlanPage overlay schema", () => {
   it("shows the failing key and reason instead of the server sentence", async () => {
     const inspect = {
