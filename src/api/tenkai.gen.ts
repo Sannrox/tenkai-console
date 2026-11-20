@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai release v0.9.0 tenkai-http-v1.schema.json (sha256 ac59d13639972687390e500a66204f501905753647323a6536362ac16ba47ef3, contract tenkai.http.v1).
+// Generated from Sannrox/tenkai commit 3a05a95aa7e1bde8a50909a723a37462d30b498c tenkai-http-v1.schema.json (sha256 ec03076e2801a7312f7e26ea9004f5f8d44b7801744a0cd286a959698e80fb6d, contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -43,6 +43,25 @@ export type DeploymentCauseKind = ("probe_failed" | "gate_breached" | "command_e
  * via the `definition` "DeploymentCausePhase".
  */
 export type DeploymentCausePhase = ("admission" | "pull" | "activate" | "health_probe" | "slo_gate" | "cleanup" | "restore")
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ArtifactState".
+ */
+export type ArtifactState = ("available" | "missing" | "unverifiable")
+/**
+ * Which stored signed artifact an [`ArtifactRunway`] grades.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ArtifactKind".
+ */
+export type ArtifactKind = ("revocation_list" | "backup_manifest" | "audit_export")
+/**
+ * Status ordering: `ok` < `warning` < `critical` < `expired`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "TrustStatus".
+ */
+export type TrustStatus = ("ok" | "warning" | "critical" | "expired")
 /**
  * Whether an entry shows material the server loaded and uses, or a file as
  * it is on disk now, which a client that read it at startup adopts only
@@ -376,6 +395,13 @@ state: "deferred"
 state: "busy"
 })
 /**
+ * Which kind of process a [`ProcessExecutors`] describes.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ProcessKind".
+ */
+export type ProcessKind = ("replica" | "runtime" | "local")
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "EvaluationOutcome".
  */
@@ -448,14 +474,23 @@ export type RunnerAuth = ("client_certificate" | "bearer")
  */
 export type SignerValidity = ("not_recorded" | "recorded")
 /**
- * Status ordering: `ok` < `warning` < `critical` < `expired`.
+ * What an environment's executing processes can run.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
- * via the `definition` "TrustStatus".
+ * via the `definition` "SupportedExecutors".
  */
-export type TrustStatus = ("ok" | "warning" | "critical" | "expired")
+export type SupportedExecutors = ({
+executors: string[]
+processes: ProcessExecutors[]
+state: "known"
+} | {
+processes?: ProcessExecutors[]
+reason: string
+state: "unknown"
+})
 
 export interface TenkaiHttpV1 {
+AdoptRequest?: AdoptRequest
 AdvisoryFeedStatus?: AdvisoryFeedStatus
 ApplyCancelMatch?: ApplyCancelMatch
 ApplyCancelResult?: ApplyCancelResult
@@ -469,6 +504,10 @@ ApprovalBriefPolicy?: ApprovalBriefPolicy
 ApprovalStatement?: ApprovalStatement
 ApprovalStatementEnvelope?: ApprovalStatementEnvelope
 ApproveRequest?: ApproveRequest
+ArtifactAvailability?: ArtifactAvailability
+ArtifactKind?: ArtifactKind
+ArtifactRunway?: ArtifactRunway
+ArtifactState?: ArtifactState
 AuditSequences?: AuditSequences
 AuthSession?: AuthSession
 BackupFailure?: BackupFailure
@@ -511,6 +550,7 @@ CompatibilityReport?: CompatibilityReport
 CompatibilityStatus?: CompatibilityStatus
 ComponentObservation?: ComponentObservation
 ComponentPin?: ComponentPin
+ConfigPresetView?: ConfigPresetView
 ConnectivityClass?: ConnectivityClass
 ContentChunk?: ContentChunk
 ContentInventory?: ContentInventory
@@ -525,6 +565,9 @@ DeliveryFreezeRequest?: DeliveryFreezeRequest
 DeliveryHold?: DeliveryHold
 DeliveryHoldRequest?: DeliveryHoldRequest
 DeliveryHoldView?: DeliveryHoldView
+DeliveryMetrics?: DeliveryMetrics
+DeliveryReport?: DeliveryReport
+DeliveryReportQuery?: DeliveryReportQuery
 DeliverySource?: DeliverySource
 DependencyHoldView?: DependencyHoldView
 DeploymentAttemptView?: DeploymentAttemptView
@@ -587,6 +630,7 @@ ExposureWaiverRequest?: ExposureWaiverRequest
 FailureThreshold?: FailureThreshold1
 FeedbackEvent?: FeedbackEvent
 FirstAdministrator?: FirstAdministrator
+FleetCertificateSummary?: FleetCertificateSummary
 FleetEnvironmentRow?: FleetEnvironmentRow
 FleetStatusReport?: FleetStatusReport
 Freshness?: Freshness
@@ -611,6 +655,7 @@ IssuerSummary?: IssuerSummary
 LabelAction?: LabelAction
 LabelChange?: LabelChange
 LabelView?: LabelView
+LiveWorkload?: LiveWorkload
 ManagementLifecycleResult?: ManagementLifecycleResult
 MatchedExposure?: MatchedExposure
 MigrationApprovalStatement?: MigrationApprovalStatement
@@ -651,6 +696,8 @@ PlanRequest?: PlanRequest
 PlanRunway?: PlanRunway
 PlanRunways?: PlanRunways
 PreviewInspect?: PreviewInspect1
+ProcessExecutors?: ProcessExecutors
+ProcessKind?: ProcessKind
 ProductDependencyView?: ProductDependencyView
 ProductImpact?: ProductImpact
 PromoteRequest?: PromoteRequest
@@ -671,6 +718,7 @@ RecallRemovalProgress?: RecallRemovalProgress
 RecallRequest?: RecallRequest
 RecallView?: RecallView
 RecipientWrap?: RecipientWrap
+ReconcileDeploymentRequest?: ReconcileDeploymentRequest
 RegisterEnvironmentRequest?: RegisterEnvironmentRequest
 ReleaseContent?: ReleaseContent
 ReleaseExposure?: ReleaseExposure
@@ -709,9 +757,12 @@ SpecDriftObject?: SpecDriftObject
 SpecDriftView?: SpecDriftView1
 StagedBundle?: StagedBundle
 StaleTarget?: StaleTarget1
+StartRequest?: StartRequest
 StatusDependencyHold?: StatusDependencyHold
 StatusRow?: StatusRow
+StopRequest?: StopRequest
 SubscribeRequest?: SubscribeRequest
+SupportedExecutors?: SupportedExecutors
 TargetChange?: TargetChange
 TargetFieldChange?: TargetFieldChange
 TerminalOutcomeProjection?: TerminalOutcomeProjection
@@ -731,6 +782,22 @@ WebhookDelivery?: WebhookDelivery
 WebhookDeliveryPage?: WebhookDeliveryPage
 WebhookEndpoint?: WebhookEndpoint
 WebhookEvent?: WebhookEvent
+}
+/**
+ * Plan recording a matching live workload as deployed without mutating it (#1082).
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "AdoptRequest".
+ */
+export interface AdoptRequest {
+environment: string
+expected_generation: number
+operation: string
+/**
+ * Catalog pin as `product@version`.
+ */
+release: string
+version: number
 }
 /**
  * Imported feed age and the releases it currently flags.
@@ -807,7 +874,9 @@ export interface ApplyCancelResult {
  */
 hold_set: boolean
 /**
- * Generation of the live apply lease.
+ * Generation of the live apply lease, read from the lease, never the
+ * caller's `expected_generation`. A cancel with no live apply is refused
+ * rather than answered with this result.
  */
 live_generation: number
 outcome: ApplyCancelMatch
@@ -1051,6 +1120,48 @@ trust_roots: TrustRoots
 version: number
 }
 /**
+ * What planning found for one artifact digest in the registry the
+ * environment pulls from (the mirror when one is configured).
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ArtifactAvailability".
+ */
+export interface ArtifactAvailability {
+digest: string
+registry: string
+state: ArtifactState
+}
+/**
+ * A stored signed artifact and how close its signer's window is to
+ * lapsing, graded with the certificate thresholds (#920). None of these
+ * artifacts carries an expiry of its own, so the signer's `not_after` is
+ * the only clock. A signer without a recorded window grades `ok`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ArtifactRunway".
+ */
+export interface ArtifactRunway {
+artifact: ArtifactKind
+/**
+ * Why the artifact could not be read; it then grades `critical`.
+ */
+error?: string
+/**
+ * The artifact's file name, never its host path.
+ */
+file: string
+/**
+ * Absent for an unsigned backup or an unreadable artifact.
+ */
+signer_key_id?: string
+/**
+ * Unix milliseconds: the earliest `not_after` any configured trust
+ * root records for the signer. Absent when none records one.
+ */
+signer_not_after?: number
+status: TrustStatus
+}
+/**
  * Inclusive chain sequences.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -1285,7 +1396,7 @@ purpose: string
 sha256_fingerprint?: string
 source: TrustSource
 /**
- * An unreadable certificate file is `critical`.
+ * Status ordering: `ok` < `warning` < `critical` < `expired`.
  */
 status: ("ok" | "warning" | "critical" | "expired")
 subject?: string
@@ -1709,6 +1820,21 @@ satisfied_by?: {
 version: number
 }
 /**
+ * Where one product's config comes from in a plan (#1095): the selected
+ * preset, the keys it supplies, the keys an override sets, and each override
+ * that hides a preset value the candidate release changed.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ConfigPresetView".
+ */
+export interface ConfigPresetView {
+conflicts?: string[]
+from_preset?: string[]
+overridden?: string[]
+preset: string
+product: string
+}
+/**
  * One chunk of a chunked layer or weight, as a staged archive indexes it.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -2009,6 +2135,97 @@ count: number
 environment: string
 set_at: number
 window_ms: number
+}
+/**
+ * Delivery metrics for one product and channel in one environment.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DeliveryMetrics".
+ */
+export interface DeliveryMetrics {
+/**
+ * Install, upgrade and removal attempts that finished. Rollbacks and
+ * blocked attempts are not changes.
+ */
+change_attempts: number
+/**
+ * `change_failures / change_attempts`; absent without change attempts.
+ */
+change_failure_rate?: number
+/**
+ * Change attempts that failed or were rolled back.
+ */
+change_failures: number
+/**
+ * The channel the instances subscribe to now; absent for instances no
+ * longer subscribed.
+ */
+channel?: string
+/**
+ * Change attempts that succeeded.
+ */
+deployments: number
+/**
+ * Median time from the release's publication to its successful deployment.
+ */
+lead_time_ms?: number
+/**
+ * Age at the end of the period of the oldest of those exposures.
+ */
+oldest_exposure_age_ms?: number
+/**
+ * Advisory exposures open at the end of the period on the releases running then.
+ */
+open_exposures: number
+product: string
+/**
+ * Failures in the period that a later attempt restored.
+ */
+restores: number
+/**
+ * Median time from a failure to its restore.
+ */
+time_to_restore_ms?: number
+/**
+ * Failures in the period still not restored at its end.
+ */
+unrestored: number
+}
+/**
+ * Delivery performance of one environment over `[since_ms, until_ms)`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DeliveryReport".
+ */
+export interface DeliveryReport {
+environment: string
+/**
+ * No attempt was recorded and no instance health was reported in the
+ * period. The rows then say nothing about how the environment ran.
+ */
+missing_data: boolean
+/**
+ * One row per product and channel, ordered by product then channel.
+ */
+rows: DeliveryMetrics[]
+since_ms: number
+until_ms: number
+}
+/**
+ * Query parameters for `GET /v1/environments/{environment}/delivery-report`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DeliveryReportQuery".
+ */
+export interface DeliveryReportQuery {
+/**
+ * Inclusive start, Unix milliseconds. Default: 30 days before `until_ms`.
+ */
+since_ms?: (number | null)
+/**
+ * Exclusive end, Unix milliseconds. Default: now.
+ */
+until_ms?: (number | null)
 }
 /**
  * One durable unmet-required-contract hold.
@@ -2529,6 +2746,14 @@ defaults?: {
 [k: string]: string
 }
 digest?: string
+/**
+ * Environment values (#1186) the subscribed head reads: declared keys
+ * that no override sets. Precedence: `overlay`, then these, then
+ * `defaults`.
+ */
+environment?: {
+[k: string]: string
+}
 overlay?: {
 [k: string]: string
 }
@@ -2608,6 +2833,14 @@ recipients: string[]
 export interface EnvironmentPlanSummary {
 approval?: PlanApprovalView
 approval_brief?: ApprovalBrief1
+/**
+ * Artifact digests checked at planning (#1062); advice, not proof.
+ */
+artifact_availability?: ArtifactAvailability[]
+/**
+ * Preset sources and conflicts per product (#1095).
+ */
+config_presets?: ConfigPresetView[]
 created_at: number
 /**
  * `sha256:` digest of the versioned executable-plan encoding, the value
@@ -3050,6 +3283,19 @@ retired_at: number
 export interface EnvironmentRuntimeReport {
 components: ObservedRuntimeComponent[]
 environment: string
+/**
+ * What the processes that run this environment's steps can execute
+ * (ADR 0057): its runtime's set, or the server replicas' common set.
+ */
+supported_executors?: ({
+executors: string[]
+processes: ProcessExecutors[]
+state: "known"
+} | {
+processes?: ProcessExecutors[]
+reason: string
+state: "unknown"
+})
 }
 /**
  * Observed state of one deployed product on an environment.
@@ -3099,6 +3345,29 @@ image_digest: string
 name: string
 restart_policy: string
 running: boolean
+}
+/**
+ * One process's recorded executor set.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ProcessExecutors".
+ */
+export interface ProcessExecutors {
+/**
+ * Last check-in, Unix milliseconds.
+ */
+checked_in_at: number
+/**
+ * Installed executor kinds. Absent when the process recorded none, as
+ * a version before ADR 0057 does.
+ */
+executors?: string[]
+/**
+ * Writer-lease holder, or `<runner>/<instance>` for a runtime.
+ */
+id: string
+kind: ProcessKind
+version?: string
 }
 /**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -3344,6 +3613,26 @@ set_at: number
 window_ms: number
 }
 /**
+ * The workload certificates of one environment, folded for the fleet table.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "FleetCertificateSummary".
+ */
+export interface FleetCertificateSummary {
+/**
+ * True when any certificate is in the last sixth of its lifetime.
+ */
+near_expiry?: boolean
+/**
+ * The earliest expiry among the reported certificates, in Unix seconds.
+ */
+nearest_expires_at: number
+/**
+ * Instances whose latest renewal attempt failed. Omitted when zero.
+ */
+renewal_failing?: number
+}
+/**
  * One environment's row in a fleet posture table (no credentials).
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -3351,18 +3640,29 @@ window_ms: number
  */
 export interface FleetEnvironmentRow {
 /**
+ * True while the latest plan waits for a person to approve it: it is
+ * still to run and its approval source is `required`. Omitted when false.
+ */
+awaiting_approval?: boolean
+certificates?: FleetCertificateSummary1
+/**
  * Effective environment criticality when set (#694).
  */
 criticality?: string
 description: string
+/**
+ * Instances whose live spec was modified outside Tenkai (#1028), as
+ * `status` reports them. Omitted when zero.
+ */
+drifted_instances?: number
 /**
  * `ok` | `unknown` | `error` | `n/a` (no subscriptions).
  */
 health_summary: string
 id: string
 /**
- * Latest plan state when a plan exists. Fleet status leaves this empty;
- * `inspect_environment` is the source for plan detail.
+ * Latest plan state when a plan exists, as `inspect_environment`
+ * reports it (#1372).
  */
 latest_plan_state?: (string | null)
 lease_held: boolean
@@ -3391,6 +3691,11 @@ products_current: number
  * Subscribed products with no deployed version.
  */
 products_missing: number
+/**
+ * The environment's runtime instances and their recorded executors
+ * (ADR 0057). Empty when no runtime runs it.
+ */
+runtimes?: ProcessExecutors[]
 subscription_count: number
 /**
  * True when any subscription has health `unknown` or a non-empty error.
@@ -3401,6 +3706,23 @@ unhealthy: boolean
  * of its own. Product endpoints are not counted. Omitted when false.
  */
 unrouted?: boolean
+}
+/**
+ * The workload certificates of one environment, folded for the fleet table.
+ */
+export interface FleetCertificateSummary1 {
+/**
+ * True when any certificate is in the last sixth of its lifetime.
+ */
+near_expiry?: boolean
+/**
+ * The earliest expiry among the reported certificates, in Unix seconds.
+ */
+nearest_expires_at: number
+/**
+ * Instances whose latest renewal attempt failed. Omitted when zero.
+ */
+renewal_failing?: number
 }
 /**
  * One open deployed exposure, with age, on a fleet row (#900).
@@ -3445,6 +3767,11 @@ environments_unhealthy: number
  * Active channel promotion policies and soak state (#899).
  */
 promotion_policies?: ChannelPromotionPolicyStatus[]
+/**
+ * Server replicas that checked in recently and their installed
+ * executors (ADR 0057). Empty on a single-replica server.
+ */
+replicas?: ProcessExecutors[]
 /**
  * The server's own version, which runners and consoles compare
  * against (#761).
@@ -3692,7 +4019,7 @@ next_change?: InstanceNextChange
  */
 export interface InstanceNextChange {
 /**
- * `install`, `upgrade`, `restart`, or `current`.
+ * `install`, `upgrade`, `downgrade`, `restart`, or `current`.
  */
 action: string
 deployed?: string
@@ -3764,6 +4091,20 @@ set_by?: string
 value: string
 }
 /**
+ * A live workload an adapter sees in an environment, whether or not a
+ * recorded instance owns it (#1082).
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "LiveWorkload".
+ */
+export interface LiveWorkload {
+/**
+ * Adapter spelling: `helm`, `kubernetes`, or `host`.
+ */
+kind: string
+name: string
+}
+/**
  * Versioned result shared by catalog lifecycle routes. A client ignores
  * fields it does not know, so a newer server can add one (#1172);
  * requests stay strict.
@@ -3800,7 +4141,9 @@ export interface ApplyCancelResult1 {
  */
 hold_set: boolean
 /**
- * Generation of the live apply lease.
+ * Generation of the live apply lease, read from the lease, never the
+ * caller's `expected_generation`. A cancel with no live apply is refused
+ * rather than answered with this result.
  */
 live_generation: number
 outcome: ApplyCancelMatch
@@ -4128,6 +4471,12 @@ export interface PlanRequest {
 environment: string
 expected_generation: number
 operation: string
+/**
+ * Admit an upgrade onto an advisory-recalled channel head that strictly
+ * lowers blocking exposure (#1068). Presence is the permission; a
+ * non-empty reason is required when set.
+ */
+recalled_upgrade_reason?: string
 version: number
 }
 /**
@@ -4169,6 +4518,10 @@ window_opens_at_ms: number
  * via the `definition` "PlanRunways".
  */
 export interface PlanRunways {
+/**
+ * Stored signed artifacts graded by their signer's window (#920).
+ */
+artifacts?: ArtifactRunway[]
 plans: PlanRunway[]
 }
 /**
@@ -4399,6 +4752,27 @@ digest: string
 key: string
 secret: string
 wrap: SealedWrap
+}
+/**
+ * `POST /v1/environments/{environment}/deployments/{product}/reconcile`:
+ * record what an operator found deployed after a failed restore or a lost
+ * completion, as `env reconcile` does (#1201). Fenced by the generation
+ * and refused while an apply lease is held.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ReconcileDeploymentRequest".
+ */
+export interface ReconcileDeploymentRequest {
+/**
+ * The version found deployed; omitted clears the recorded deployment
+ * after cleanup.
+ */
+deployed?: string
+environment: string
+expected_generation: number
+operation: string
+product: string
+version: number
 }
 /**
  * Body of `POST /v1/environments`.
@@ -4791,6 +5165,12 @@ contracts: string[]
  */
 first_administrator?: ("configured" | "missing")
 profile: string
+/**
+ * Writer-lease holders of peer replicas whose installed executors
+ * differ from this one's (ADR 0057). Plans are refused for executors
+ * a peer lacks. Absent when all match; it never fails readiness.
+ */
+replica_executors_differ?: string[]
 status: string
 /**
  * How many stored grant rules this replica withholds (#850): rows it
@@ -4800,8 +5180,7 @@ status: string
  */
 stored_grant_rules_withheld?: number
 /**
- * The worst status of the host's certificates (#676), when any are
- * configured. It never fails readiness; `GET /v1/trust` has details.
+ * Status ordering: `ok` < `warning` < `critical` < `expired`.
  */
 trust?: ("ok" | "warning" | "critical" | "expired")
 /**
@@ -4961,6 +5340,19 @@ kind: string
 name: string
 }
 /**
+ * Plan a start of a stopped instance onto its recorded release (#1067).
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "StartRequest".
+ */
+export interface StartRequest {
+environment: string
+expected_generation: number
+operation: string
+product: string
+version: number
+}
+/**
  * Dependency hold carried on a status row (no product; the row already names it).
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -5007,6 +5399,7 @@ overlay_stale?: boolean
 owner?: string
 product: string
 spec_drift?: SpecDriftView2
+unmanaged?: LiveWorkload1
 }
 /**
  * What `status` shows of an instance's workload certificate.
@@ -5053,6 +5446,31 @@ objects?: SpecDriftObject[]
 status: string
 }
 /**
+ * A live workload an adapter sees in an environment, whether or not a
+ * recorded instance owns it (#1082).
+ */
+export interface LiveWorkload1 {
+/**
+ * Adapter spelling: `helm`, `kubernetes`, or `host`.
+ */
+kind: string
+name: string
+}
+/**
+ * Plan a stop of a deployed instance, keeping its subscription (#1067).
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "StopRequest".
+ */
+export interface StopRequest {
+environment: string
+expected_generation: number
+operation: string
+product: string
+reason: string
+version: number
+}
+/**
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "SubscribeRequest".
  */
@@ -5088,7 +5506,7 @@ revocation_list?: InstalledRevocations
 runtime_client_cert_required: boolean
 signing: SigningRoot[]
 /**
- * The worst certificate status; `ok` when nothing is about to lapse.
+ * Status ordering: `ok` < `warning` < `critical` < `expired`.
  */
 status: ("ok" | "warning" | "critical" | "expired")
 tls: CertificateEntry[]
@@ -5141,7 +5559,8 @@ next_attempt_at: number
  */
 sources?: DeliverySource[]
 /**
- * `pending`, `retrying` or `delivered`. The environment list also shows
+ * `pending`, `retrying`, `delivered`, or `dropped` (never delivered;
+ * `last_error` says why). The environment list also shows
  * one synthetic `unconfigured` row (event `owner.unconfigured`) while
  * the environment owner has no notification endpoint.
  */
