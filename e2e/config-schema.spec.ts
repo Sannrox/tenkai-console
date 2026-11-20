@@ -6,6 +6,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openApp,
   serveConsole,
 } from "./mock-backend";
 
@@ -135,7 +136,7 @@ test.describe("config schema checks", () => {
       ),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     const table = overlays(page);
     await expect(table.getByRole("cell", { name: "region", exact: true })).toBeVisible();
     await expect(table.getByRole("cell", { name: "eu", exact: true })).toBeVisible();
@@ -165,7 +166,7 @@ test.describe("config schema checks", () => {
       ),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await page.getByRole("link", { name: "Open plan" }).click();
     await page.getByRole("button", { name: "Plan" }).click();
     const table = overlays(page);
@@ -200,7 +201,7 @@ test.describe("config schema checks on a phone", () => {
       ),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByRole("heading", { name: "Overlays" })).toBeVisible();
     await expect(overlays(page).getByRole("cell", { name: "region", exact: true })).toBeVisible();
     expect(await page.locator("body").textContent()).not.toMatch(

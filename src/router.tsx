@@ -28,6 +28,9 @@ const Imports = lazyRouteComponent(() => import("./screens/imports"), "Imports")
 const Access = lazyRouteComponent(() => import("./screens/access"), "Access");
 const Exposure = lazyRouteComponent(() => import("./screens/exposure"), "Exposure");
 const AuthCallback = lazyRouteComponent(() => import("./screens/auth-callback"), "AuthCallback");
+const SearchPage = lazyRouteComponent(() => import("./screens/placeholders"), "SearchPage");
+const AttentionPage = lazyRouteComponent(() => import("./screens/placeholders"), "AttentionPage");
+const AppsPage = lazyRouteComponent(() => import("./screens/placeholders"), "AppsPage");
 
 const useServer = () =>
   useQuery({
@@ -162,6 +165,24 @@ const accessRoute = createRoute({
   },
 });
 
+const searchRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/search",
+  component: SearchPage,
+});
+
+const attentionRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/attention",
+  component: AttentionPage,
+});
+
+const appsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/apps",
+  component: AppsPage,
+});
+
 const callbackRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/auth/callback",
@@ -191,6 +212,9 @@ export const router = createRouter({
       importsRoute,
       operationsRoute,
       accessRoute,
+      searchRoute,
+      attentionRoute,
+      appsRoute,
     ]),
     callbackRoute,
   ]),

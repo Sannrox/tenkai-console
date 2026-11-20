@@ -8,7 +8,13 @@ import type {
   WebhookDelivery,
   WebhookEndpoint,
 } from "../src/api/tenkai.gen";
-import { type MockBackend, type Reply, expectDesignRules, serveConsole } from "./mock-backend";
+import {
+  type MockBackend,
+  type Reply,
+  expectDesignRules,
+  openApp,
+  serveConsole,
+} from "./mock-backend";
 
 const ok = (body: unknown): Reply => ({ status: 200, body });
 
@@ -196,7 +202,7 @@ const open = async (page: Page, app: MockBackend) => {
     response.url().endsWith("/webhooks/deliveries"),
   );
   await page.goto(app.url);
-  await page.getByRole("link", { name: "Environments" }).click();
+  await openApp(page, "Environments");
   await expect(owner(page)).toBeVisible();
   await deliveries;
   await expect(owner(page)).not.toContainText("Loading");
@@ -204,7 +210,7 @@ const open = async (page: Page, app: MockBackend) => {
 
 const openReleases = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await page.getByRole("link", { name: "Releases" }).click();
+  await openApp(page, "Releases");
   await expect(page.getByRole("table", { name: "Product owners" })).toBeVisible();
   await expect(page.getByRole("table", { name: "Product owners" })).not.toContainText("Loading");
 };

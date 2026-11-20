@@ -92,3 +92,107 @@ export const Title = ({ subtitle }: { subtitle: string }) => (
     <div className="mb-4 text-xs text-muted">{subtitle}</div>
   </>
 );
+
+/** Underline for the current tab; used by the object page and Platform. */
+export const tabClass = (current: boolean) =>
+  current
+    ? "py-1.5 text-fg no-underline shadow-[inset_0_-2px_0_var(--color-primary)]"
+    : "py-1.5 text-muted no-underline";
+
+/** Extra actions next to one primary control. */
+export const ActionsMenu = ({
+  items,
+}: {
+  items: ReadonlyArray<{ label: string; onClick: () => void; disabled?: boolean }>;
+}) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <Button variant="ghost" aria-expanded={open} onClick={() => setOpen(!open)}>
+        Actions
+      </Button>
+      {open && (
+        <div className="absolute right-0 z-10 mt-1 min-w-44 border border-line bg-page p-1 text-xs">
+          {items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              disabled={item.disabled}
+              className="block w-full cursor-pointer rounded px-1.5 py-1 text-left text-fg hover:bg-selected disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => {
+                setOpen(false);
+                item.onClick();
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Shared object page: type, name, status, one primary action plus Actions,
+ * a key property strip, tabs, then attention, main, and linked objects.
+ */
+export const ObjectPage = ({
+  kind,
+  name,
+  status,
+  primary,
+  actions,
+  properties,
+  tabs,
+  attention,
+  main,
+  linked,
+  children,
+}: {
+  kind?: string;
+  name: string;
+  status?: ReactNode;
+  primary?: ReactNode;
+  actions?: ReactNode;
+  properties?: ReadonlyArray<{ label: string; value: ReactNode }>;
+  tabs?: ReactNode;
+  attention?: ReactNode;
+  main?: ReactNode;
+  linked?: ReactNode;
+  children?: ReactNode;
+}) => (
+  <div>
+    {kind && <div className="text-xs text-muted">{kind}</div>}
+    <div className="mb-3 flex flex-wrap items-center gap-3">
+      <h1 className="m-0 text-lg font-semibold">{name}</h1>
+      {status && <span className="text-xs text-muted">{status}</span>}
+      {(primary || actions) && (
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {primary}
+          {actions}
+        </div>
+      )}
+    </div>
+    {properties && properties.length > 0 && (
+      <dl className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-xs">
+        {properties.map((item) => (
+          <div key={item.label}>
+            <dt className="text-muted">{item.label}</dt>
+            <dd className="m-0">{item.value}</dd>
+          </div>
+        ))}
+      </dl>
+    )}
+    {tabs}
+    {children ?? (
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
+        <div>
+          {attention}
+          {main}
+        </div>
+        {linked}
+      </div>
+    )}
+  </div>
+);

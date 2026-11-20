@@ -6,6 +6,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openApp,
   serveConsole,
 } from "./mock-backend";
 
@@ -265,7 +266,7 @@ test.describe("environment dependencies", () => {
   test("shows requires, unmet, and the selected product document", async ({ page }) => {
     app = await serveConsole(server(ok(GRAPH)));
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByRole("heading", { name: "Dependencies" })).toBeVisible();
     await expect(page.getByText("1 waiting")).toBeVisible();
     await expect(page.getByText("reports@1.0.0").first()).toBeVisible();
@@ -315,7 +316,7 @@ test.describe("environment dependencies", () => {
   test("shows waiting when the held product has not deployed yet", async ({ page }) => {
     app = await serveConsole(server(ok(GRAPH), { inspect: INSPECT_FRESH }));
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     const subscriptions = page
       .locator("table")
       .filter({ has: page.getByRole("columnheader", { name: "Deployed" }) });
@@ -331,7 +332,7 @@ test.describe("environment dependencies", () => {
   test("lists two unmet contracts on one hold", async ({ page }) => {
     app = await serveConsole(server(ok(GRAPH_MULTI)));
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByText("shop@2.2.0").first()).toBeVisible();
     await expect(page.getByRole("cell", { name: "catalog >= 2.0.0", exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "inventory >= 1.0.0", exact: true })).toBeVisible();
@@ -354,13 +355,13 @@ test.describe("environment dependencies", () => {
     };
     app = await serveConsole(routes);
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByText("1 waiting")).toBeVisible();
-    await page.getByRole("link", { name: "Delivery" }).click();
+    await page.getByRole("link", { name: "Home" }).click();
     await page.getByRole("button", { name: "Reconcile" }).click();
     await page.getByRole("button", { name: "Run one reconcile tick" }).click();
     await expect(page.getByText("Tick ran: 0 environments")).toBeVisible();
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByText("1 waiting")).toHaveCount(0);
     await expect(page.getByText("no known provider")).toHaveCount(0);
     await expect(page.getByText("held at 2023-11-14T22:13:20.000Z")).toHaveCount(0);
@@ -384,7 +385,7 @@ test.describe("environment dependencies", () => {
   test("says none when the graph is empty", async ({ page }) => {
     app = await serveConsole(server(ok({ environment: "prod", holds: [], products: [] })));
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByText("This server does not report product dependencies.")).toHaveCount(
       0,
     );
@@ -499,7 +500,7 @@ test.describe("environment dependencies", () => {
     };
     app = await serveConsole(server(ok(graph), { inspect }));
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     const instances = page
       .locator("table")
       .filter({ has: page.getByRole("columnheader", { name: "Instance" }) });
@@ -577,7 +578,7 @@ test.describe("environment dependencies", () => {
       ),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     const bindings = page
       .locator("table")
       .filter({ has: page.getByRole("columnheader", { name: "Bound to" }) });
@@ -603,7 +604,7 @@ test.describe("environment dependencies", () => {
       server(ok({ environment: "prod", holds: [], products: [] }), { inspect }),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByText("none").first()).toBeVisible();
     await expect(page.getByRole("columnheader", { name: "Instance" })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Bindings" })).toHaveCount(0);
@@ -613,7 +614,7 @@ test.describe("environment dependencies", () => {
   test("says the route is missing when the server predates it", async ({ page }) => {
     app = await serveConsole(server({ status: 404, body: { error: "not found" } }));
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByText("This server does not report product dependencies.")).toBeVisible();
     await expect(page.getByText("not found")).toHaveCount(0);
     await expectDesignRules(page);

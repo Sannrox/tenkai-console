@@ -6,6 +6,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openApp,
   serveConsole,
 } from "./mock-backend";
 
@@ -157,7 +158,7 @@ const NOTE = "A changed pace applies from the next promotion.";
 
 const openPace = async (page: Page, app: MockBackend, channel = "api/stable") => {
   await page.goto(app.url);
-  await page.getByRole("link", { name: "Releases" }).click();
+  await openApp(page, "Releases");
   await section(page).getByRole("combobox", { name: "Channel" }).selectOption(channel);
 };
 

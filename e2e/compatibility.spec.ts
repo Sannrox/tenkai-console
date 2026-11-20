@@ -6,6 +6,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openApp,
   serveConsole,
 } from "./mock-backend";
 
@@ -98,7 +99,7 @@ test.describe("release compatibility", () => {
   }) => {
     app = await serveConsole(server({ prod: ok(PASS), "edge-1": ok(BLOCKED) }));
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Releases" }).click();
+    await openApp(page, "Releases");
     await expect(page.getByRole("heading", { name: "Compatibility" })).toBeVisible();
     await page.getByLabel("Release to check").fill("shop@2.1.0");
     const table = page
@@ -147,7 +148,7 @@ test.describe("release compatibility", () => {
       }),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Releases" }).click();
+    await openApp(page, "Releases");
     await page.getByLabel("Release to check").fill("shop@2.1.0");
     await expect(page.getByText("compatible").first()).toBeVisible();
     await expect(page.getByText("none").first()).toBeVisible();

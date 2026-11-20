@@ -7,7 +7,7 @@ import { useSession } from "../auth/session";
 import { SignedIn } from "./signed-in";
 
 // The signed-in layout's router pieces are not under test here.
-vi.mock("./top-bar", () => ({ TopBar: () => null }));
+vi.mock("./shell", () => ({ Shell: ({ children }: { children: unknown }) => children }));
 vi.mock("@tanstack/react-router", () => ({ Outlet: () => null }));
 
 // React's act() needs this flag outside a test renderer.

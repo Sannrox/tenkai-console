@@ -55,7 +55,7 @@ const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-no
 const td = "border-b border-line px-3.5 py-2 align-top";
 
 /**
- * Decision 4D: environments as a top tab, one table, the selected row's detail
+ * Decision 4D: environments as a list, one table, the selected row's detail
  * below. The detail shows observed runtime, subscribes a product channel,
  * rolls back, and retires.
  */

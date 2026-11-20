@@ -151,7 +151,7 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
     <>
       <div className="mb-1 text-xs text-muted">
         <Link to="/" className="text-muted">
-          Delivery
+          Home
         </Link>{" "}
         / {environment} /{" "}
         <b className="font-medium text-fg">

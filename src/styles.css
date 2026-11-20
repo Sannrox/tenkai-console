@@ -17,6 +17,8 @@
   --radius-card: 10px;
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  /* 391px so a 390px viewport uses the phone shell (max-phone is width < this). */
+  --breakpoint-phone: 24.4375rem;
 }
 
 :root {

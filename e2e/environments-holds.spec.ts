@@ -11,6 +11,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openApp,
   serveConsole,
 } from "./mock-backend";
 
@@ -135,7 +136,7 @@ const open = async (page: Page, app: MockBackend) => {
   const loaded = page.waitForResponse((response) =>
     response.url().endsWith("/v1/environments/prod/hold"),
   );
-  await page.getByRole("link", { name: "Environments" }).click();
+  await openApp(page, "Environments");
   await loaded;
   await expect(row(page, "delivery hold")).toBeVisible();
 };

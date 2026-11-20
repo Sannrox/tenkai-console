@@ -6,6 +6,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openApp,
   serveConsole,
 } from "./mock-backend";
 
@@ -187,7 +188,7 @@ test.describe("environment instance health", () => {
     await page.goto(app.url);
     const counts = await fleetCounts(page);
     await expect(counts.unknown).toHaveText("0");
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(instanceRow(page, "api").getByRole("cell", { name: "healthy" })).toBeVisible();
     await expect(rollup(page)).toHaveText("2 healthy");
     // This server sends no observation time: none is shown.
@@ -203,7 +204,7 @@ test.describe("environment instance health", () => {
     const counts = await fleetCounts(page);
     await expect(counts.unhealthy).toHaveText("1");
     await expect(counts.unknown).toHaveText("0");
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     const api = instanceRow(page, "api");
     await expect(api).toContainText("failing");
     await expect(api).toContainText("disk failing: 97% full on /var");
@@ -231,7 +232,7 @@ test.describe("environment instance health", () => {
     const counts = await fleetCounts(page);
     await expect(counts.unhealthy).toHaveText("0");
     await expect(counts.unknown).toHaveText("1");
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     const api = instanceRow(page, "api");
     await expect(api.getByRole("cell", { name: "unknown", exact: true })).toBeVisible();
     await expect(api).not.toContainText("healthy");
@@ -266,7 +267,7 @@ test.describe("environment instance health", () => {
       ),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     const api = instanceRow(page, "api");
     await expect(api.getByRole("cell", { name: /^repairing/ })).toBeVisible();
     await expect(api).toContainText("pool repairing: reconnecting to primary");
@@ -292,7 +293,7 @@ test.describe("environment instance health", () => {
     });
     await page.clock.install();
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(rollup(page)).toHaveText("1 healthy");
     // Inspect already shows healthy; let the first status read settle so the
     // interval tick starts a new read instead of joining the one in flight.
@@ -315,7 +316,7 @@ test.describe("environment instance health", () => {
       ),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(rollup(page)).toHaveText("2 unknown");
     await expect(page.getByRole("cell", { name: "healthy", exact: true })).toHaveCount(0);
     await capture(page, "health-agent-silent");
@@ -330,7 +331,7 @@ test.describe("environment instance health", () => {
       }),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(instanceRow(page, "api").getByRole("cell", { name: "healthy" })).toBeVisible();
     await expect(rollup(page)).toHaveText("1 healthy");
     await expectDesignRules(page);
@@ -357,7 +358,7 @@ test.describe("environment instance health", () => {
     const counts = await fleetCounts(page);
     await expect(counts.unhealthy).toHaveText("21");
     await expect(counts.unknown).toHaveText("20");
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(rollup(page)).toHaveText("10 failing · 10 unknown · 20 healthy");
     await capture(page, "health-dense");
     await expectDesignRules(page);
@@ -374,7 +375,7 @@ test.describe("environment instance health on a phone", () => {
   test("failing checks stay inside the instance card", async ({ page }) => {
     app = await serveConsole(server(FAILING, "error"));
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(instanceRow(page, "api")).toContainText("disk failing: 97% full on /var");
     await expect(rollup(page)).toHaveText("1 failing · 1 warning · 1 healthy");
     await instanceRow(page, "api").getByRole("cell").nth(5).scrollIntoViewIfNeeded();

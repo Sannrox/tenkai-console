@@ -91,3 +91,20 @@ export const expectDesignRules = async (page: Page) => {
   );
   expect(overflow).toBeLessThanOrEqual(0);
 };
+
+/** Opens a sidebar app. On a phone, Apps is a bottom-bar page first. */
+export const openApp = async (
+  page: Page,
+  name: "Environments" | "Releases" | "Exposure" | "Runners" | "Platform",
+) => {
+  const main = page.getByRole("navigation", { name: "Main" });
+  const fromMain = main.getByRole("link", { name, exact: true });
+  const apps = main.getByRole("link", { name: "Apps" });
+  await fromMain.or(apps).waitFor();
+  if (await fromMain.isVisible()) {
+    await fromMain.click();
+    return;
+  }
+  await apps.click();
+  await page.getByRole("link", { name, exact: true }).click();
+};

@@ -6,6 +6,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openApp,
   serveConsole,
 } from "./mock-backend";
 
@@ -109,7 +110,7 @@ test.describe("environment instance identity", () => {
   test("says the server does not report identity when the route is missing", async ({ page }) => {
     app = await serveConsole(server({ status: 404, body: { error: "not found" } }));
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByRole("heading", { name: "Identity", exact: true })).toBeVisible();
     await expect(page.getByText("This server does not report instance identity.")).toBeVisible();
     await expect(identity(page)).toHaveCount(0);
@@ -119,7 +120,7 @@ test.describe("environment instance identity", () => {
   test("says none when no instance has a certificate", async ({ page }) => {
     app = await serveConsole(server(ok([{ product: "api", channel: "stable", head: "1.0.0" }])));
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByRole("heading", { name: "Identity", exact: true })).toBeVisible();
     const card = page
       .getByRole("heading", { name: "Identity", exact: true })
@@ -144,7 +145,7 @@ test.describe("environment instance identity", () => {
       ),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(instanceIdentity(page)).toBeVisible();
     const table = identity(page);
     await expect(table.getByRole("cell", { name: "tenkai://prod/api", exact: true })).toBeVisible();
@@ -184,7 +185,7 @@ test.describe("environment instance identity on a phone", () => {
       ),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByRole("heading", { name: "Identity", exact: true })).toBeVisible();
     await expect(identity(page).getByRole("cell", { name: "renewing", exact: true })).toBeVisible();
     expect(await page.locator("body").textContent()).not.toMatch(

@@ -82,8 +82,7 @@ const server =
     return undefined;
   };
 
-// Signed-in screens run at desktop width only: the top bar's tabs do not fit a
-// phone yet, independent of sign-in.
+// Signed-in screens in this file run at the default desktop width.
 test.describe("signed in", () => {
   let app: MockBackend;
   test.afterEach(async () => {
@@ -101,7 +100,11 @@ test.describe("signed in", () => {
     await expect(page.getByText("Close the SSH tunnel to sign out.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
 
-    await page.getByRole("link", { name: "Access" }).click();
+    await page.getByRole("link", { name: "Platform" }).click();
+    await page
+      .getByRole("navigation", { name: "Platform" })
+      .getByRole("link", { name: "Access" })
+      .click();
     const access = page.locator("dl");
     await expect(access).toContainText("alice");
     await expect(access).toContainText("tenkai-viewer, tenkai-operator");
@@ -116,7 +119,11 @@ test.describe("signed in", () => {
     await page.goto(app.url);
     await page.getByLabel("Platform token").fill("fixture-token");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await page.getByRole("link", { name: "Access" }).click();
+    await page.getByRole("link", { name: "Platform" }).click();
+    await page
+      .getByRole("navigation", { name: "Platform" })
+      .getByRole("link", { name: "Access" })
+      .click();
     const access = page.locator("dl");
     await expect(access).toContainText("bearer token");
     await expect(access).toContainText(/grants\s*read$/);

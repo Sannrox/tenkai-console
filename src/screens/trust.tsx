@@ -16,7 +16,7 @@ import { RefreshFailed, STATUS_TONE, td, th, useTrustPosture } from "../ui/postu
  * The 2026-10-28 pick A (#36): a runway banner naming the first plan a
  * lapsing certificate blocks, then signing trust and TLS certificates as two
  * tables, the revocation list under the signing table. A top-level tab of its
- * own (#34). Trust roots record no signer validity (Sannrox/tenkai#812), so
+ * own, now a Platform tab. Trust roots record no signer validity (Sannrox/tenkai#812), so
  * signers have no expiry and the signing table is not sorted by one.
  */
 export const Trust = () => {

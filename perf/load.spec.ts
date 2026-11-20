@@ -3,7 +3,7 @@
 // CPU, against a mocked API serving 1 000 environments and a 50 x 10 product
 // x channel matrix. Run with `pnpm build && pnpm perf:load`.
 import { expect, test } from "@playwright/test";
-import { type MockBackend, type Routes, serveConsole } from "../e2e/mock-backend";
+import { type MockBackend, type Routes, openApp, serveConsole } from "../e2e/mock-backend";
 import type {
   ChannelListEntry,
   EnvironmentInspectReport,
@@ -144,7 +144,7 @@ test("fleet-scale screens stay within the load budget", async ({ page }) => {
   await expect(page.getByText("Loading")).toHaveCount(0, { timeout: 60_000 });
   await expect(page.getByText(/1000 environments/)).toBeVisible();
   const opened = Date.now();
-  await page.getByRole("link", { name: "Environments" }).click();
+  await openApp(page, "Environments");
   await expect(page.getByText("1000 active")).toBeVisible({ timeout: 30_000 });
   const scroller = page.getByRole("region", { name: "Environments" });
   await expect(scroller.locator("tbody tr").first()).toBeVisible();
@@ -170,7 +170,7 @@ test("fleet-scale screens stay within the load budget", async ({ page }) => {
     ...(await page.evaluate(() => (window as unknown as { longTasks: number[] }).longTasks)),
   );
 
-  await page.getByRole("link", { name: "Releases" }).click();
+  await openApp(page, "Releases");
   await expect(page.locator("table").first().locator("tbody tr")).toHaveCount(PRODUCTS, {
     timeout: 30_000,
   });

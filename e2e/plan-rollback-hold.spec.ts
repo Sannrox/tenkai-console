@@ -1,7 +1,13 @@
 // Hold choice when applying a rollback plan, against a mocked API. Run with `pnpm build && pnpm e2e`.
 import { type Page, expect, test } from "@playwright/test";
 import type { EnvironmentInspectReport, FleetStatusReport } from "../src/api/tenkai.gen";
-import { type MockBackend, type Reply, expectDesignRules, serveConsole } from "./mock-backend";
+import {
+  type MockBackend,
+  type Reply,
+  expectDesignRules,
+  openApp,
+  serveConsole,
+} from "./mock-backend";
 
 const FLEET: FleetStatusReport = {
   environments: [
@@ -156,7 +162,7 @@ const serve = (action = "rollback") =>
 
 const openPlan = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await page.getByRole("link", { name: "Environments" }).click();
+  await openApp(page, "Environments");
   await page.getByRole("link", { name: "Open plan" }).first().click();
   await page.getByLabel("Approval envelope").fill(ENVELOPE);
   await page.getByLabel("Approval trust roots").fill(ROOTS);

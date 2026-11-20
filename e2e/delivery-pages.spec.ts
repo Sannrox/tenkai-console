@@ -9,7 +9,13 @@ import type {
   WebhookDelivery,
   WebhookDeliveryPage,
 } from "../src/api/tenkai.gen";
-import { type MockBackend, type Reply, expectDesignRules, serveConsole } from "./mock-backend";
+import {
+  type MockBackend,
+  type Reply,
+  expectDesignRules,
+  openApp,
+  serveConsole,
+} from "./mock-backend";
 
 const ok = (body: unknown): Reply => ({ status: 200, body });
 const RAW = { status: 500, body: { error: "delivery store cursor decode panicked" } };
@@ -157,7 +163,7 @@ const openEnvironment = async (page: Page, app: MockBackend) => {
     response.url().endsWith("/environments/prod/webhooks/deliveries"),
   );
   await page.goto(app.url);
-  await page.getByRole("link", { name: "Environments" }).click();
+  await openApp(page, "Environments");
   await deliveries;
   await expect(owner(page)).toBeVisible();
   await expect(owner(page)).not.toContainText("Loading");
@@ -276,7 +282,7 @@ test.describe("paged delivery lists", () => {
       response.url().endsWith("/products/api/webhooks/deliveries"),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Releases" }).click();
+    await openApp(page, "Releases");
     await deliveries;
     await expect(failureCount(page)).toHaveText(["2"]);
     await expect(failuresPartial(page)).toHaveText("in the newest 2 deliveries, more exist");
