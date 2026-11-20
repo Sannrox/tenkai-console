@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  adoptBody,
   applyBody,
   cancelApplyBody,
   expectedGeneration,
@@ -63,6 +64,13 @@ describe("lifecycle requests", () => {
       environment: "prod-eu",
       expected_generation: 41,
       spec: "api=stable",
+    });
+    expect(adoptBody("prod-eu", 41, "api@1.0.0")).toEqual({
+      version: 1,
+      operation: "adopt",
+      environment: "prod-eu",
+      expected_generation: 41,
+      release: "api@1.0.0",
     });
     const evidence = parseEvidence("prod-eu", envelope("prod-eu"), roots);
     if (typeof evidence === "string") {

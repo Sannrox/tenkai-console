@@ -1,6 +1,7 @@
 import { type } from "arktype";
 import { parse as parseToml } from "smol-toml";
 import type {
+  AdoptRequest,
   ApplyRequest,
   ApproveRequest,
   ChannelHoldRequest,
@@ -41,6 +42,19 @@ export const planBody = (
     ...(reason === "" ? {} : { recalled_upgrade_reason: reason }),
   };
 };
+
+/** Same spec as `tenkaictl adopt <env> <product@version>`. */
+export const adoptBody = (
+  environment: string,
+  generation: number,
+  release: string,
+): AdoptRequest => ({
+  version: VERSION,
+  operation: "adopt",
+  environment,
+  expected_generation: generation,
+  release,
+});
 
 /** Same spec as `tenkaictl env subscribe <env> <product>=<channel>`. */
 export const subscribeBody = (

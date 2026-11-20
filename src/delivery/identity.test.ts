@@ -59,6 +59,18 @@ describe("parseStatus", () => {
     ).toEqual([{ product: "api", health: "unknown", health_observed_at_ms: 1_700_000_000_000 }]);
   });
 
+  it("keeps an unmanaged live workload and drops unknown keys on it", () => {
+    expect(
+      parseStatus([
+        {
+          product: "api",
+          extra: true,
+          unmanaged: { kind: "helm", name: "api", extra: 1 },
+        },
+      ]),
+    ).toEqual([{ product: "api", unmanaged: { kind: "helm", name: "api" } }]);
+  });
+
   it("rejects a non-array body", () => {
     expect(parseStatus({ product: "api" })).toBeUndefined();
   });

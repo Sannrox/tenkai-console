@@ -39,7 +39,12 @@ export type StatusRow = {
   health_observed_at_ms?: number;
   /** Product owner contact when set (Tenkai #1066). */
   owner?: string;
+  /** Live workload no recorded instance owns (Tenkai #1082). */
+  unmanaged?: LiveWorkload;
 };
+
+/** Adapter spelling: `helm`, `kubernetes`, or `host`. */
+export type LiveWorkload = { kind: string; name: string };
 
 export type StatusLoad =
   | { kind: "ok"; value: StatusRow[] }
