@@ -35,7 +35,7 @@ const JOB_POLL_MS = 1_000;
 
 /**
  * The 2026-10-28 pick B (#35): staged, checked and imported columns that a
- * bundle moves across, then the content inventory. A top-level tab (#34).
+ * bundle moves across, then the content inventory. A Platform tab.
  * Bundles are staged on the host, never uploaded from the browser.
  */
 export const Imports = () => {

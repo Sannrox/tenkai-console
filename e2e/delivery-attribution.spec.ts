@@ -9,7 +9,13 @@ import type {
   WebhookDelivery,
   WebhookEndpoint,
 } from "../src/api/tenkai.gen";
-import { type MockBackend, type Reply, expectDesignRules, serveConsole } from "./mock-backend";
+import {
+  type MockBackend,
+  type Reply,
+  expectDesignRules,
+  openApp,
+  serveConsole,
+} from "./mock-backend";
 
 const ok = (body: unknown): Reply => ({ status: 200, body });
 
@@ -166,7 +172,7 @@ const openEnvironment = async (page: Page, app: MockBackend) => {
     response.url().endsWith("/environments/prod/webhooks/deliveries"),
   );
   await page.goto(app.url);
-  await page.getByRole("link", { name: "Environments" }).click();
+  await openApp(page, "Environments");
   await expect(owner(page)).toBeVisible();
   await deliveries;
   await expect(owner(page)).not.toContainText("Loading");
@@ -177,7 +183,7 @@ const openReleases = async (page: Page, app: MockBackend) => {
     response.url().endsWith("/products/api/webhooks/deliveries"),
   );
   await page.goto(app.url);
-  await page.getByRole("link", { name: "Releases" }).click();
+  await openApp(page, "Releases");
   const table = page.getByRole("table", { name: "Product owners" });
   await expect(table).toBeVisible();
   await expect(table).not.toContainText("Loading");
@@ -297,7 +303,7 @@ test.describe("fleet route flag", () => {
       ],
     });
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByLabel("Unrouted environments")).toHaveText(
       "2 unrouted: no owner and no webhook endpoint, so failures notify no one",
     );
@@ -310,7 +316,7 @@ test.describe("fleet route flag", () => {
   test("an older server without the flag claims nothing", async ({ page }) => {
     app = await serve({ fleet: [fleetRow("edge"), fleetRow("prod")] });
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(table(page).getByRole("row", { name: /^edge/ })).toBeVisible();
     await expect(page.getByLabel("Unrouted environments")).toHaveCount(0);
     await expect(table(page)).not.toContainText("unrouted");

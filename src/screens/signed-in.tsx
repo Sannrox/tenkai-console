@@ -8,10 +8,10 @@ import { useSignOut } from "../auth/use-sign-out";
 import { useDelivery } from "../delivery/use-delivery";
 import { Button, Centered, Title } from "../ui/kit";
 import { FirstAdministratorBanner } from "./first-administrator";
+import { Shell } from "./shell";
 import { SignIn } from "./sign-in";
-import { TopBar } from "./top-bar";
 
-/** Every signed-in screen: sign-in gate, expired and no-access states, top bar. */
+/** Every signed-in screen: sign-in gate, expired and no-access states, shell. */
 export const SignedIn = ({ settings }: { settings: OidcClientDiscovery | null }) => {
   const session = useSession((state) => state.session);
   const signOut = useSession((state) => state.signOut);
@@ -49,12 +49,9 @@ export const SignedIn = ({ settings }: { settings: OidcClientDiscovery | null })
     );
   }
   return (
-    <div className="min-h-screen bg-surface">
-      <TopBar session={session} settings={settings} />
-      <main className="px-6 py-5">
-        <FirstAdministratorBanner />
-        <Outlet />
-      </main>
-    </div>
+    <Shell session={session} settings={settings}>
+      <FirstAdministratorBanner />
+      <Outlet />
+    </Shell>
   );
 };

@@ -11,6 +11,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openApp,
   serveConsole,
 } from "./mock-backend";
 
@@ -162,7 +163,7 @@ const rows = (page: Page) =>
 
 const open = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await page.getByRole("link", { name: "Environments" }).click();
+  await openApp(page, "Environments");
   await expect(section(page)).toBeVisible();
   await expect(section(page)).not.toContainText("Loading");
 };

@@ -127,7 +127,7 @@ const brief = (page: Page) => page.getByRole("region", { name: "Approval brief" 
 // the test signs in at the root and moves the router to the plan in place.
 const openPlan = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await expect(page.getByRole("link", { name: "Environments" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Home" })).toBeVisible();
   await page.evaluate(() => {
     history.pushState({}, "", `${location.pathname}environments/prod/plan`);
     dispatchEvent(new PopStateEvent("popstate"));

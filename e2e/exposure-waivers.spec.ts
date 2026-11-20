@@ -1,7 +1,13 @@
 // Advisory waivers on exposure findings against a mocked API. Run with `pnpm build && pnpm e2e`.
 import { type Page, expect, test } from "@playwright/test";
 import type { AdvisoryFeedStatus, ExposureWaiver, MatchedExposure } from "../src/api/tenkai.gen";
-import { type MockBackend, type Reply, expectDesignRules, serveConsole } from "./mock-backend";
+import {
+  type MockBackend,
+  type Reply,
+  expectDesignRules,
+  openApp,
+  serveConsole,
+} from "./mock-backend";
 
 const DAY = 86_400_000;
 
@@ -68,7 +74,7 @@ const findings = (page: Page) => page.getByRole("table", { name: "Findings" });
 const open = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
   const loaded = page.waitForResponse((response) => response.url().endsWith("/v1/advisory-feed"));
-  await page.getByRole("link", { name: "Exposure" }).click();
+  await openApp(page, "Exposure");
   await loaded;
   await expect(findings(page)).toBeVisible();
 };

@@ -14,6 +14,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openApp,
   serveConsole,
 } from "./mock-backend";
 
@@ -158,7 +159,7 @@ const recall = (page: Page) => page.getByRole("region", { name: "Recall detail" 
 
 const openReleases = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await page.getByRole("link", { name: "Releases" }).click();
+  await openApp(page, "Releases");
   await expect(page.getByRole("heading", { name: "Promotion policies" })).toBeVisible();
 };
 

@@ -6,6 +6,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openApp,
   serveConsole,
 } from "./mock-backend";
 
@@ -113,7 +114,7 @@ const facts = (page: Page) => detail(page).getByRole("definition");
 
 const openReleases = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await page.getByRole("link", { name: "Releases" }).click();
+  await openApp(page, "Releases");
   await expect(page.getByRole("heading", { name: "Recall follow-through" })).toBeVisible();
 };
 

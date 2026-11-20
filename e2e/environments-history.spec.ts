@@ -6,6 +6,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openApp,
   serveConsole,
 } from "./mock-backend";
 
@@ -149,7 +150,7 @@ test.describe("environment history", () => {
   test("shows attempts, collapsed detail, and a hold link", async ({ page }) => {
     app = await serveConsole(server(ok(ATTEMPTS)));
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
     const history = page
       .locator("table")
@@ -188,7 +189,7 @@ test.describe("environment history", () => {
       }),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     const historyLink = page.getByRole("link", { name: "History" });
     await expect(historyLink).toBeVisible();
     const href = await historyLink.getAttribute("href");
@@ -220,7 +221,7 @@ test.describe("environment history", () => {
       }),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     const history = page
       .locator("table")
       .filter({ has: page.getByRole("columnheader", { name: "From -> to" }) });
@@ -235,7 +236,7 @@ test.describe("environment history", () => {
   test("says none when there are no attempts", async ({ page }) => {
     app = await serveConsole(server(ok({ items: [] })));
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
     await expect(page.getByText("This server does not report deployment history.")).toHaveCount(0);
     await expect(page.getByText("none").first()).toBeVisible();
@@ -276,7 +277,7 @@ test.describe("environment history", () => {
       ),
     );
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     const history = page
       .locator("table")
       .filter({ has: page.getByRole("columnheader", { name: "Cause" }) });
@@ -293,7 +294,7 @@ test.describe("environment history", () => {
   test("says the route is missing without a status code", async ({ page }) => {
     app = await serveConsole(server({ status: 404, body: { error: "not found" } }));
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByText("This server does not report deployment history.")).toBeVisible();
     await expect(page.getByText("not found")).toHaveCount(0);
     await expectDesignRules(page);
@@ -313,7 +314,7 @@ test.describe("environment history on a phone", () => {
   test("shows history without leaking internals", async ({ page }) => {
     app = await serveConsole(server(ok(ATTEMPTS)));
     await page.goto(app.url);
-    await page.getByRole("link", { name: "Environments" }).click();
+    await openApp(page, "Environments");
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
     const history = page
       .locator("table")

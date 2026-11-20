@@ -36,7 +36,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
 
 /**
  * The 2026-10-28 pick A (#37): Backups, Exports and Export history stacked,
- * as a top-level tab (#34). Downloads go through the authenticated client;
+ * as a Platform tab. Downloads go through the authenticated client;
  * no token or artifact is kept.
  */
 export const Operations = () => {

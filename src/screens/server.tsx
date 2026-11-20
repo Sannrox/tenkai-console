@@ -15,7 +15,7 @@ import { RefreshFailed, STATUS_TONE, td, th, useTrustPosture } from "../ui/postu
  * The 2026-10-28 pick B (#39): hub transport facts (TLS mode, whether runner
  * mTLS is required, the runner CA with its fingerprint), then one row per
  * environment with its runners by auth, bearer in warning. A top-level tab
- * of its own (#34); `server-status.tsx` stays the unreachable-hub panel.
+ * of its own, now a Platform tab; `server-status.tsx` stays the unreachable-hub panel.
  */
 export const Server = () => {
   const token = useSession((state) => state.session?.accessToken);

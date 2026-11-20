@@ -1,7 +1,13 @@
 // Environment and release labels against a mocked API. Run with `pnpm build && pnpm e2e`.
 import { type Page, expect, test } from "@playwright/test";
 import type { FleetStatusReport } from "../src/api/tenkai.gen";
-import { type MockBackend, type Reply, expectDesignRules, serveConsole } from "./mock-backend";
+import {
+  type MockBackend,
+  type Reply,
+  expectDesignRules,
+  openApp,
+  serveConsole,
+} from "./mock-backend";
 
 const ok = (body: unknown): Reply => ({ status: 200, body });
 
@@ -89,14 +95,14 @@ const capture = (page: Page, name: string) =>
 
 const openEnvironment = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await page.getByRole("link", { name: "Environments" }).click();
+  await openApp(page, "Environments");
   await expect(envLabels(page)).not.toHaveText("Loading");
   await page.waitForLoadState("networkidle");
 };
 
 const openRelease = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await page.getByRole("link", { name: "Releases" }).click();
+  await openApp(page, "Releases");
   await page.getByLabel("Labelled release").fill("api@1.2.0");
   await expect(releaseLabels(page)).not.toHaveText("Loading");
   await page.waitForLoadState("networkidle");

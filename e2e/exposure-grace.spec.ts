@@ -7,7 +7,13 @@ import type {
   FleetStatusReport,
   MatchedExposure,
 } from "../src/api/tenkai.gen";
-import { type MockBackend, type Reply, expectDesignRules, serveConsole } from "./mock-backend";
+import {
+  type MockBackend,
+  type Reply,
+  expectDesignRules,
+  openApp,
+  serveConsole,
+} from "./mock-backend";
 
 const DAY = 86_400_000;
 const SHOTS = "/tmp/lane-164";
@@ -105,7 +111,7 @@ const shot = (page: Page, name: string) =>
 
 const open = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await page.getByRole("link", { name: "Exposure" }).click();
+  await openApp(page, "Exposure");
   await expect(findings(page)).toBeVisible();
 };
 
@@ -288,7 +294,7 @@ test.describe("environment exposure grace", () => {
     test(`shows a ${text} grace window read-only`, async ({ page }) => {
       app = await environment(grace);
       await page.goto(app.url);
-      await page.getByRole("link", { name: "Environments" }).click();
+      await openApp(page, "Environments");
       await expect(page.getByLabel("Exposure grace configured")).toHaveText(text);
       await shot(page, `environment-grace-${text.replace(" ", "-")}`);
       await expectDesignRules(page);
