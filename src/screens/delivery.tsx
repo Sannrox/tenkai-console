@@ -1,23 +1,18 @@
-import { Link } from "@tanstack/react-router";
 import type { FleetStatusReport } from "../api/tenkai.gen";
-import type { FleetAttention, FleetTableRow } from "../delivery/configuration";
+import type { FleetTableRow } from "../delivery/configuration";
 import { Card } from "../ui/kit";
 
-const DOT = { warn: "bg-warning", bad: "bg-danger" } as const;
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2";
 
-/** What needs you first, then fleet counts from bulk routes. */
+/** Fleet counts from bulk routes. */
 export const Delivery = ({
   rows,
-  items,
   fleet,
 }: {
   rows: FleetTableRow[];
-  items: FleetAttention[];
   fleet: FleetStatusReport | undefined;
 }) => {
-  // Server `unhealthy` folds in unknown health; split it so unknown stands on its own.
   const health = (summary: string) =>
     fleet?.environments.filter((row) => row.health_summary === summary).length ?? "·";
   if (rows.length === 0) {
@@ -28,31 +23,7 @@ export const Delivery = ({
 
   return (
     <>
-      {items.length > 0 && (
-        <Card>
-          {items.map((item) => (
-            <div
-              key={`${item.environment}/${item.next}`}
-              className="grid grid-cols-[10px_1fr_auto] items-center gap-3 border-t border-line px-3.5 py-2.5 first:border-t-0"
-            >
-              <span className={`size-[7px] rounded-full ${DOT[item.tone]}`} />
-              <div>
-                <div className="text-[13px] font-semibold">{item.environment}</div>
-                <div className="text-xs text-muted">{item.detail}</div>
-              </div>
-              <Link
-                to="/environments/$environment"
-                params={{ environment: item.environment }}
-                className="inline-flex items-center rounded-md border border-field px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap text-fg no-underline"
-              >
-                {item.next}
-              </Link>
-            </div>
-          ))}
-        </Card>
-      )}
-
-      <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">All deliveries</h2>
+      <h2 className="mt-0 mb-2 text-[13px] font-semibold">Fleet</h2>
       <Card className="overflow-x-auto">
         <table className="w-full border-collapse text-xs">
           <thead>

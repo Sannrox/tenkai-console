@@ -38,8 +38,8 @@ const Imports = lazyRouteComponent(() => import("./screens/imports"), "Imports")
 const Access = lazyRouteComponent(() => import("./screens/access"), "Access");
 const Exposure = lazyRouteComponent(() => import("./screens/exposure"), "Exposure");
 const AuthCallback = lazyRouteComponent(() => import("./screens/auth-callback"), "AuthCallback");
-const SearchPage = lazyRouteComponent(() => import("./screens/placeholders"), "SearchPage");
-const AttentionPage = lazyRouteComponent(() => import("./screens/placeholders"), "AttentionPage");
+const SearchPage = lazyRouteComponent(() => import("./screens/search"), "SearchPage");
+const AttentionPage = lazyRouteComponent(() => import("./screens/attention"), "AttentionPage");
 const AppsPage = lazyRouteComponent(() => import("./screens/placeholders"), "AppsPage");
 
 const useServer = () =>

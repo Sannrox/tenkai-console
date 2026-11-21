@@ -49,7 +49,7 @@ const signIn = async (page: Page, url: string) => {
   await page.goto(url);
   await page.getByLabel("Platform token").fill("fixture-token");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Delivery" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
 };
 
 const capture = (page: Page, name: string) =>
@@ -109,7 +109,7 @@ test.describe("shell at desktop width", () => {
     await open("attention", "Attention", () =>
       main.getByRole("link", { name: "Attention" }).click(),
     );
-    await open("home", "Delivery", () => main.getByRole("link", { name: "Home" }).click());
+    await open("home", "Home", () => main.getByRole("link", { name: "Home" }).click());
   });
 
   test("collapsed sidebar is icons only and remembered", async ({ page }) => {

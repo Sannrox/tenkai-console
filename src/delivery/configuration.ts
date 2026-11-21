@@ -1,12 +1,15 @@
 import type {
+  ChangeEvent,
   ChannelPage,
   EnvironmentInspectReport,
   EnvironmentListEntry,
   FleetEnvironmentRow,
   FleetStatusReport,
+  RuntimeRunner,
 } from "../api/tenkai.gen";
 import { planLabel } from "./maintenance";
 import { holdLine } from "./model";
+import { shortId } from "./runners";
 
 /**
  * Read-only configuration views (decision 4D). Fleet tables and the releases
@@ -77,27 +80,135 @@ export const fleetTableRows = (
     });
 };
 
+export const ATTENTION_KINDS = ["environment", "finding", "runner", "release", "event"] as const;
+
+export type AttentionKind = (typeof ATTENTION_KINDS)[number];
+
 export type FleetAttention = {
   tone: "warn" | "bad";
-  environment: string;
+  kind: AttentionKind;
+  key: string;
+  title: string;
   detail: string;
   next: string;
+  environment?: string;
+  runnerId?: string;
+  advisory?: string;
+  release?: string;
 };
 
+export type AttentionSources = {
+  environments?: readonly FleetEnvironmentRow[];
+  runners?: readonly RuntimeRunner[];
+  events?: readonly ChangeEvent[];
+};
+
+const RANK = { bad: 0, warn: 1 } as const;
+
 /**
- * Fleet-scale attention from bulk posture only. Plan state is not on
- * `v1/fleet/status`; the selected environment's inspect rail is the source.
+ * Fleet-scale attention from bulk reads: posture, products behind, open
+ * findings, runners with no heartbeat, recall events, and target failures.
+ * Plan approvals, drift and certificate warnings stay off this list.
  */
-export const fleetAttention = (rows: FleetEnvironmentRow[]): FleetAttention[] =>
-  rows
-    .filter((row) => row.posture === "unhealthy")
-    .map((row) => ({
-      tone: "bad" as const,
-      environment: row.name,
-      detail: `${row.health_summary} · ${row.posture}`,
-      next: "Inspect",
-    }))
-    .toSorted((left, right) => left.environment.localeCompare(right.environment));
+export const fleetAttention = (source: AttentionSources): FleetAttention[] => {
+  const items: FleetAttention[] = [];
+  for (const row of source.environments ?? []) {
+    if (row.posture === "unhealthy") {
+      items.push({
+        tone: "bad",
+        kind: "environment",
+        key: `env:${row.name}:unhealthy`,
+        title: row.name,
+        detail: `${row.health_summary} · ${row.posture}`,
+        next: "Inspect",
+        environment: row.name,
+      });
+    }
+    if (row.products_behind > 0) {
+      items.push({
+        tone: "warn",
+        kind: "environment",
+        key: `env:${row.name}:behind`,
+        title: row.name,
+        detail: `${row.products_behind} behind`,
+        next: "Inspect",
+        environment: row.name,
+      });
+    }
+    for (const exposure of row.open_exposures ?? []) {
+      items.push({
+        tone: exposure.severity === "critical" || exposure.severity === "high" ? "bad" : "warn",
+        kind: "finding",
+        key: `finding:${row.name}:${exposure.advisory_id}:${exposure.release}`,
+        title: exposure.advisory_id,
+        detail: `${row.name} · ${exposure.release} · ${exposure.severity}`,
+        next: "Inspect",
+        environment: row.name,
+        advisory: exposure.advisory_id,
+        release: exposure.release,
+      });
+    }
+  }
+  for (const runner of source.runners ?? []) {
+    if (runner.state === "revoked") {
+      continue;
+    }
+    const heartbeat = runner.instances.some((instance) => instance.last_heartbeat_at !== undefined);
+    if (!heartbeat) {
+      items.push({
+        tone: "bad",
+        kind: "runner",
+        key: `runner:${runner.id}`,
+        title: shortId(runner.id),
+        detail: `${runner.environment} · no heartbeat`,
+        next: "Inspect",
+        environment: runner.environment,
+        runnerId: runner.id,
+      });
+    }
+  }
+  const recalled = new Set<string>();
+  const failed = new Set<string>();
+  for (const event of [...(source.events ?? [])].toReversed()) {
+    if (event.kind === "release_recalled") {
+      if (recalled.has(event.resource)) {
+        continue;
+      }
+      recalled.add(event.resource);
+      items.push({
+        tone: "warn",
+        kind: "release",
+        key: `recall:${event.resource}`,
+        title: event.resource,
+        detail: event.environment ? `${event.environment} · recalled` : "recalled",
+        next: "Follow through",
+        ...(event.environment === undefined ? {} : { environment: event.environment }),
+        release: event.resource,
+      });
+    } else if (event.kind === "target_failed") {
+      const id = `${event.environment ?? ""}:${event.resource}`;
+      if (failed.has(id)) {
+        continue;
+      }
+      failed.add(id);
+      items.push({
+        tone: "bad",
+        kind: "event",
+        key: `event:${id}`,
+        title: event.resource,
+        detail: event.environment ? `${event.environment} · failed` : "failed",
+        next: "Inspect",
+        ...(event.environment === undefined ? {} : { environment: event.environment }),
+      });
+    }
+  }
+  return items.toSorted(
+    (left, right) =>
+      RANK[left.tone] - RANK[right.tone] ||
+      left.title.localeCompare(right.title) ||
+      left.key.localeCompare(right.key),
+  );
+};
 
 /** Channel head as the operator-facing version, dropping a `tenkai:release:` prefix. */
 export const channelHeadLabel = (head: string): string => {

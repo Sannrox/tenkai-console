@@ -208,7 +208,7 @@ const shot = (page: Page, name: string) =>
 
 const signIn = async (page: Page, url: string) => {
   await page.goto(url);
-  await expect(page.getByRole("heading", { name: "Delivery" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
 };
 
 test.describe("object pages at desktop width", () => {
