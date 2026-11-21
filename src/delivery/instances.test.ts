@@ -7,6 +7,8 @@ import {
   instanceHealth,
   instanceHealthView,
   instanceName,
+  lifecycleHealth,
+  upgradeHeldReason,
 } from "./instances";
 
 const GRAPH = {
@@ -121,6 +123,37 @@ describe("instanceHealth", () => {
       }),
     ).toEqual({ label: "error", tone: "bad" });
   });
+
+  it("names a recorded stop, never failing or unknown", () => {
+    expect(
+      instanceHealth({
+        product: "api",
+        channel: "stable",
+        head: "1",
+        state: "stopped",
+        health: "stopped",
+        error: "upgrade held: drain for maintenance",
+      }),
+    ).toEqual({ label: "stopped", tone: "muted" });
+    expect(
+      instanceHealth({
+        product: "api",
+        channel: "stable",
+        head: "1",
+        state: "current",
+        error: "upgrade held: drain for maintenance",
+      }),
+    ).toEqual({ label: "stopped", tone: "muted" });
+  });
+});
+
+describe("upgradeHeldReason", () => {
+  it("reads the operator reason a stop recorded, and ignores other errors", () => {
+    expect(upgradeHeldReason("upgrade held: drain for maintenance")).toBe("drain for maintenance");
+    expect(upgradeHeldReason("upgrade held:")).toBe("stopped");
+    expect(upgradeHeldReason("target failed; automatic retry held")).toBeUndefined();
+    expect(upgradeHeldReason("")).toBeUndefined();
+  });
 });
 
 describe("instanceHealthView", () => {
@@ -178,6 +211,17 @@ describe("instanceHealthView", () => {
     ).not.toHaveProperty("observed");
   });
 
+  it("keeps a stopped instance stopped when live probes fail", () => {
+    expect(
+      instanceHealthView({
+        health: "stopped",
+        error: "upgrade held: drain for maintenance",
+        health_checks: [{ name: "http", state: "failing", message: "503 on /ready" }],
+        health_observed_at_ms: Date.UTC(2026, 10, 14, 9, 12, 45),
+      }),
+    ).toEqual({ label: "stopped", tone: "muted", checks: [] });
+  });
+
   it("lists a repairing check with the others, below a warning", () => {
     const view = instanceHealthView({
       health: "healthy",
@@ -194,6 +238,37 @@ describe("instanceHealthView", () => {
   });
 });
 
+describe("lifecycleHealth", () => {
+  const stopped = { label: "stopped", tone: "muted" as const, checks: [] };
+  const healthy = { label: "healthy", tone: "ok" as const, checks: [] };
+  const stopPlan = {
+    state: "running",
+    steps: [{ product: "api", instance: "api", action: "stop" }],
+  };
+  const startPlan = {
+    state: "computed",
+    steps: [{ product: "api", action: "start" }],
+  };
+
+  it("reads an in-flight stop or start from the latest plan", () => {
+    expect(lifecycleHealth(healthy, stopPlan, "api", "api")).toMatchObject({
+      label: "stopping",
+      tone: "warn",
+    });
+    expect(lifecycleHealth(stopped, startPlan, "api", "api")).toMatchObject({
+      label: "starting",
+      tone: "warn",
+    });
+  });
+
+  it("keeps reported health when the plan is idle or for another instance", () => {
+    expect(
+      lifecycleHealth(healthy, { state: "succeeded", steps: stopPlan.steps }, "api", "api"),
+    ).toBe(healthy);
+    expect(lifecycleHealth(stopped, stopPlan, "web", "web")).toBe(stopped);
+  });
+});
+
 describe("healthRollup", () => {
   it("counts unknown apart from healthy, worst first", () => {
     expect(
@@ -205,6 +280,12 @@ describe("healthRollup", () => {
       ]),
     ).toEqual({ label: "1 unknown · 1 warning · 2 healthy", tone: "bad" });
     expect(healthRollup([])).toEqual({ label: "none", tone: "muted" });
+    expect(
+      healthRollup([
+        { label: "stopped", tone: "muted" },
+        { label: "healthy", tone: "ok" },
+      ]),
+    ).toEqual({ label: "1 healthy · 1 stopped", tone: "ok" });
   });
 });
 

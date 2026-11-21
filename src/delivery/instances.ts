@@ -20,16 +20,37 @@ export type HealthTone = "ok" | "warn" | "bad" | "muted";
 
 export type InstanceHealth = { label: string; tone: HealthTone };
 
+/** Server prefix on a stopped instance whose channel upgrade waits for start. */
+const UPGRADE_HELD = "upgrade held:";
+
+/**
+ * Operator reason a stop recorded on the status row, when the server names
+ * the held upgrade that way. Absent for any other error.
+ */
+export const upgradeHeldReason = (error: string | null | undefined): string | undefined => {
+  const text = (error ?? "").trim();
+  if (!text.startsWith(UPGRADE_HELD)) {
+    return undefined;
+  }
+  const reason = text.slice(UPGRADE_HELD.length).trim();
+  return reason === "" ? "stopped" : reason;
+};
+
 /**
  * Reported instance health; missing on older bodies is `n/a`.
  * `unhealthy` is the serving label for a failing observation; a stale
  * observation is already `unknown` on the server, never healthy.
+ * A recorded stop stays `stopped`: live probes of a scaled-down workload
+ * must not count as failing.
  */
 const reportedHealth = (
   reported: string | null | undefined,
   error: string | null | undefined,
 ): InstanceHealth => {
   const health = reported?.trim() ?? "";
+  if (health === "stopped" || (health === "" && upgradeHeldReason(error) !== undefined)) {
+    return { label: "stopped", tone: "muted" };
+  }
   if (health === "ok" || health === "healthy") {
     return { label: health, tone: "ok" };
   }
@@ -86,6 +107,13 @@ export const instanceHealthView = (row: {
   health_checks?: readonly HealthCheck[] | undefined;
   health_observed_at_ms?: number | undefined;
 }): InstanceHealthView => {
+  const observed = observedLabel(row.health_observed_at_ms);
+  const base = reportedHealth(row.health, row.error);
+  if (base.label === "stopped") {
+    // Overlay already drops live checks; keep them off the label so a
+    // scaled-down probe never paints the instance as failing or unknown.
+    return { label: "stopped", tone: "muted", checks: [] };
+  }
   const checks = (row.health_checks ?? [])
     .map((check) => ({
       name: check.name,
@@ -97,16 +125,48 @@ export const instanceHealthView = (row: {
       (left, right) =>
         checkRank(right.state) - checkRank(left.state) || left.name.localeCompare(right.name),
     );
-  const base = reportedHealth(row.health, row.error);
   const worst = checks[0];
   // `unknown` and `failing` are `bad`, which no check outranks.
   const raise = worst !== undefined && checkRank(worst.state) > BASE_RANK[base.tone];
-  const observed = observedLabel(row.health_observed_at_ms);
   return {
     ...(raise ? { label: worst.state, tone: worst.tone } : base),
     checks,
     ...(observed === undefined ? {} : { observed }),
   };
+};
+
+const ACTIVE_PLAN = new Set(["computed", "running", "blocked"]);
+
+/**
+ * In-flight stop or start from the environment's latest plan, else the
+ * reported health. A start plan of a stopped instance reads as starting.
+ */
+export const lifecycleHealth = (
+  health: InstanceHealthView,
+  plan:
+    | {
+        state: string;
+        steps?: readonly { product: string; instance?: string; action: string }[] | undefined;
+      }
+    | null
+    | undefined,
+  product: string,
+  instance: string,
+): InstanceHealthView => {
+  if (!plan || !ACTIVE_PLAN.has(plan.state)) {
+    return health;
+  }
+  const step = plan.steps?.find((candidate) => {
+    const named = candidate.instance?.trim();
+    return named ? named === instance : candidate.product === product;
+  });
+  if (step?.action === "start") {
+    return { ...health, label: "starting", tone: "warn", checks: [] };
+  }
+  if (step?.action === "stop") {
+    return { ...health, label: "stopping", tone: "warn", checks: [] };
+  }
+  return health;
 };
 
 type HealthRow = Parameters<typeof instanceHealthView>[0] & { product: string; instance?: string };
@@ -118,12 +178,23 @@ type HealthRow = Parameters<typeof instanceHealthView>[0] & { product: string; i
 export const withHealth = <Row extends HealthRow>(
   subscriptions: readonly InstanceSubscription[],
   rows: readonly Row[] | undefined,
+  plan?: Parameters<typeof lifecycleHealth>[1],
 ) => {
   const byInstance = new Map(rows?.map((row) => [row.instance?.trim() || row.product, row]));
   return subscriptions.map((subscription) => {
     const instance = instanceName(subscription);
     const row = byInstance.get(instance);
-    return { subscription, instance, row, health: instanceHealthView(row ?? subscription) };
+    return {
+      subscription,
+      instance,
+      row,
+      health: lifecycleHealth(
+        instanceHealthView(row ?? subscription),
+        plan,
+        subscription.product,
+        instance,
+      ),
+    };
   });
 };
 

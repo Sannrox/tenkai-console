@@ -90,6 +90,43 @@ describe("matrix", () => {
     expect(m.cell("api", "prod-eu")?.status).toBe("rolling out → 1.16.0");
   });
 
+  it("names a stop or start plan, and a recorded stop as held by stop", () => {
+    const stop = plan("running", "api", "1.16.0");
+    stop.steps![0]!.action = "stop";
+    expect(
+      matrix([env("prod-eu", [sub("api", "current", "1.16.0", "1.16.0")], stop)]).cell(
+        "api",
+        "prod-eu",
+      ),
+    ).toMatchObject({
+      tone: "warn",
+      status: "stopping",
+    });
+    const start = plan("computed", "api", "1.16.0");
+    start.steps![0]!.action = "start";
+    expect(
+      matrix([env("prod-eu", [sub("api", "stopped", "1.16.0", "1.16.0")], start)]).cell(
+        "api",
+        "prod-eu",
+      ),
+    ).toMatchObject({ tone: "warn", status: "plan ready → start" });
+    expect(
+      matrix([
+        env("prod-eu", [
+          {
+            ...sub("api", "stopped", "1.16.0", "1.16.0"),
+            health: "stopped",
+            error: "upgrade held: drain for maintenance",
+          },
+        ]),
+      ]).cell("api", "prod-eu"),
+    ).toMatchObject({
+      version: "1.16.0",
+      tone: "warn",
+      status: "upgrade held: drain for maintenance",
+    });
+  });
+
   it("marks missing and unhealthy deployments", () => {
     const m = matrix([
       env("prod-us", [

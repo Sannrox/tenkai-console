@@ -43,6 +43,7 @@ import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { AddEnvironment, ConfigSections } from "./environment-config";
 import { HoldRows, SubscriptionHold } from "./environment-hold";
 import { Runtime } from "./environment-runtime";
+import { EnvironmentStopStart } from "./environment-stop";
 import { FleetTable } from "./fleet-table";
 import { HealthChecks } from "./health-checks";
 
@@ -192,6 +193,7 @@ const Detail = ({
   const instances = withHealth(
     report.subscriptions.filter((subscription) => !unmanagedNames.has(instanceName(subscription))),
     status.data?.kind === "ok" ? status.data.value : undefined,
+    report.latest_plan,
   );
   const rollup = healthRollup(instances.map((item) => item.health));
   const showAdopt =
@@ -237,19 +239,19 @@ const Detail = ({
                       ? identityLabel(row, nowSecs)
                       : { label: "n/a", tone: "muted" as const };
                   const held = waiting.has(instance) || waiting.has(subscription.product);
+                  const versionWarn =
+                    held || (subscription.state !== "current" && subscription.state !== "stopped");
                   return (
                     <tr key={instance} className="[&:last-child>td]:border-b-0">
                       <td className={`${td} font-mono`}>{instance}</td>
                       <td className={td}>{subscription.product}</td>
                       <td className={td}>{subscription.channel}</td>
-                      <td
-                        className={`${td} font-mono ${held || subscription.state !== "current" ? "text-warning" : "text-ok"}`}
-                      >
+                      <td className={`${td} font-mono ${versionWarn ? "text-warning" : "text-ok"}`}>
                         {deployedLabel(subscription.deployed, held)}
                       </td>
                       <td className={`${td} font-mono whitespace-nowrap`}>
                         {subscription.head}
-                        {subscription.state !== "current" && (
+                        {versionWarn && (
                           <button
                             type="button"
                             className="ml-2 cursor-pointer font-sans font-semibold text-muted"
@@ -280,7 +282,7 @@ const Detail = ({
                             isHeldFailedTarget(subscription) &&
                             !productHasActivePlan(report.latest_plan, subscription.product)
                           }
-                          error={subscription.error}
+                          error={row?.error ?? subscription.error}
                           token={token}
                         />
                       </td>
@@ -413,6 +415,7 @@ const Detail = ({
               <Notice tone={hold.outcome.tone}>{hold.outcome.text}</Notice>
             </div>
           )}
+          <EnvironmentStopStart report={report} token={token} instances={instances} />
           {rollback.allowed && deployed.length > 0 && (
             <div className="flex flex-wrap gap-2 border-t border-line px-3.5 py-3">
               {deployed.length > 1 && (
