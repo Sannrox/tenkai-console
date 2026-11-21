@@ -32,9 +32,12 @@ export const isPlatformPath = (path: string) => PLATFORM_TABS.some((tab) => tab.
 export const isAppPath = (path: string) =>
   path === "/apps" ||
   path.startsWith("/environments") ||
-  path === "/releases" ||
-  path === "/exposure" ||
-  path === "/runners" ||
+  path.startsWith("/releases") ||
+  path.startsWith("/products") ||
+  path.startsWith("/plans") ||
+  path.startsWith("/findings") ||
+  path.startsWith("/exposure") ||
+  path.startsWith("/runners") ||
   isPlatformPath(path);
 
 /** Which bottom-bar / primary item the current path belongs to. */
@@ -56,7 +59,16 @@ export const appItemActive = (path: string, to: string) => {
     return isPlatformPath(path);
   }
   if (to === "/environments") {
-    return path.startsWith("/environments");
+    return path.startsWith("/environments") || path.startsWith("/plans");
+  }
+  if (to === "/releases") {
+    return path.startsWith("/releases") || path.startsWith("/products");
+  }
+  if (to === "/exposure") {
+    return path.startsWith("/exposure") || path.startsWith("/findings");
+  }
+  if (to === "/runners") {
+    return path.startsWith("/runners");
   }
   return path === to;
 };

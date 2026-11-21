@@ -21,6 +21,7 @@ import {
 import { useManagementCall } from "../management/use-management";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { td, th } from "../ui/posture";
+import { FindingLink, ReleaseLink } from "./object-link";
 
 const field =
   "min-w-0 rounded-md border border-field bg-white/4 px-2.5 py-1.5 font-mono text-xs text-fg placeholder:text-muted";
@@ -82,9 +83,17 @@ export const Findings = ({ token, matches }: { token: string; matches: MatchedEx
                 const grace = inGrace(match.grace);
                 return (
                   <tr key={key}>
-                    <td className={`${td} font-mono`}>{match.advisory_id}</td>
+                    <td className={`${td} font-mono`}>
+                      <FindingLink
+                        advisory={match.advisory_id}
+                        release={match.release}
+                        component={match.component}
+                      />
+                    </td>
                     <td className={td}>{match.severity}</td>
-                    <td className={`${td} font-mono`}>{match.release}</td>
+                    <td className={`${td} font-mono`}>
+                      <ReleaseLink spec={match.release} />
+                    </td>
                     <td className={`${td} font-mono`}>
                       {match.component} {match.component_version}
                     </td>

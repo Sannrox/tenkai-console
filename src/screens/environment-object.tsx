@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { EnvironmentInspectReport } from "../api/tenkai.gen";
+import { channelHeadLabel } from "../delivery/configuration";
 import { deployedLabel } from "../delivery/dependencies";
 import type { StatusRow } from "../delivery/identity";
 import { instanceName, withHealth } from "../delivery/instances";
@@ -11,6 +11,8 @@ import { useEnvironmentHold } from "../delivery/use-delivery";
 import { Button } from "../ui/kit";
 import { HoldRows, SubscriptionHold } from "./environment-hold";
 import { HealthChecks } from "./health-checks";
+import { PlanLink, ProductLink, ReleaseLink } from "./object-link";
+import { releaseSpec } from "./objects";
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2 align-top";
@@ -68,18 +70,14 @@ export const LinkedColumn = ({ report }: { report: EnvironmentInspectReport }) =
       <ul className="m-0 list-none p-0">
         {report.latest_plan && (
           <li>
-            <Link
-              to="/environments/$environment/plan"
-              params={{ environment: report.name }}
-              className="text-muted"
-            >
+            <PlanLink environment={report.name} planId={report.latest_plan.id}>
               {report.latest_plan.id}
-            </Link>
+            </PlanLink>
           </li>
         )}
         {products.map((product) => (
           <li key={product} className="font-mono">
-            {product}
+            <ProductLink product={product} environment={report.name} />
           </li>
         ))}
         {products.length === 0 && !report.latest_plan && <li className="text-muted">none</li>}
@@ -136,13 +134,29 @@ export const InstanceTable = ({
           return (
             <tr key={instance} className="[&:last-child>td]:border-b-0">
               <td className={`${td} font-mono`}>{instance}</td>
-              <td className={td}>{subscription.product}</td>
+              <td className={td}>
+                <ProductLink product={subscription.product} environment={report.name} />
+              </td>
               <td className={td}>{subscription.channel}</td>
               <td className={`${td} font-mono ${versionWarn ? "text-warning" : "text-ok"}`}>
-                {deployedLabel(subscription.deployed, held)}
+                {subscription.deployed ? (
+                  <ReleaseLink
+                    spec={releaseSpec(subscription.product, subscription.deployed)}
+                    environment={report.name}
+                  >
+                    {subscription.deployed}
+                  </ReleaseLink>
+                ) : (
+                  deployedLabel(subscription.deployed, held)
+                )}
               </td>
               <td className={`${td} font-mono whitespace-nowrap`}>
-                {subscription.head}
+                <ReleaseLink
+                  spec={releaseSpec(subscription.product, channelHeadLabel(subscription.head))}
+                  environment={report.name}
+                >
+                  {channelHeadLabel(subscription.head)}
+                </ReleaseLink>
                 {versionWarn && (
                   <button
                     type="button"

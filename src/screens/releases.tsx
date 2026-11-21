@@ -24,6 +24,8 @@ import { td } from "../ui/posture";
 import { Canaries } from "./canaries";
 import { Compatibility } from "./compatibility";
 import { Migrations } from "./migrations";
+import { ProductLink, ReleaseLink } from "./object-link";
+import { releaseSpec } from "./objects";
 import { PromotionPolicies } from "./promotion-policies";
 
 const ReleaseLabels = lazy(() => import("./release-labels"));
@@ -76,13 +78,17 @@ export const Releases = () => {
           <tbody>
             {table.products.map((product) => (
               <tr key={product} className="[&:last-child>td]:border-b-0">
-                <td className="border-b border-line px-3.5 py-2 font-semibold">{product}</td>
+                <td className="border-b border-line px-3.5 py-2 font-semibold">
+                  <ProductLink product={product} />
+                </td>
                 {table.channels.map((channel) => {
                   const cell = table.cell(product, channel);
                   return (
                     <td key={channel} className="border-b border-l border-line px-3.5 py-2">
                       {cell ? (
-                        <span className="font-mono">{cell.version}</span>
+                        <ReleaseLink spec={releaseSpec(product, cell.version)}>
+                          {cell.version}
+                        </ReleaseLink>
                       ) : (
                         <span className="text-muted">·</span>
                       )}
