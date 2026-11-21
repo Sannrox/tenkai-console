@@ -19,12 +19,14 @@ export const useAttention = (token: string | undefined) => {
     queryFn: () => request<RuntimeRunnerList>("v1/runners", { token }),
     enabled,
     retry: false,
+    refetchOnWindowFocus: false,
   });
   const events = useQuery({
     queryKey: ["events", token],
     queryFn: () => request<ChangeEventPage>("v1/events?limit=100", { token }),
     enabled,
     retry: false,
+    refetchOnWindowFocus: false,
   });
   const failed: AttentionSourceId[] = [
     ...(delivery.error ? (["fleet"] as const) : []),

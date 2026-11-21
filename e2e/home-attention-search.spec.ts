@@ -223,11 +223,14 @@ test.describe("home attention and search at desktop width", () => {
       .getByRole("navigation", { name: "Main" })
       .getByRole("link", { name: "Attention" })
       .click();
-    await expect(page.getByText("The list may be incomplete.")).toBeVisible();
+    const incomplete = page.getByText("The list may be incomplete.");
+    await expect(incomplete).toBeVisible();
     await expect(page.getByRole("list", { name: "Attention" })).not.toContainText("Follow through");
+    const retry = incomplete.locator("..").getByRole("button", { name: "Retry" });
+    await expect(retry).toBeVisible();
     fail = false;
-    await page.getByRole("button", { name: "Retry" }).click();
-    await expect(page.getByText("The list may be incomplete.")).toHaveCount(0);
+    await retry.click();
+    await expect(incomplete).toHaveCount(0);
     await expect(page.getByRole("list", { name: "Attention" })).toContainText("api@1.0.0");
     await expectDesignRules(page);
     await shot(page, "attention-partial");
