@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ApiError } from "../api/http";
 import type { ChannelPromotionPolicyStatus, ChannelPromotionPolicyView } from "../api/tenkai.gen";
 import {
+  canaryCohort,
   evaluatesPolicies,
   evidenceLine,
   fetchPolicyView,
@@ -102,6 +103,26 @@ describe("fetchPolicyView", () => {
     expect(load.kind).toBe("ok");
   });
 
+  it("keeps a canary cohort and still loads a policy without one", async () => {
+    const withCohort = await fetchPolicyView(
+      "api",
+      "stable",
+      "t",
+      answering(200, {
+        ...view({}),
+        canary: {
+          policy_digest: "sha256:x",
+          environments: ["stage"],
+          selector: { selector: "tier=edge", environments: ["stage"] },
+        },
+      }),
+    );
+    expect(withCohort.kind === "ok" && canaryCohort(withCohort.value)).toBe(
+      "tier=edge, matched stage",
+    );
+    expect((await fetchPolicyView("api", "stable", "t", answering(200, view({})))).kind).toBe("ok");
+  });
+
   // Older servers answer 404; a malformed body is not shown as a policy.
   it("never surfaces raw server text", async () => {
     expect(await fetchPolicyView("api", "stable", "t", answering(404, { error: "x" }))).toEqual({
@@ -152,6 +173,28 @@ describe("policy detail lines", () => {
       ),
     ).toBe("policy channel-promotion-policy:api/stable");
     expect(promotedBy(view({ promoted_by: "alice" }))).toBe("alice");
+  });
+
+  it("names the canary cohort's selector and resolved environments", () => {
+    expect(canaryCohort(view({}))).toBeUndefined();
+    expect(
+      canaryCohort(
+        view({
+          canary: { policy_digest: "sha256:x", environments: ["stage", "lab"] },
+        }),
+      ),
+    ).toBe("stage, lab");
+    expect(
+      canaryCohort(
+        view({
+          canary: {
+            policy_digest: "sha256:x",
+            environments: ["stage"],
+            selector: { selector: "tier=edge", environments: ["stage", "lab"] },
+          },
+        }),
+      ),
+    ).toBe("tier=edge, matched stage, lab");
   });
 });
 

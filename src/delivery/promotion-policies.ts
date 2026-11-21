@@ -3,6 +3,7 @@ import { ApiError, request } from "../api/http";
 import type { ChannelPolicyPauseRequest, ChannelRecallRuleRequest } from "../api/tenkai.gen";
 import { ageMs } from "./exposure";
 import { graceWindow } from "./grace";
+import { selectorLine } from "./hold";
 import { failedLoad, type Load } from "./owners";
 
 // `FleetStatusReport.promotion_policies` (Tenkai #899), read-only. The server
@@ -82,6 +83,12 @@ const Evidence = type({
   "recall_on_failing?": "boolean",
 });
 
+const CanaryCohort = type({
+  environments: "string[]",
+  policy_digest: "string",
+  "selector?": { selector: "string", environments: "string[]" },
+});
+
 const PolicyView = type({
   product: "string",
   target_channel: "string",
@@ -104,6 +111,7 @@ const PolicyView = type({
   "promoted_by?": "string",
   "promoted_by_kind?": "string",
   "instances_without_evidence?": "string[]",
+  "canary?": CanaryCohort,
 });
 
 export type PolicyView = typeof PolicyView.infer;
@@ -179,6 +187,19 @@ export const promotedBy = (view: PolicyView): string | undefined =>
     : view.promoted_by_kind === "channel_promotion_policy"
       ? `policy ${view.promoted_by}`
       : view.promoted_by;
+
+/**
+ * The active canary cohort: the selector that chose it and the environments
+ * it resolved to, or the named environments when it was not set by selector.
+ */
+export const canaryCohort = (view: PolicyView): string | undefined => {
+  if (view.canary === undefined) {
+    return undefined;
+  }
+  return view.canary.selector === undefined
+    ? view.canary.environments.join(", ")
+    : selectorLine(view.canary.selector);
+};
 
 /**
  * What a pause or resume answer means. No answer, or a 5xx that may have

@@ -51,7 +51,7 @@ export const newRequestId = (): string =>
  * mutations (main.tsx). A credential refusal hides that capability's controls
  * for the session, and every settled call refreshes the environment, hold,
  * status, dependency, runtime, migration, runner, owner, delivery, promotion policy,
- * and history reads so the screen shows the server's state. History is reset, not invalidated, so extra
+ * canary, and history reads so the screen shows the server's state. History is reset, not invalidated, so extra
  * cursor pages are dropped instead of refetched against a shifted list.
  */
 export const useManagementCall = <T>(
@@ -107,6 +107,7 @@ export const useManagementCall = <T>(
         queryClient.invalidateQueries({ queryKey: ["product-owners"] }),
         queryClient.invalidateQueries({ queryKey: ["webhook-deliveries"] }),
         queryClient.invalidateQueries({ queryKey: ["promotion-policy"] }),
+        queryClient.invalidateQueries({ queryKey: ["canaries"] }),
       ]),
   });
   // By status, not data: some routes answer success with JSON `null`.

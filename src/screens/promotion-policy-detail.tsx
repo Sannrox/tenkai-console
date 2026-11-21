@@ -5,6 +5,7 @@ import { useAuthSession } from "../auth/identity";
 import { ageMs } from "../delivery/exposure";
 import {
   at,
+  canaryCohort,
   evidenceLine,
   fetchPolicyView,
   parseRecallRule,
@@ -234,6 +235,7 @@ const Item = ({
 
 const Rules = ({ view }: { view: PolicyView }) => {
   const promoted = promotedBy(view);
+  const canary = canaryCohort(view);
   return (
     <dl aria-label="Policy rules" className="m-0 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
       <Item label="Policy">
@@ -243,6 +245,7 @@ const Rules = ({ view }: { view: PolicyView }) => {
       </Item>
       <Item label="Minimum soak">{ageMs(view.soak_duration_ms)}</Item>
       <Item label="Evidence">{evidenceLine(view.evidence)}</Item>
+      {canary !== undefined && <Item label="Canary">{canary}</Item>}
       <Item label="Recall" tone={view.evidence.recall_on_failing ? "text-warning" : ""}>
         {recallRule(view)}
       </Item>
