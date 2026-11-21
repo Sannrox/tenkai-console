@@ -156,7 +156,15 @@ const signIn = async (page: Page, url: string) => {
   await page.goto(url);
   await page.getByLabel("Platform token").fill("fixture-token");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Home", level: 1 })).toBeVisible();
+};
+
+const openAttention = async (page: Page) => {
+  await page
+    .getByRole("navigation", { name: "Main" })
+    .getByRole("link", { name: "Attention" })
+    .click();
+  await expect(page.getByRole("heading", { name: "Attention", level: 1 })).toBeVisible();
 };
 
 const shot = (page: Page, name: string) =>
@@ -185,11 +193,7 @@ test.describe("home attention and search at desktop width", () => {
   test("attention lists the fixture rows and the per-environment gap", async ({ page }) => {
     app = await serveConsole(server());
     await signIn(page, app.url);
-    await page
-      .getByRole("navigation", { name: "Main" })
-      .getByRole("link", { name: "Attention" })
-      .click();
-    await expect(page.getByRole("heading", { name: "Attention" })).toBeVisible();
+    await openAttention(page);
     await expect(
       page.getByText("Plan approvals, drift and certificate warnings stay on the environment."),
     ).toBeVisible();
@@ -219,10 +223,7 @@ test.describe("home attention and search at desktop width", () => {
       return server()(path, request);
     });
     await signIn(page, app.url);
-    await page
-      .getByRole("navigation", { name: "Main" })
-      .getByRole("link", { name: "Attention" })
-      .click();
+    await openAttention(page);
     const incomplete = page.getByText("The list may be incomplete.");
     await expect(incomplete).toBeVisible();
     await expect(page.getByRole("list", { name: "Attention" })).not.toContainText("Follow through");
@@ -273,11 +274,7 @@ test.describe("attention at phone width", () => {
   test("phone attention list does not overflow", async ({ page }) => {
     app = await serveConsole(server());
     await signIn(page, app.url);
-    await page
-      .getByRole("navigation", { name: "Main" })
-      .getByRole("link", { name: "Attention" })
-      .click();
-    await expect(page.getByRole("heading", { name: "Attention" })).toBeVisible();
+    await openAttention(page);
     await expectDesignRules(page);
     await shot(page, "phone-attention");
   });
