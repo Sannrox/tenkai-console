@@ -44,12 +44,13 @@ import {
   signCommand,
 } from "../plan/requests";
 import { rollbackHoldChoice, rollbackOnly } from "../plan/rollback-hold";
-import { Button, Card } from "../ui/kit";
+import { Button, Card, ObjectPage } from "../ui/kit";
 import { ApplyCancel } from "./apply-cancel";
 import { ApprovalBrief } from "./approval-brief";
 import { ArtifactAvailability } from "./artifact-availability";
 import { ConfigPresets } from "./config-presets";
 import { EnvironmentOverlays } from "./environment-overlays";
+import { EnvironmentLink, LinkedList, ProductLink, planLinks } from "./object-link";
 import { RollbackHold } from "./rollback-hold";
 import { TargetChanges } from "./target-changes";
 
@@ -151,212 +152,220 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
 
   return (
     <>
-      <div className="mb-1 text-xs text-muted">
-        <Link to="/" className="text-muted">
-          Home
-        </Link>{" "}
-        / {environment} /{" "}
-        <b className="font-medium text-fg">
-          plan {plan ? plan.id.split(":").at(-1)?.slice(0, 8) : ""}
-        </b>
-      </div>
       {report.error ? (
-        <p role="alert" className="text-xs text-danger">
-          {report.error instanceof ApiError && report.error.status === 403
-            ? NO_ACCESS
-            : report.error.message}
-        </p>
+        <ObjectPage kind="Plan" name={environment}>
+          <p role="alert" className="text-xs text-danger">
+            {report.error instanceof ApiError && report.error.status === 403
+              ? NO_ACCESS
+              : report.error.message}
+          </p>
+        </ObjectPage>
       ) : !data ? (
-        <p className="text-xs text-muted">Loading</p>
+        <ObjectPage kind="Plan" name={environment}>
+          <p className="text-xs text-muted">Loading</p>
+        </ObjectPage>
       ) : (
-        <>
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <h1 className="m-0 text-lg font-semibold">{plan ? planSummary(plan) : "No plan"}</h1>
-            <span className="text-xs text-muted">
-              {environment} · lease{" "}
-              {data.lease.held ? `held, generation ${generation}` : "free, generation 0"}
-            </span>
-            <div className="ml-auto flex gap-2">
-              {plan?.state !== "running" && (
-                <Button
-                  variant={drift && !awaiting ? "primary" : "plain"}
-                  disabled={run.isPending}
-                  onClick={() =>
-                    run.mutate({
-                      path: `v1/environments/${env}/plans`,
-                      body: planBody(environment, generation),
-                    })
-                  }
-                >
-                  {plan ? "Plan again" : "Plan"}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {plan && <ApprovalBrief plan={plan} />}
-          {plan && <ArtifactAvailability plan={plan} />}
-          {plan && <ConfigPresets plan={plan} />}
-
-          {plan && (
-            <div className="mb-4 flex overflow-hidden rounded-md border border-line">
-              {STRIP.map((step, index) => {
-                const reached = STRIP.indexOf(plan.state as (typeof STRIP)[number]);
-                const label =
-                  step === "succeeded" && plan.state === "failed"
-                    ? "Failed"
-                    : step === "computed" && plan.state === "blocked"
-                      ? "Blocked"
-                      : step[0]?.toUpperCase() + step.slice(1);
-                const current =
-                  plan.state === step ||
-                  (step === "succeeded" && plan.state === "failed") ||
-                  (step === "computed" && plan.state === "blocked");
-                return (
-                  <div
-                    key={step}
-                    className={`flex-1 border-r border-line px-3 py-2 text-xs last:border-r-0 ${current ? "bg-selected text-fg" : index < reached ? "text-fg" : "text-muted"}`}
-                  >
-                    <b className="block font-mono text-[10px] font-medium">{index + 1}</b>
-                    {label}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <Card>
-              <h2 className="mx-3.5 mt-3 mb-0 text-[13px] font-semibold">
-                Steps{" "}
-                <span className="font-mono text-[11px] font-medium text-muted">
-                  {plan?.step_count ?? 0}
-                </span>
-              </h2>
-              <div className="px-3.5 py-3 font-mono text-xs leading-[1.7]">
-                {plan?.steps?.length ? (
-                  plan.steps.map((step) => (
-                    <div key={step.id}>
-                      {step.from && (
-                        <span className="text-danger">
-                          - {step.product} {step.from}
-                        </span>
-                      )}
-                      {step.from && <br />}
-                      <span className="text-ok">
-                        + {step.product} {step.to}
-                      </span>{" "}
-                      <span className="text-muted">
-                        {step.release_id} · {step.action}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <span className="text-muted">
-                    {plan ? "no step details returned" : "nothing planned"}
-                  </span>
-                )}
-                {plan?.steps_truncated && <div className="text-muted">more steps not shown</div>}
-              </div>
-            </Card>
-            <Card>
-              <dl className="m-0 grid grid-cols-[120px_1fr] gap-x-3 gap-y-1 px-3.5 py-3 text-xs">
-                <dt className="text-muted">state</dt>
-                <dd
-                  className={`m-0 ${awaiting ? "text-warning" : plan?.state === "failed" ? "text-danger" : ""}`}
-                >
-                  {plan?.state ?? "none"}
-                </dd>
-                <dt className="text-muted">held</dt>
-                <dd className="m-0">{plan?.status_detail || "nothing reported"}</dd>
-                <dt className="text-muted">digest</dt>
-                <dd className="m-0 font-mono break-all">{approval.digest}</dd>
-                <dt className="text-muted">approved</dt>
-                <dd className="m-0">{approval.source}</dd>
-                <dt className="text-muted">human</dt>
-                <dd className="m-0">{approval.human}</dd>
-                <dt className="text-muted">stale</dt>
-                <dd className={`m-0 ${approval.stale !== "no" ? "text-warning" : ""}`}>
-                  {approval.stale}
-                </dd>
-                <dt className="text-muted">plan</dt>
-                <dd className="m-0 font-mono break-all">{plan?.id ?? "none"}</dd>
-              </dl>
-            </Card>
-          </div>
-
-          {plan && <TargetChanges plan={plan} token={token} />}
-
-          {awaiting && plan && (
-            <Quorum
-              view={approvals.data}
-              error={approvals.error?.message}
-              stale={approvals.error !== null && approvals.data !== undefined}
-            />
-          )}
-
-          {awaiting && plan && (
-            <Approval
-              applyBlocked={
-                approvals.data ? quorumStatus(quorumMatrix(approvals.data)).applyBlocked : false
-              }
-              planId={plan.id}
-              planSteps={plan.steps}
-              rollback={rollbackOnly(plan)}
-              environment={environment}
-              digest={digestShown}
-              generation={generation}
-              run={run.mutate}
-              pending={run.isPending}
-            />
-          )}
-
-          <ApplyCancel report={data} token={token} />
-
-          {unhealthy.length > 0 && (
+        <ObjectPage
+          kind="Plan"
+          name={plan ? planSummary(plan) : "No plan"}
+          status={plan?.state}
+          primary={
+            plan?.state !== "running" ? (
+              <Button
+                variant={drift && !awaiting ? "primary" : "plain"}
+                disabled={run.isPending}
+                onClick={() =>
+                  run.mutate({
+                    path: `v1/environments/${env}/plans`,
+                    body: planBody(environment, generation),
+                  })
+                }
+              >
+                {plan ? "Plan again" : "Plan"}
+              </Button>
+            ) : undefined
+          }
+          properties={[
+            { label: "Environment", value: <EnvironmentLink environment={environment} /> },
+            {
+              label: "Lease",
+              value: data.lease.held ? `held, generation ${generation}` : "free, generation 0",
+            },
+            { label: "Plan", value: plan?.id ?? "none" },
+          ]}
+          linked={<LinkedList items={planLinks(environment, plan?.steps)} />}
+          main={
             <>
-              <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Recover</h2>
-              <Card>
-                {unhealthy.map((subscription) => (
-                  <div
-                    key={subscription.product}
-                    className="flex items-center gap-3 border-t border-line px-3.5 py-2.5 first:border-t-0"
-                  >
-                    <span className="size-[7px] rounded-full bg-danger" />
-                    <div className="flex-1 text-xs">
-                      <b className="font-semibold">{subscription.product}</b>{" "}
+              {plan && <ApprovalBrief plan={plan} />}
+              {plan && <ArtifactAvailability plan={plan} />}
+              {plan && <ConfigPresets plan={plan} />}
+
+              {plan && (
+                <div className="mb-4 flex overflow-hidden rounded-md border border-line">
+                  {STRIP.map((step, index) => {
+                    const reached = STRIP.indexOf(plan.state as (typeof STRIP)[number]);
+                    const label =
+                      step === "succeeded" && plan.state === "failed"
+                        ? "Failed"
+                        : step === "computed" && plan.state === "blocked"
+                          ? "Blocked"
+                          : step[0]?.toUpperCase() + step.slice(1);
+                    const current =
+                      plan.state === step ||
+                      (step === "succeeded" && plan.state === "failed") ||
+                      (step === "computed" && plan.state === "blocked");
+                    return (
+                      <div
+                        key={step}
+                        className={`flex-1 border-r border-line px-3 py-2 text-xs last:border-r-0 ${current ? "bg-selected text-fg" : index < reached ? "text-fg" : "text-muted"}`}
+                      >
+                        <b className="block font-mono text-[10px] font-medium">{index + 1}</b>
+                        {label}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <Card>
+                  <h2 className="mx-3.5 mt-3 mb-0 text-[13px] font-semibold">
+                    Steps{" "}
+                    <span className="font-mono text-[11px] font-medium text-muted">
+                      {plan?.step_count ?? 0}
+                    </span>
+                  </h2>
+                  <div className="px-3.5 py-3 font-mono text-xs leading-[1.7]">
+                    {plan?.steps?.length ? (
+                      plan.steps.map((step) => (
+                        <div key={step.id}>
+                          {step.from && (
+                            <span className="text-danger">
+                              - {step.product} {step.from}
+                            </span>
+                          )}
+                          {step.from && <br />}
+                          <span className="text-ok">
+                            + {step.product} {step.to}
+                          </span>{" "}
+                          <span className="text-muted">
+                            {step.release_id} · {step.action}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
                       <span className="text-muted">
-                        {subscription.deployed} unhealthy
-                        {subscription.error ? `: ${subscription.error}` : ""}
+                        {plan ? "no step details returned" : "nothing planned"}
                       </span>
-                    </div>
-                    <Link
-                      to="/environments/$environment"
-                      params={{ environment }}
-                      className="text-xs font-medium text-muted"
+                    )}
+                    {plan?.steps_truncated && (
+                      <div className="text-muted">more steps not shown</div>
+                    )}
+                  </div>
+                </Card>
+                <Card>
+                  <dl className="m-0 grid grid-cols-[120px_1fr] gap-x-3 gap-y-1 px-3.5 py-3 text-xs">
+                    <dt className="text-muted">state</dt>
+                    <dd
+                      className={`m-0 ${awaiting ? "text-warning" : plan?.state === "failed" ? "text-danger" : ""}`}
                     >
-                      Open environment
-                    </Link>
-                  </div>
-                ))}
-              </Card>
-            </>
-          )}
+                      {plan?.state ?? "none"}
+                    </dd>
+                    <dt className="text-muted">held</dt>
+                    <dd className="m-0">{plan?.status_detail || "nothing reported"}</dd>
+                    <dt className="text-muted">digest</dt>
+                    <dd className="m-0 font-mono break-all">{approval.digest}</dd>
+                    <dt className="text-muted">approved</dt>
+                    <dd className="m-0">{approval.source}</dd>
+                    <dt className="text-muted">human</dt>
+                    <dd className="m-0">{approval.human}</dd>
+                    <dt className="text-muted">stale</dt>
+                    <dd className={`m-0 ${approval.stale !== "no" ? "text-warning" : ""}`}>
+                      {approval.stale}
+                    </dd>
+                    <dt className="text-muted">plan</dt>
+                    <dd className="m-0 font-mono break-all">{plan?.id ?? "none"}</dd>
+                  </dl>
+                </Card>
+              </div>
 
-          <EnvironmentOverlays report={data} {...(refusal === undefined ? {} : { refusal })} />
+              {plan && <TargetChanges plan={plan} token={token} />}
 
-          {result && refusal === undefined && (
-            <>
-              <p role="status" className={`mt-4 text-xs ${result.ok ? "text-ok" : "text-danger"}`}>
-                {result.text}
-              </p>
-              {result.detail === "unavailable" && (
-                <p className="mt-1 text-xs text-muted">{APPLY_COPY.unavailable}</p>
+              {awaiting && plan && (
+                <Quorum
+                  view={approvals.data}
+                  error={approvals.error?.message}
+                  stale={approvals.error !== null && approvals.data !== undefined}
+                />
               )}
-              {result.rows && <ApplySteps environment={environment} rows={result.rows} />}
+
+              {awaiting && plan && (
+                <Approval
+                  applyBlocked={
+                    approvals.data ? quorumStatus(quorumMatrix(approvals.data)).applyBlocked : false
+                  }
+                  planId={plan.id}
+                  planSteps={plan.steps}
+                  rollback={rollbackOnly(plan)}
+                  environment={environment}
+                  digest={digestShown}
+                  generation={generation}
+                  run={run.mutate}
+                  pending={run.isPending}
+                />
+              )}
+
+              <ApplyCancel report={data} token={token} />
+
+              {unhealthy.length > 0 && (
+                <>
+                  <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Recover</h2>
+                  <Card>
+                    {unhealthy.map((subscription) => (
+                      <div
+                        key={subscription.product}
+                        className="flex items-center gap-3 border-t border-line px-3.5 py-2.5 first:border-t-0"
+                      >
+                        <span className="size-[7px] rounded-full bg-danger" />
+                        <div className="flex-1 text-xs">
+                          <b className="font-semibold">{subscription.product}</b>{" "}
+                          <span className="text-muted">
+                            {subscription.deployed} unhealthy
+                            {subscription.error ? `: ${subscription.error}` : ""}
+                          </span>
+                        </div>
+                        <Link
+                          to="/environments/$environment"
+                          params={{ environment }}
+                          className="text-xs font-medium text-muted"
+                        >
+                          Open environment
+                        </Link>
+                      </div>
+                    ))}
+                  </Card>
+                </>
+              )}
+
+              <EnvironmentOverlays report={data} {...(refusal === undefined ? {} : { refusal })} />
+
+              {result && refusal === undefined && (
+                <>
+                  <p
+                    role="status"
+                    className={`mt-4 text-xs ${result.ok ? "text-ok" : "text-danger"}`}
+                  >
+                    {result.text}
+                  </p>
+                  {result.detail === "unavailable" && (
+                    <p className="mt-1 text-xs text-muted">{APPLY_COPY.unavailable}</p>
+                  )}
+                  {result.rows && <ApplySteps environment={environment} rows={result.rows} />}
+                </>
+              )}
             </>
-          )}
-        </>
+          }
+        />
       )}
     </>
   );
@@ -509,7 +518,9 @@ const ApplySteps = ({ environment, rows }: { environment: string; rows: ApplyRow
               key={`${row.product}:${row.instance}:${row.action}:${row.to_version}:${row.status}:${attempt}`}
               className="[&:last-child>td]:border-b-0"
             >
-              <td className={`${td} font-mono`}>{row.product}</td>
+              <td className={`${td} font-mono`}>
+                <ProductLink product={row.product} environment={environment} />
+              </td>
               <td className={`${td} font-mono`}>{row.instance}</td>
               <td className={td}>{row.action}</td>
               <td className={`${td} ${STEP_TONE[row.status] ?? ""}`}>{row.status}</td>

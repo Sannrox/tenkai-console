@@ -37,17 +37,20 @@ const loadError = (error: unknown): string =>
 export const Compatibility = ({
   token,
   environments,
+  release: locked,
 }: {
   token: string;
   environments: string[];
+  /** When set, the page is this release; the input stays away. */
+  release?: string;
 }) => {
   const queryClient = useQueryClient();
   const refused = useSession((state) => state.refused);
-  const [release, setRelease] = useState("");
+  const [typed, setRelease] = useState("");
   const [selected, setSelected] = useState<string>();
   const [evidence, setEvidence] = useState("");
   const [parseError, setParseError] = useState<string>();
-  const spec = release.trim();
+  const spec = (locked ?? typed).trim();
   const valid = isReleaseSpec(spec);
   const reports = useQueries({
     queries: environments.map((environment) => ({
@@ -104,16 +107,18 @@ export const Compatibility = ({
   return (
     <>
       <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Compatibility</h2>
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <input
-          aria-label="Release to check"
-          placeholder="product@version"
-          value={release}
-          onChange={(event) => setRelease(event.target.value)}
-          className={field}
-        />
-        {spec && !valid && <span className="text-xs text-muted">product@version</span>}
-      </div>
+      {locked === undefined && (
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <input
+            aria-label="Release to check"
+            placeholder="product@version"
+            value={typed}
+            onChange={(event) => setRelease(event.target.value)}
+            className={field}
+          />
+          {spec && !valid && <span className="text-xs text-muted">product@version</span>}
+        </div>
+      )}
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_320px]">
         <Card className="overflow-x-auto">
           <table className="w-full border-collapse text-xs">

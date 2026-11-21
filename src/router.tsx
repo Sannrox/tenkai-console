@@ -12,6 +12,7 @@ import { useSession } from "./auth/session";
 import { useSessionRefresh } from "./auth/use-session-refresh";
 import { Environments } from "./screens/environments";
 import { Home } from "./screens/home";
+import { findingSearch, objectEnvironment } from "./screens/objects";
 import { ServerStatus } from "./screens/server-status";
 import { SignedIn } from "./screens/signed-in";
 import { Centered, Title } from "./ui/kit";
@@ -23,6 +24,11 @@ const EnvironmentPage = lazyRouteComponent(
   "EnvironmentPage",
 );
 const PlanPage = lazyRouteComponent(() => import("./screens/plan-page"), "PlanPage");
+const PlanByIdPage = lazyRouteComponent(() => import("./screens/plan-by-id"), "PlanByIdPage");
+const ProductPage = lazyRouteComponent(() => import("./screens/product-page"), "ProductPage");
+const ReleasePage = lazyRouteComponent(() => import("./screens/release-page"), "ReleasePage");
+const RunnerPage = lazyRouteComponent(() => import("./screens/runner-page"), "RunnerPage");
+const FindingPage = lazyRouteComponent(() => import("./screens/finding-page"), "FindingPage");
 const Releases = lazyRouteComponent(() => import("./screens/releases"), "Releases");
 const Runners = lazyRouteComponent(() => import("./screens/runners"), "Runners");
 const Server = lazyRouteComponent(() => import("./screens/server"), "Server");
@@ -166,10 +172,73 @@ const environmentsRoute = createRoute({
   },
 });
 
+const productSearch = objectEnvironment;
+
+const productRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/products/$product",
+  validateSearch: productSearch,
+  component: ProductPage,
+});
+
+const productLinkedRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/products/$product/linked",
+  validateSearch: productSearch,
+  component: ProductPage,
+});
+
+const releaseObjectRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/releases/$product/$version",
+  validateSearch: productSearch,
+  component: ReleasePage,
+});
+
+const releaseLinkedRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/releases/$product/$version/linked",
+  validateSearch: productSearch,
+  component: ReleasePage,
+});
+
 const releasesRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/releases",
   component: Releases,
+});
+
+const runnerObjectRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/runners/$runnerId",
+  component: RunnerPage,
+});
+
+const runnerLinkedRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/runners/$runnerId/linked",
+  component: RunnerPage,
+});
+
+const planByIdRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/plans/$planId",
+  validateSearch: productSearch,
+  component: PlanByIdPage,
+});
+
+const findingRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/findings/$advisory",
+  validateSearch: findingSearch,
+  component: FindingPage,
+});
+
+const findingLinkedRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/findings/$advisory/linked",
+  validateSearch: findingSearch,
+  component: FindingPage,
 });
 
 const exposureRoute = createRoute({
@@ -261,7 +330,16 @@ export const router = createRouter({
       environmentSecurityRoute,
       environmentLinkedRoute,
       environmentsRoute,
+      productRoute,
+      productLinkedRoute,
+      releaseObjectRoute,
+      releaseLinkedRoute,
       releasesRoute,
+      runnerObjectRoute,
+      runnerLinkedRoute,
+      planByIdRoute,
+      findingRoute,
+      findingLinkedRoute,
       exposureRoute,
       runnersRoute,
       serverRoute,

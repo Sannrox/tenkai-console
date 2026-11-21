@@ -29,6 +29,11 @@ describe("nav", () => {
     expect(isAppPath("/environments/prod")).toBe(true);
     expect(isAppPath("/environments/prod/history")).toBe(true);
     expect(isAppPath("/environments/prod/plan")).toBe(true);
+    expect(isAppPath("/products/api")).toBe(true);
+    expect(isAppPath("/releases/api/1.1.0")).toBe(true);
+    expect(isAppPath("/plans/tenkai:plan:1")).toBe(true);
+    expect(isAppPath("/findings/CVE-1")).toBe(true);
+    expect(isAppPath("/runners/sha256:abc")).toBe(true);
     expect(isAppPath("/server")).toBe(true);
     expect(isAppPath("/apps")).toBe(true);
     expect(isAppPath("/")).toBe(false);
@@ -37,6 +42,10 @@ describe("nav", () => {
     expect(appItemActive("/environments/prod/plan", "/environments")).toBe(true);
     expect(appItemActive("/trust", "/server")).toBe(true);
     expect(appItemActive("/releases", "/releases")).toBe(true);
+    expect(appItemActive("/products/api", "/releases")).toBe(true);
+    expect(appItemActive("/releases/api/1.1.0", "/releases")).toBe(true);
+    expect(appItemActive("/findings/CVE-1", "/exposure")).toBe(true);
+    expect(appItemActive("/plans/tenkai:plan:1", "/environments")).toBe(true);
     expect(appItemActive("/releases", "/environments")).toBe(false);
   });
 
@@ -45,6 +54,7 @@ describe("nav", () => {
     expect(activeMain("/search")).toBe("Search");
     expect(activeMain("/attention")).toBe("Attention");
     expect(activeMain("/environments")).toBe("Apps");
+    expect(activeMain("/products/api")).toBe("Apps");
     expect(activeMain("/access")).toBe("Apps");
     expect(activeMain("/apps")).toBe("Apps");
   });

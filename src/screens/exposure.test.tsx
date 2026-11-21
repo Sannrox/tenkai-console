@@ -1,5 +1,13 @@
 // @vitest-environment happy-dom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  Outlet,
+  RouterProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from "@tanstack/react-router";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -134,6 +142,42 @@ const settle = async () => {
   }
 };
 
+const Page = () => null;
+
+const withRouter = (ui: React.ReactNode) => {
+  const rootRoute = createRootRoute({
+    component: function Harness() {
+      return (
+        <>
+          {ui}
+          <Outlet />
+        </>
+      );
+    },
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/environments/$environment",
+        component: Page,
+      }),
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/releases/$product/$version",
+        component: Page,
+      }),
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/findings/$advisory",
+        component: Page,
+      }),
+    ]),
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+  });
+  return <RouterProvider router={router} />;
+};
+
 const render = async () => {
   await act(async () => {
     root.render(
@@ -144,7 +188,7 @@ const render = async () => {
           })
         }
       >
-        <Exposure />
+        {withRouter(<Exposure />)}
       </QueryClientProvider>,
     );
   });

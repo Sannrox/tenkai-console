@@ -25,6 +25,7 @@ import {
   type Outcome,
 } from "../management/use-management";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
+import { EnvironmentLink, RunnerLink } from "./object-link";
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2 align-top whitespace-nowrap";
@@ -147,9 +148,11 @@ export const Runners = () => {
             {rows.map((row) => (
               <tr key={row.id} className="[&:last-child>td]:border-b-0">
                 <td className={`${td} font-mono`} title={row.id}>
-                  {shortId(row.id)}
+                  <RunnerLink id={row.id} label={shortId(row.id)} />
                 </td>
-                <td className={td}>{row.environment}</td>
+                <td className={td}>
+                  <EnvironmentLink environment={row.environment} />
+                </td>
                 <td className={`${td} ${STATE_TONE[row.state] ?? "text-warning"}`}>{row.state}</td>
                 <td className={`${td} ${row.lastPull === "none" ? "text-muted" : ""}`}>
                   {row.lastPull}
@@ -312,7 +315,7 @@ export const Enroll = ({
 };
 
 /** Revoke one enrolled runner: a reason, then a confirmation naming it. */
-const Revoke = ({ row, token }: { row: RunnerRow; token: string }) => {
+export const Revoke = ({ row, token }: { row: RunnerRow; token: string }) => {
   const revoke = useManagementCall(
     token,
     `environment:${row.environment}`,

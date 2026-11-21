@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  Outlet,
+  RouterProvider,
   createMemoryHistory,
   createRootRoute,
+  createRoute,
   createRouter,
-  RouterProvider,
 } from "@tanstack/react-router";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -63,12 +65,47 @@ const serve = (approvals: unknown) =>
     }),
   );
 
+const Page = () => null;
+
 const render = async () => {
   const rootRoute = createRootRoute({
-    component: () => <PlanPage environment="prod" token="operator" />,
+    component: function Harness() {
+      return (
+        <>
+          <PlanPage environment="prod" token="operator" />
+          <Outlet />
+        </>
+      );
+    },
   });
   const router = createRouter({
-    routeTree: rootRoute,
+    routeTree: rootRoute.addChildren([
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/environments/$environment",
+        component: Page,
+      }),
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/environments/$environment/plan",
+        component: Page,
+      }),
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/products/$product",
+        component: Page,
+      }),
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/releases/$product/$version",
+        component: Page,
+      }),
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/plans/$planId",
+        component: Page,
+      }),
+    ]),
     history: createMemoryHistory({ initialEntries: ["/"] }),
   });
   await act(async () => {

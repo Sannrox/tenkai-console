@@ -26,6 +26,7 @@ import {
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { RefreshFailed, td, th } from "../ui/posture";
 import { Findings } from "./exposure-waivers";
+import { EnvironmentLink, ReleaseLink } from "./object-link";
 
 // The waiver list reads its own route, after the screen's first paint.
 const WaiverList = lazy(() => import("./exposure-waiver-list"));
@@ -190,8 +191,16 @@ const Results = ({
               ) : (
                 rows.map((row) => (
                   <tr key={`${row.environment}|${row.release}|${row.componentVersion}`}>
-                    <td className={td}>{row.environment}</td>
-                    <td className={`${td} font-mono`}>{row.release}</td>
+                    <td className={td}>
+                      {row.environment === "·" ? (
+                        row.environment
+                      ) : (
+                        <EnvironmentLink environment={row.environment} />
+                      )}
+                    </td>
+                    <td className={`${td} font-mono`}>
+                      <ReleaseLink spec={row.release} />
+                    </td>
                     <td className={`${td} font-mono`}>{row.componentVersion}</td>
                     <td className={td}>{row.criticality}</td>
                     <td className={td}>{row.freshness}</td>

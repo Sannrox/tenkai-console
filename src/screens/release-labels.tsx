@@ -25,14 +25,14 @@ const message = (result: ManagementLifecycleResult) => result.message;
  * generation, so the last write wins; each is one confirmed request with a
  * reason, never retried. The editor is hidden without management.
  */
-const ReleaseLabels = ({ token }: { token: string }) => {
+const ReleaseLabels = ({ token, release: locked }: { token: string; release?: string }) => {
   const call = useManagementCall(token, "fleet", "management", message);
   const me = useAuthSession(token);
-  const [release, setRelease] = useState("");
+  const [typed, setRelease] = useState("");
   const [key, setKey] = useState("");
   const [value, setValue] = useState("");
   const [reason, setReason] = useState("");
-  const spec = release.trim();
+  const spec = (locked ?? typed).trim();
   const valid = isReleaseSpec(spec);
   const query = useQuery({
     queryKey: ["release-labels", spec, token],
@@ -65,13 +65,15 @@ const ReleaseLabels = ({ token }: { token: string }) => {
     <section aria-label="Release labels">
       <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Release labels</h2>
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          aria-label="Labelled release"
-          placeholder="product@version"
-          value={release}
-          onChange={(event) => setRelease(event.target.value)}
-          className={field}
-        />
+        {locked === undefined && (
+          <input
+            aria-label="Labelled release"
+            placeholder="product@version"
+            value={typed}
+            onChange={(event) => setRelease(event.target.value)}
+            className={field}
+          />
+        )}
         {valid && (
           <p aria-label="Release labels configured" className="m-0 text-xs break-all text-muted">
             {load === undefined
