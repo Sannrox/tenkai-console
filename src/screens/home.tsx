@@ -1,40 +1,61 @@
+import { Link } from "@tanstack/react-router";
 import type { TickReport } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
-import { fleetAttention, fleetTableRows } from "../delivery/configuration";
-import { useDelivery } from "../delivery/use-delivery";
+import { fleetTableRows } from "../delivery/configuration";
+import { useAttention } from "../delivery/use-attention";
 import { tickLines, tickSummary } from "../management/reconcile";
 import { refusesCredential, useManagementCall } from "../management/use-management";
-import { ConfirmButton, Notice } from "../ui/kit";
+import { Button, ConfirmButton, Notice } from "../ui/kit";
+import { AttentionList } from "./attention-list";
 import { Delivery } from "./delivery";
 
 const TONE = { ok: "text-ok", warn: "text-warning", bad: "text-danger" } as const;
+const TOP = 5;
 
-/** Signed-in landing: fleet counts from bulk routes and one reconcile tick on request. */
+/** Signed-in landing: fleet counts, top attention, empty pin and recent, reconcile. */
 export const Home = () => {
   const token = useSession((state) => state.session?.accessToken);
-  const delivery = useDelivery(token);
-  const rows = fleetTableRows(delivery.fleet, delivery.list);
-  const items = fleetAttention(delivery.fleet?.environments ?? []);
+  const attention = useAttention(token);
+  const rows = fleetTableRows(attention.fleet, attention.list);
+  const top = attention.items.slice(0, TOP);
+  const more = attention.items.length - top.length;
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <h1 className="m-0 text-lg font-semibold">Delivery</h1>
+        <h1 className="m-0 text-lg font-semibold">Home</h1>
         <span className="text-xs text-muted">
-          {delivery.error
-            ? delivery.error.message
-            : delivery.loading
+          {attention.error
+            ? attention.error.message
+            : attention.loading
               ? "Loading"
-              : items.length > 0
-                ? `${items.length} need attention`
-                : delivery.fleet && delivery.fleet.environments_behind > 0
-                  ? `${rows.length} environments, ${delivery.fleet.environments_behind} behind`
-                  : `${rows.length} environments, all current`}
+              : attention.fleet && attention.fleet.environments_behind > 0
+                ? `${rows.length} environments, ${attention.fleet.environments_behind} behind`
+                : `${rows.length} environments, all current`}
         </span>
         {token !== undefined && <Reconcile token={token} />}
       </div>
-      {!delivery.loading && !delivery.error && (
-        <Delivery rows={rows} items={items} fleet={delivery.fleet} />
+      {attention.failed.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-warning">
+          <span>The list may be incomplete.</span>
+          <Button onClick={attention.retry}>Retry</Button>
+        </div>
       )}
+      {!attention.loading && !attention.error && <Delivery rows={rows} fleet={attention.fleet} />}
+      {!attention.loading && !attention.error && rows.length > 0 && (
+        <>
+          <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Attention</h2>
+          <AttentionList items={top} />
+          {more > 0 && (
+            <Link to="/attention" className="mt-2 inline-block text-xs text-fg">
+              {more} more
+            </Link>
+          )}
+        </>
+      )}
+      <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Pinned</h2>
+      <p className="m-0 text-xs text-muted">None yet.</p>
+      <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Recent</h2>
+      <p className="m-0 text-xs text-muted">None yet.</p>
     </>
   );
 };

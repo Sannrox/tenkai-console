@@ -215,17 +215,118 @@ describe("fleet table rows", () => {
 });
 
 describe("fleet attention", () => {
-  it("lists unhealthy environments from fleet posture, not behind or plan-state rows", () => {
-    const items = fleetAttention([
-      fleetRow("edge", { posture: "behind", products_behind: 2, products_missing: 0 }),
-      fleetRow("core", { posture: "unhealthy", health_summary: "error", unhealthy: true }),
-      fleetRow("lab", { latest_plan_state: "blocked", posture: "current" }),
-    ]);
-    expect(items.map((item) => item.environment)).toEqual(["core"]);
+  it("lists unhealthy posture and products behind, not plan-state or drift", () => {
+    const items = fleetAttention({
+      environments: [
+        fleetRow("edge", { posture: "behind", products_behind: 2, products_missing: 0 }),
+        fleetRow("core", { posture: "unhealthy", health_summary: "error", unhealthy: true }),
+        fleetRow("lab", {
+          latest_plan_state: "blocked",
+          posture: "current",
+          awaiting_approval: true,
+          drifted_instances: 2,
+          certificates: { nearest_expires_at: 1, near_expiry: true },
+        }),
+      ],
+    });
+    expect(items.map((item) => item.key)).toEqual(["env:core:unhealthy", "env:edge:behind"]);
     expect(items[0]).toMatchObject({
+      kind: "environment",
       tone: "bad",
+      title: "core",
       next: "Inspect",
       detail: "error · unhealthy",
+    });
+    expect(items[1]).toMatchObject({
+      kind: "environment",
+      tone: "warn",
+      title: "edge",
+      detail: "2 behind",
+    });
+  });
+
+  it("merges findings, silent runners, recalls and failures from bulk reads", () => {
+    const items = fleetAttention({
+      environments: [
+        fleetRow("prod", {
+          open_exposures: [
+            {
+              advisory_id: "TENKAI-2026-1",
+              age_ms: 86_400_000,
+              first_seen_at: 1,
+              release: "api@1.0.0",
+              severity: "high",
+            },
+          ],
+        }),
+      ],
+      runners: [
+        {
+          id: "sha256:0123456789abcdef0123",
+          environment: "prod",
+          state: "active",
+          instances: [{ holds_lease: false, instance_id: "api-1" }],
+        },
+        {
+          id: "sha256:fedcba9876543210abcd",
+          environment: "edge",
+          state: "active",
+          instances: [
+            { holds_lease: false, instance_id: "web-1", last_heartbeat_at: 1_700_000_000_000 },
+          ],
+        },
+        {
+          id: "sha256:dead",
+          environment: "prod",
+          state: "revoked",
+          instances: [],
+        },
+      ],
+      events: [
+        {
+          cursor: "1",
+          kind: "release_recalled",
+          occurred_at: 1,
+          resource: "api@1.0.0",
+          environment: "prod",
+        },
+        {
+          cursor: "2",
+          kind: "target_failed",
+          occurred_at: 2,
+          resource: "api-1",
+          environment: "prod",
+        },
+        {
+          cursor: "3",
+          kind: "plan_applied",
+          occurred_at: 3,
+          resource: "tenkai:plan:1",
+        },
+      ],
+    });
+    expect(items.map((item) => [item.kind, item.title])).toEqual([
+      ["event", "api-1"],
+      ["runner", "sha256:0123456789ab"],
+      ["finding", "TENKAI-2026-1"],
+      ["release", "api@1.0.0"],
+    ]);
+    expect(items.find((item) => item.kind === "finding")).toMatchObject({
+      title: "TENKAI-2026-1",
+      advisory: "TENKAI-2026-1",
+      release: "api@1.0.0",
+    });
+    expect(items.find((item) => item.kind === "runner")).toMatchObject({
+      title: "sha256:0123456789ab",
+      runnerId: "sha256:0123456789abcdef0123",
+    });
+    expect(items.find((item) => item.kind === "release")).toMatchObject({
+      title: "api@1.0.0",
+      next: "Follow through",
+    });
+    expect(items.find((item) => item.kind === "event")).toMatchObject({
+      title: "api-1",
+      environment: "prod",
     });
   });
 });

@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { type ReactNode, useState } from "react";
+import { lazy, Suspense, type ReactNode, useEffect, useState } from "react";
 import type { OidcClientDiscovery } from "../api/tenkai.gen";
 import { HOST_SIGN_OUT, signInMethod } from "../auth/identity";
 import type { Session } from "../auth/session";
@@ -16,6 +16,10 @@ import {
   readCollapsed,
   writeCollapsed,
 } from "./nav";
+
+const QuickSearch = lazy(() =>
+  import("./quick-search").then((mod) => ({ default: mod.QuickSearch })),
+);
 
 const ICONS: Record<string, string> = {
   search: "M11.5 11.5 14 14M7 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z",
@@ -62,6 +66,7 @@ export const Shell = ({
 }) => {
   const path = useRouterState({ select: (state) => state.location.pathname });
   const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [searchOpen, setSearchOpen] = useState(false);
   const toggle = () => {
     setCollapsed((current) => {
       const next = !current;
@@ -69,6 +74,16 @@ export const Shell = ({
       return next;
     });
   };
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <div className="flex min-h-screen bg-page">
@@ -141,6 +156,11 @@ export const Shell = ({
           {children}
         </main>
       </div>
+      {searchOpen && (
+        <Suspense fallback={null}>
+          <QuickSearch onClose={() => setSearchOpen(false)} />
+        </Suspense>
+      )}
       <nav
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 hidden border-t border-line bg-page max-phone:flex"
