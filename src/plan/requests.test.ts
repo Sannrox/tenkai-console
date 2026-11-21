@@ -12,6 +12,8 @@ import {
   retryFailedTargetBody,
   rollbackBody,
   signCommand,
+  startBody,
+  stopBody,
   subscribeBody,
 } from "./requests";
 
@@ -123,6 +125,22 @@ describe("lifecycle requests", () => {
       product: "tenkai",
       recovery_reason: "bad canary on 0.6.1",
     });
+    expect(stopBody("prod-eu", 41, "api", "drain for maintenance")).toEqual({
+      version: 1,
+      operation: "stop",
+      environment: "prod-eu",
+      expected_generation: 41,
+      product: "api",
+      reason: "drain for maintenance",
+    });
+    expect(startBody("prod-eu", 41, "api")).toEqual({
+      version: 1,
+      operation: "start",
+      environment: "prod-eu",
+      expected_generation: 41,
+      product: "api",
+    });
+    expect(startBody("prod-eu", 41, "api")).not.toHaveProperty("reason");
   });
 
   it("refuses malformed or misdirected approval evidence before sending", () => {

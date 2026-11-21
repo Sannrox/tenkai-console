@@ -9,6 +9,7 @@ import type {
 } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
 import { auditLine, liftLine, recentAudit, selectorLine } from "../delivery/hold";
+import { upgradeHeldReason } from "../delivery/instances";
 import { holdLine } from "../delivery/model";
 import { useManagementCall } from "../management/use-management";
 import {
@@ -49,7 +50,8 @@ export const SubscriptionHold = ({
   const retry = useManagementCall(token, envScope, "management", message);
   const generation = expectedGeneration(report.lease);
   const [retryReason, setRetryReason] = useState("");
-  if (!hold && !failed) {
+  const stoppedReason = upgradeHeldReason(error);
+  if (!hold && !failed && stoppedReason === undefined) {
     return <span className="text-muted">none</span>;
   }
   return (
@@ -72,6 +74,9 @@ export const SubscriptionHold = ({
           )}
           {release.outcome && <Notice tone={release.outcome.tone}>{release.outcome.text}</Notice>}
         </>
+      )}
+      {stoppedReason !== undefined && (
+        <span className="text-warning">upgrade held: {stoppedReason}</span>
       )}
       {failed && (
         <>

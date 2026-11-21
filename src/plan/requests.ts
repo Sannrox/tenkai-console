@@ -11,6 +11,8 @@ import type {
   PlanRequest,
   RetryFailedTargetRequest,
   RollbackRequest,
+  StartRequest,
+  StopRequest,
   SubscribeRequest,
 } from "../api/tenkai.gen";
 
@@ -82,6 +84,34 @@ export const rollbackBody = (
   product,
   expected_generation: generation,
   recovery_reason: reason,
+});
+
+/** Plan a stop of a deployed instance, keeping its subscription. */
+export const stopBody = (
+  environment: string,
+  generation: number,
+  product: string,
+  reason: string,
+): StopRequest => ({
+  version: VERSION,
+  operation: "stop",
+  environment,
+  expected_generation: generation,
+  product,
+  reason,
+});
+
+/** Plan a start of a stopped instance onto its recorded release. */
+export const startBody = (
+  environment: string,
+  generation: number,
+  product: string,
+): StartRequest => ({
+  version: VERSION,
+  operation: "start",
+  environment,
+  expected_generation: generation,
+  product,
 });
 
 /** `selector` records the selector the hold is placed by; the server refuses it unless the environment matches. */

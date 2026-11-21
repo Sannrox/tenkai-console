@@ -84,8 +84,25 @@ const cell = (
     return { ...base, tone: "warn", status: holdLine(subscription.delivery_hold) };
   }
   if (step && plan) {
+    if (step.action === "stop") {
+      return {
+        ...base,
+        tone: "warn",
+        status: plan.state === "running" ? "stopping" : "plan ready → stop",
+      };
+    }
+    if (step.action === "start") {
+      return {
+        ...base,
+        tone: "warn",
+        status: plan.state === "running" ? "starting" : "plan ready → start",
+      };
+    }
     const verb = { computed: "plan ready", running: "rolling out", blocked: "blocked" }[plan.state];
     return { ...base, status: `${verb} → ${step.to}` };
+  }
+  if (subscription.health === "stopped" || subscription.state === "stopped") {
+    return { ...base, tone: "warn", status: subscription.error?.trim() || "stopped" };
   }
   if (isHeldFailedTarget(subscription)) {
     const status = subscription.error ?? "target failed; automatic retry held";
