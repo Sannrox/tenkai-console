@@ -65,8 +65,10 @@ const serve = (
   vi.stubGlobal(
     "fetch",
     vi.fn<typeof fetch>(async (input) => {
-      const url = String(input instanceof Request ? input.url : input);
-      const reply = rest?.(url) ?? { status, body };
+      const url = input instanceof URL ? input.href : input instanceof Request ? input.url : input;
+      const reply = url.includes("delivery-report")
+        ? { status: 404, body: { error: "not found" } }
+        : (rest?.(url) ?? { status, body });
       return new Response(JSON.stringify(reply.body), { status: reply.status });
     }),
   );
@@ -253,7 +255,7 @@ describe("EnvironmentHistory", () => {
     );
     expect(container.textContent).toContain("web");
     expect(container.textContent).not.toContain("probe failed");
-    const select = container.querySelector("select");
+    const select = container.querySelector<HTMLSelectElement>('select[aria-label="Instance"]');
     expect(select).not.toBeNull();
     await act(async () => {
       select!.value = "api";

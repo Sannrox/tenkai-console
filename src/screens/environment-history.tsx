@@ -21,6 +21,7 @@ import {
 } from "../delivery/history";
 import type { StatusLoad } from "../delivery/identity";
 import { Button, Card } from "../ui/kit";
+import EnvironmentDelivery from "./environment-delivery";
 import EnvironmentDrift from "./environment-drift";
 import EnvironmentIdentity from "./environment-identity";
 import EnvironmentIssuer from "./environment-issuer";
@@ -151,6 +152,7 @@ export const EnvironmentHistory = ({
 
   return (
     <>
+      <EnvironmentDelivery environment={environment} token={token} />
       {report !== undefined && <EnvironmentOverlays report={report} />}
       {report !== undefined && <EnvironmentDrift report={report} />}
       {report !== undefined && <EnvironmentIssuer report={report} />}
