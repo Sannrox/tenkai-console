@@ -226,7 +226,7 @@ test.describe("home attention and search at desktop width", () => {
     const incomplete = page.getByText("The list may be incomplete.");
     await expect(incomplete).toBeVisible();
     await expect(page.getByRole("list", { name: "Attention" })).not.toContainText("Follow through");
-    const retry = incomplete.locator("..").getByRole("button", { name: "Retry" });
+    const retry = page.getByRole("button", { name: "Retry" });
     await expect(retry).toBeVisible();
     fail = false;
     await retry.click();

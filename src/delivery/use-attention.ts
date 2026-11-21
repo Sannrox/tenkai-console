@@ -19,6 +19,8 @@ export const useAttention = (token: string | undefined) => {
     queryFn: () => request<RuntimeRunnerList>("v1/runners", { token }),
     enabled,
     retry: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
     refetchOnWindowFocus: false,
   });
   const events = useQuery({
@@ -26,6 +28,8 @@ export const useAttention = (token: string | undefined) => {
     queryFn: () => request<ChangeEventPage>("v1/events?limit=100", { token }),
     enabled,
     retry: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
     refetchOnWindowFocus: false,
   });
   const failed: AttentionSourceId[] = [
