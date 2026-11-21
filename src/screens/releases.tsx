@@ -21,6 +21,7 @@ import {
 import { expectedGeneration, holdBody, releaseHoldBody } from "../plan/requests";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { td } from "../ui/posture";
+import { Canaries } from "./canaries";
 import { Compatibility } from "./compatibility";
 import { Migrations } from "./migrations";
 import { PromotionPolicies } from "./promotion-policies";
@@ -99,6 +100,7 @@ export const Releases = () => {
         </Suspense>
       )}
       <PromotionPolicies fleet={delivery.fleet} loading={delivery.loading} token={token} />
+      {token !== undefined && <Canaries token={token} />}
       {token !== undefined && <Compatibility token={token} environments={names} />}
       {token !== undefined && (
         <Suspense fallback={null}>

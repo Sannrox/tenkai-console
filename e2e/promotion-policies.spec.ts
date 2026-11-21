@@ -77,6 +77,11 @@ const EXTRA: Record<string, Partial<ChannelPromotionPolicyView>> = {
     elapsed_ms: 720_000,
     healthy_share: 0.98,
     failing_share: 0.01,
+    canary: {
+      policy_digest: "sha256:cohort",
+      environments: ["stage", "lab"],
+      selector: { selector: "tier=edge", environments: ["stage", "lab"] },
+    },
   },
   "billing/stable": { paused_by: "oidc:alice", paused_at: Date.UTC(2026, 10, 14, 9, 30) },
   "web/candidate": {
@@ -233,10 +238,12 @@ test.describe("promotion policy detail", () => {
       "channel-promotion-policy:api/candidate v2",
       "1h",
       "health SLO · healthy >= 95% · failing <= 5%",
+      "tier=edge, matched stage, lab",
       "off, a failing soak only resets",
       "no",
       "api@1.4.0 · 12m of 1h · healthy 98% · failing 1%",
     ]);
+    await expect(detail(page)).not.toContainText("sha256");
     await expect(detail(page).getByRole("button", { name: "Pause" })).toBeVisible();
     await page.screenshot({ path: test.info().outputPath("policy-soaking.png"), fullPage: true });
     await expectDesignRules(page);
