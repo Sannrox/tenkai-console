@@ -35,7 +35,7 @@ const PlanFromId = ({ planId, token }: { planId: string; token: string }) => {
   });
   if (plan.error) {
     return (
-      <ObjectPage kind="Plan" name={planId}>
+      <ObjectPage kind="Plan" name={planId} id={planId}>
         <p role="alert" className="text-xs text-danger">
           {plan.error instanceof ApiError && plan.error.status === 403
             ? NO_ACCESS
@@ -46,7 +46,7 @@ const PlanFromId = ({ planId, token }: { planId: string; token: string }) => {
   }
   if (plan.data === undefined) {
     return (
-      <ObjectPage kind="Plan" name={planId}>
+      <ObjectPage kind="Plan" name={planId} id={planId}>
         <p className="text-xs text-muted">Loading</p>
       </ObjectPage>
     );
@@ -56,6 +56,7 @@ const PlanFromId = ({ planId, token }: { planId: string; token: string }) => {
     <ObjectPage
       kind="Plan"
       name={planSummary(data)}
+      id={data.id}
       status={data.state}
       properties={[{ label: "Plan", value: data.id }]}
       linked={

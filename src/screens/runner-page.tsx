@@ -60,7 +60,7 @@ export const RunnerPage = () => {
 
   if (query.error) {
     return (
-      <ObjectPage kind="Runner" name={shortId(runnerId)}>
+      <ObjectPage kind="Runner" name={shortId(runnerId)} id={runnerId}>
         <Notice tone="bad">
           {query.error instanceof Error ? query.error.message : String(query.error)}
         </Notice>
@@ -69,7 +69,7 @@ export const RunnerPage = () => {
   }
   if (query.isPending || runner === undefined) {
     return (
-      <ObjectPage kind="Runner" name={shortId(runnerId)}>
+      <ObjectPage kind="Runner" name={shortId(runnerId)} id={runnerId}>
         <p className="m-0 text-xs text-muted">Loading</p>
       </ObjectPage>
     );
@@ -79,6 +79,7 @@ export const RunnerPage = () => {
     <ObjectPage
       kind="Runner"
       name={shortId(runner.id)}
+      id={runner.id}
       status={runner.state}
       primary={
         token !== undefined && runner.state === "active" ? (
