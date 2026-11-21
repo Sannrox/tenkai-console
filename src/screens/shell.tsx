@@ -5,6 +5,7 @@ import { HOST_SIGN_OUT, signInMethod } from "../auth/identity";
 import type { Session } from "../auth/session";
 import { useSignOut } from "../auth/use-sign-out";
 import { Button, tabClass } from "../ui/kit";
+import { objectKey, useSaved, type SavedObject } from "../ui/saved";
 import {
   APP_ITEMS,
   MAIN_ITEMS,
@@ -16,6 +17,7 @@ import {
   readCollapsed,
   writeCollapsed,
 } from "./nav";
+import { SavedLink, matchesSaved } from "./object-link";
 
 const QuickSearch = lazy(() =>
   import("./quick-search").then((mod) => ({ default: mod.QuickSearch })),
@@ -67,6 +69,7 @@ export const Shell = ({
   const path = useRouterState({ select: (state) => state.location.pathname });
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [searchOpen, setSearchOpen] = useState(false);
+  const pins = useSaved((state) => state.pins);
   const toggle = () => {
     setCollapsed((current) => {
       const next = !current;
@@ -108,6 +111,7 @@ export const Shell = ({
               {!collapsed && item.label}
             </Link>
           ))}
+          {!collapsed && <SavedNav items={pins} path={path} />}
           {collapsed ? (
             APP_ITEMS.map((item) => (
               <Link
@@ -180,6 +184,24 @@ export const Shell = ({
         ))}
       </nav>
     </div>
+  );
+};
+
+const SavedNav = ({ items, path }: { items: readonly SavedObject[]; path: string }) => {
+  if (items.length === 0) {
+    return null;
+  }
+  return (
+    <>
+      <div className="mt-3 px-2 text-[13px] font-medium text-muted">Pinned</div>
+      {items.map((item) => (
+        <SavedLink
+          key={objectKey(item)}
+          item={item}
+          className={`${itemClass(matchesSaved(path, item), false)} truncate`}
+        />
+      ))}
+    </>
   );
 };
 

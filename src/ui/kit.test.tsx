@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionsMenu, ObjectPage } from "./kit";
+import { reloadSaved, useSaved } from "./saved";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -20,6 +21,8 @@ afterEach(async () => {
     root.unmount();
   });
   container.remove();
+  localStorage.clear();
+  reloadSaved();
 });
 
 describe("ObjectPage", () => {
@@ -66,5 +69,25 @@ describe("ObjectPage", () => {
         ?.click();
     });
     expect(container.textContent).toContain("Hold delivery");
+  });
+
+  it("pins from the star and records the object as recent", async () => {
+    await act(async () => {
+      root.render(<ObjectPage kind="Environment" name="prod" />);
+    });
+    expect(useSaved.getState().recent[0]).toEqual({
+      kind: "environment",
+      name: "prod",
+      id: "prod",
+    });
+    const pin = [...container.querySelectorAll("button")].find(
+      (button) => button.getAttribute("aria-label") === "Pin",
+    );
+    expect(pin).toBeTruthy();
+    await act(async () => {
+      pin?.click();
+    });
+    expect(useSaved.getState().pins[0]?.name).toBe("prod");
+    expect(container.querySelector('[aria-label="Unpin"]')).toBeTruthy();
   });
 });

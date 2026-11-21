@@ -1,4 +1,5 @@
-import { type ComponentProps, type ReactNode, useState } from "react";
+import { type ComponentProps, type ReactNode, useEffect, useState } from "react";
+import { objectKey, useSaved, type ObjectKind, type SavedObject } from "./saved";
 
 /** Primitives matching the reference mock: cards, buttons, a centered panel. */
 
@@ -133,13 +134,50 @@ export const ActionsMenu = ({
   );
 };
 
+const OBJECT_KINDS = {
+  Environment: "environment",
+  Product: "product",
+  Release: "release",
+  Runner: "runner",
+  Plan: "plan",
+  Finding: "finding",
+} as const satisfies Record<string, ObjectKind>;
+
+const savedFrom = (
+  kind: string | undefined,
+  name: string,
+  id: string | undefined,
+): SavedObject | undefined => {
+  if (kind === undefined || !(kind in OBJECT_KINDS)) {
+    return undefined;
+  }
+  return { kind: OBJECT_KINDS[kind as keyof typeof OBJECT_KINDS], name, id: id ?? name };
+};
+
+const PinButton = ({ item }: { item: SavedObject }) => {
+  const key = objectKey(item);
+  const pinned = useSaved((state) => state.pins.some((entry) => objectKey(entry) === key));
+  const togglePin = useSaved((state) => state.togglePin);
+  return (
+    <Button
+      variant="ghost"
+      aria-pressed={pinned}
+      aria-label={pinned ? "Unpin" : "Pin"}
+      onClick={() => togglePin(item)}
+    >
+      {pinned ? "★" : "☆"}
+    </Button>
+  );
+};
+
 /**
  * Shared object page: type, name, status, one primary action plus Actions,
- * a key property strip, tabs, then attention, main, and linked objects.
+ * a pin star, a key property strip, tabs, then attention, main, and linked.
  */
 export const ObjectPage = ({
   kind,
   name,
+  id,
   status,
   primary,
   actions,
@@ -152,6 +190,8 @@ export const ObjectPage = ({
 }: {
   kind?: string;
   name: string;
+  /** Route id when it differs from the heading, such as a runner digest. */
+  id?: string;
   status?: ReactNode;
   primary?: ReactNode;
   actions?: ReactNode;
@@ -161,38 +201,48 @@ export const ObjectPage = ({
   main?: ReactNode;
   linked?: ReactNode;
   children?: ReactNode;
-}) => (
-  <div className="min-w-0 max-w-full">
-    {kind && <div className="text-xs text-muted">{kind}</div>}
-    <div className="mb-3 flex flex-wrap items-center gap-3">
-      <h1 className="m-0 text-lg font-semibold">{name}</h1>
-      {status && <span className="text-xs text-muted">{status}</span>}
-      {(primary || actions) && (
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {primary}
-          {actions}
+}) => {
+  const saved = savedFrom(kind, name, id);
+  useEffect(() => {
+    const item = savedFrom(kind, name, id);
+    if (item) {
+      useSaved.getState().visit(item);
+    }
+  }, [kind, name, id]);
+  return (
+    <div className="min-w-0 max-w-full">
+      {kind && <div className="text-xs text-muted">{kind}</div>}
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <h1 className="m-0 text-lg font-semibold">{name}</h1>
+        {status && <span className="text-xs text-muted">{status}</span>}
+        {(primary || actions || saved) && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {primary}
+            {actions}
+            {saved && <PinButton item={saved} />}
+          </div>
+        )}
+      </div>
+      {properties && properties.length > 0 && (
+        <dl className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-xs">
+          {properties.map((item) => (
+            <div key={item.label}>
+              <dt className="text-muted">{item.label}</dt>
+              <dd className="m-0">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {tabs}
+      {children ?? (
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
+          <div className="min-w-0">
+            {attention}
+            {main}
+          </div>
+          {linked}
         </div>
       )}
     </div>
-    {properties && properties.length > 0 && (
-      <dl className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-xs">
-        {properties.map((item) => (
-          <div key={item.label}>
-            <dt className="text-muted">{item.label}</dt>
-            <dd className="m-0">{item.value}</dd>
-          </div>
-        ))}
-      </dl>
-    )}
-    {tabs}
-    {children ?? (
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
-        <div className="min-w-0">
-          {attention}
-          {main}
-        </div>
-        {linked}
-      </div>
-    )}
-  </div>
-);
+  );
+};

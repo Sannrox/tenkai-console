@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import type { SavedObject } from "../ui/saved";
 import { parseReleaseSpec, releaseSpec } from "./objects";
 
 /** Object names as links: same weight as surrounding text. */
@@ -124,6 +125,117 @@ export const planLinks = (
       return { key: `rel:${spec}`, node: <ReleaseLink spec={spec} environment={environment} /> };
     }),
   ];
+};
+
+/** Pin and recent rows: same routes as the object pages. */
+export const SavedLink = ({
+  item,
+  className = objectLinkClass,
+}: {
+  item: SavedObject;
+  className?: string;
+}) => {
+  if (item.kind === "environment") {
+    return (
+      <Link to="/environments/$environment" params={{ environment: item.id }} className={className}>
+        {item.name}
+      </Link>
+    );
+  }
+  if (item.kind === "product") {
+    return (
+      <Link to="/products/$product" params={{ product: item.id }} className={className}>
+        {item.name}
+      </Link>
+    );
+  }
+  if (item.kind === "release") {
+    const parsed = parseReleaseSpec(item.id) ?? parseReleaseSpec(item.name);
+    if (parsed === undefined) {
+      return <span className={className}>{item.name}</span>;
+    }
+    return (
+      <Link to="/releases/$product/$version" params={parsed} className={`font-mono ${className}`}>
+        {item.name}
+      </Link>
+    );
+  }
+  if (item.kind === "runner") {
+    return (
+      <Link
+        to="/runners/$runnerId"
+        params={{ runnerId: item.id }}
+        className={`font-mono ${className}`}
+      >
+        {item.name}
+      </Link>
+    );
+  }
+  if (item.kind === "finding") {
+    return (
+      <Link
+        to="/findings/$advisory"
+        params={{ advisory: item.id }}
+        className={`font-mono ${className}`}
+      >
+        {item.name}
+      </Link>
+    );
+  }
+  if (item.id.includes(":plan:")) {
+    return (
+      <Link to="/plans/$planId" params={{ planId: item.id }} className={className}>
+        {item.name}
+      </Link>
+    );
+  }
+  return (
+    <Link
+      to="/environments/$environment/plan"
+      params={{ environment: item.id }}
+      className={className}
+    >
+      {item.name}
+    </Link>
+  );
+};
+
+export const matchesSaved = (path: string, item: SavedObject): boolean => {
+  const restHas = (root: string, expected: string) => {
+    const needle = `/${root}/`;
+    const start = path.indexOf(needle);
+    if (start < 0) {
+      return false;
+    }
+    const rest = path.slice(start + needle.length);
+    const encoded = encodeURIComponent(expected);
+    return (
+      rest === expected ||
+      rest.startsWith(`${expected}/`) ||
+      rest === encoded ||
+      rest.startsWith(`${encoded}/`)
+    );
+  };
+  if (item.kind === "environment") {
+    return restHas("environments", item.id);
+  }
+  if (item.kind === "product") {
+    return restHas("products", item.id);
+  }
+  if (item.kind === "release") {
+    const parsed = parseReleaseSpec(item.id) ?? parseReleaseSpec(item.name);
+    return parsed !== undefined && restHas("releases", `${parsed.product}/${parsed.version}`);
+  }
+  if (item.kind === "runner") {
+    return restHas("runners", item.id);
+  }
+  if (item.kind === "finding") {
+    return restHas("findings", item.id);
+  }
+  if (item.id.includes(":plan:")) {
+    return restHas("plans", item.id);
+  }
+  return restHas("environments", item.id) && path.endsWith("/plan");
 };
 
 export const LinkedList = ({

@@ -153,7 +153,8 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
   return (
     <>
       {report.error ? (
-        <ObjectPage kind="Plan" name={environment}>
+        <ObjectPage kind="Plan" name={environment} id={environment}>
+          {/* id is the environment so loading and the loaded plan share one pin. */}
           <p role="alert" className="text-xs text-danger">
             {report.error instanceof ApiError && report.error.status === 403
               ? NO_ACCESS
@@ -161,13 +162,14 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
           </p>
         </ObjectPage>
       ) : !data ? (
-        <ObjectPage kind="Plan" name={environment}>
+        <ObjectPage kind="Plan" name={environment} id={environment}>
           <p className="text-xs text-muted">Loading</p>
         </ObjectPage>
       ) : (
         <ObjectPage
           kind="Plan"
           name={plan ? planSummary(plan) : "No plan"}
+          id={environment}
           status={plan?.state}
           primary={
             plan?.state !== "running" ? (

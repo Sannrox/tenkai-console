@@ -6,16 +6,44 @@ import { useAttention } from "../delivery/use-attention";
 import { tickLines, tickSummary } from "../management/reconcile";
 import { refusesCredential, useManagementCall } from "../management/use-management";
 import { Button, ConfirmButton, Notice } from "../ui/kit";
+import { objectKey, objectTypeLabel, useSaved, type SavedObject } from "../ui/saved";
 import { AttentionList } from "./attention-list";
 import { Delivery } from "./delivery";
+import { SavedLink } from "./object-link";
 
 const TONE = { ok: "text-ok", warn: "text-warning", bad: "text-danger" } as const;
 const TOP = 5;
 
-/** Signed-in landing: fleet counts, top attention, empty pin and recent, reconcile. */
+const SavedSection = ({
+  title,
+  items,
+}: {
+  title: "Pinned" | "Recent";
+  items: readonly SavedObject[];
+}) => (
+  <>
+    <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">{title}</h2>
+    {items.length === 0 ? (
+      <p className="m-0 text-xs text-muted">None yet.</p>
+    ) : (
+      <ul aria-label={title} className="m-0 list-none p-0">
+        {items.map((item) => (
+          <li key={objectKey(item)} className="mb-1 text-[13px]">
+            <SavedLink item={item} />
+            <span className="ml-2 text-xs text-muted">{objectTypeLabel(item.kind)}</span>
+          </li>
+        ))}
+      </ul>
+    )}
+  </>
+);
+
+/** Signed-in landing: fleet counts, top attention, pinned, recent, reconcile. */
 export const Home = () => {
   const token = useSession((state) => state.session?.accessToken);
   const attention = useAttention(token);
+  const pins = useSaved((state) => state.pins);
+  const recent = useSaved((state) => state.recent);
   const rows = fleetTableRows(attention.fleet, attention.list);
   const top = attention.items.slice(0, TOP);
   const more = attention.items.length - top.length;
@@ -52,10 +80,8 @@ export const Home = () => {
           )}
         </>
       )}
-      <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Pinned</h2>
-      <p className="m-0 text-xs text-muted">None yet.</p>
-      <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Recent</h2>
-      <p className="m-0 text-xs text-muted">None yet.</p>
+      <SavedSection title="Pinned" items={pins} />
+      <SavedSection title="Recent" items={recent} />
     </>
   );
 };
