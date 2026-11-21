@@ -6,6 +6,8 @@ import {
   type Reply,
   expectDesignRules,
   openApp,
+  openEnvironment as openEnvObject,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -113,7 +115,8 @@ const capture = (page: Page, name: string) =>
 
 const openEnvironment = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await openApp(page, "Environments");
+  await openEnvObject(page);
+  await openEnvironmentTab(page, "Settings");
   await expect(envLabels(page)).not.toHaveText("Loading");
   await page.waitForLoadState("networkidle");
 };

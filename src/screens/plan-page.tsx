@@ -331,8 +331,8 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
                       </span>
                     </div>
                     <Link
-                      to="/environments"
-                      search={{ environment }}
+                      to="/environments/$environment"
+                      params={{ environment }}
                       className="text-xs font-medium text-muted"
                     >
                       Open environment
@@ -525,8 +525,9 @@ const ApplySteps = ({ environment, rows }: { environment: string; rows: ApplyRow
                   attempt
                 ) : (
                   <Link
-                    to="/environments"
-                    search={{ environment, instance: row.instance }}
+                    to="/environments/$environment/history"
+                    params={{ environment }}
+                    search={{ instance: row.instance }}
                     className="font-medium text-muted"
                   >
                     {attempt}

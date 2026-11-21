@@ -238,7 +238,8 @@ const FigureLink = ({
   }
   return (
     <Link
-      to="/environments"
+      to="/environments/$environment/history"
+      params={{ environment }}
       search={historySearch(environment, product)}
       aria-label={`${figure.value} ${label}, ${figure.count}, ${period}`}
       className="font-medium text-muted"

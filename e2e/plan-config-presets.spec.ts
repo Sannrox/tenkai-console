@@ -7,7 +7,8 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  openEnvironment,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -299,7 +300,8 @@ test.describe("config presets on overlays", () => {
       ),
     );
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "Settings");
     await expect(page.getByText("api preset large")).toBeVisible();
     const table = page.locator("table").filter({
       has: page.getByRole("columnheader", { name: "Source" }),

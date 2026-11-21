@@ -41,8 +41,8 @@ export const Delivery = ({
                 <div className="text-xs text-muted">{item.detail}</div>
               </div>
               <Link
-                to="/environments"
-                search={{ environment: item.environment }}
+                to="/environments/$environment"
+                params={{ environment: item.environment }}
                 className="inline-flex items-center rounded-md border border-field px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap text-fg no-underline"
               >
                 {item.next}

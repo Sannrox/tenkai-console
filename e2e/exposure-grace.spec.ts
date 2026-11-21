@@ -12,6 +12,8 @@ import {
   type Reply,
   expectDesignRules,
   openApp,
+  openEnvironment,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -294,7 +296,8 @@ test.describe("environment exposure grace", () => {
     test(`shows a ${text} grace window read-only`, async ({ page }) => {
       app = await environment(grace);
       await page.goto(app.url);
-      await openApp(page, "Environments");
+      await openEnvironment(page);
+      await openEnvironmentTab(page, "Settings");
       await expect(page.getByLabel("Exposure grace configured")).toHaveText(text);
       await shot(page, `environment-grace-${text.replace(" ", "-")}`);
       await expectDesignRules(page);

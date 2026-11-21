@@ -11,7 +11,7 @@ import type {
 } from "../api/tenkai.gen";
 import { graceWindow } from "../delivery/grace";
 import { thresholdLine } from "../delivery/hold";
-import { formatViewerInstant } from "../delivery/maintenance";
+import { formatSchedule, formatViewerInstant } from "../delivery/maintenance";
 import { configCall, nextOpening, registerBody } from "../management/environment-config";
 import { useManagementCall } from "../management/use-management";
 import { clearThresholdBody, expectedGeneration, thresholdBody } from "../plan/requests";
@@ -136,19 +136,41 @@ export const ConfigSections = ({
   const send = (draft: number, reason: string, change: EnvironmentConfigChange) =>
     call.mutate(configCall(report.name, draft, reason, change));
   const props = { pending: call.isPending, generation, send };
+  const facts = Object.entries(report.facts);
+  const constraints = report.constraints ?? [];
+  const windows = report.maintenance?.windows ?? [];
   return (
     <>
-      <Section title="Facts" allowed={call.allowed}>
+      <Section
+        title="Facts"
+        allowed={call.allowed}
+        summary={
+          facts.length === 0 ? "none" : facts.map(([key, value]) => `${key}=${value}`).join(" · ")
+        }
+      >
         <FactsForm {...props} />
       </Section>
-      <Section title="Constraints" allowed={call.allowed}>
+      <Section
+        title="Constraints"
+        allowed={call.allowed}
+        summary={
+          constraints.length === 0
+            ? "none"
+            : constraints.map((item) => `${item.kind} ${item.name}=${item.value}`).join(" · ")
+        }
+      >
         <ConstraintsForm {...props} />
       </Section>
-      <Section title="Maintenance windows" allowed={call.allowed}>
-        <WindowForm
-          {...props}
-          existing={report.maintenance?.windows.map((w) => w.identity) ?? []}
-        />
+      <Section
+        title="Maintenance windows"
+        allowed={call.allowed}
+        summary={
+          windows.length === 0
+            ? "none"
+            : windows.map((window) => formatSchedule(window)).join(" · ")
+        }
+      >
+        <WindowForm {...props} existing={windows.map((window) => window.identity)} />
       </Section>
       <Section
         title="Webhooks"

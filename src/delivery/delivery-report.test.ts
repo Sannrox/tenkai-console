@@ -134,7 +134,7 @@ describe("figures", () => {
       count: "1 restored · 0 unrestored",
     });
     expect(exposureFigure(ROW)).toEqual({ value: "5d", count: "3 open" });
-    expect(historySearch("prod", "api")).toEqual({ environment: "prod", instance: "api" });
+    expect(historySearch("prod", "api")).toEqual({ instance: "api" });
   });
 
   it("omits rates, times, and ages that have no records", () => {

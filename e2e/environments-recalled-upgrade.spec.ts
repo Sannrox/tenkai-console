@@ -7,7 +7,8 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  openEnvironment,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -182,7 +183,8 @@ const admit = (page: Page) => page.getByRole("button", { name: "Admit lower-expo
 
 const open = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await openApp(page, "Environments");
+  await openEnvironment(page);
+  await openEnvironmentTab(page, "Instances");
   await expect(section(page)).toBeVisible();
 };
 

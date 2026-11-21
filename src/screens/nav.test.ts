@@ -26,11 +26,14 @@ describe("nav", () => {
 
   it("keeps the plan page under Environments and Platform under Apps", () => {
     expect(isAppPath("/environments")).toBe(true);
+    expect(isAppPath("/environments/prod")).toBe(true);
+    expect(isAppPath("/environments/prod/history")).toBe(true);
     expect(isAppPath("/environments/prod/plan")).toBe(true);
     expect(isAppPath("/server")).toBe(true);
     expect(isAppPath("/apps")).toBe(true);
     expect(isAppPath("/")).toBe(false);
     expect(isAppPath("/search")).toBe(false);
+    expect(appItemActive("/environments/prod", "/environments")).toBe(true);
     expect(appItemActive("/environments/prod/plan", "/environments")).toBe(true);
     expect(appItemActive("/trust", "/server")).toBe(true);
     expect(appItemActive("/releases", "/releases")).toBe(true);

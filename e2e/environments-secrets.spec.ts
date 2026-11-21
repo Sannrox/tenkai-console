@@ -11,7 +11,8 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  openEnvironment,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -163,7 +164,8 @@ const rows = (page: Page) =>
 
 const open = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await openApp(page, "Environments");
+  await openEnvironment(page);
+  await openEnvironmentTab(page, "Security");
   await expect(section(page)).toBeVisible();
   await expect(section(page)).not.toContainText("Loading");
 };
@@ -230,6 +232,7 @@ test.describe("sealed secret age and rotation", () => {
     await expect(rows(page).first()).toContainText("web");
     await expect(rows(page).first()).toContainText("120d");
     await expect(rows(page).first()).toContainText("overdue");
+    await openEnvironmentTab(page, "Overview");
     const web = page
       .getByRole("row")
       .filter({ has: page.getByRole("cell", { name: "web", exact: true }) });

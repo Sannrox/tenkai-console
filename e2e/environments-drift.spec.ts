@@ -6,7 +6,8 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  openEnvironment,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -105,7 +106,8 @@ test.describe("environment drift", () => {
       } as unknown as EnvironmentInspectReport),
     );
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "Settings");
     await expect(page.getByRole("heading", { name: "Drift" })).toBeVisible();
     await expect(page.getByText("This server does not report drift.")).toBeVisible();
     await expect(drift(page)).toHaveCount(0);
@@ -129,7 +131,8 @@ test.describe("environment drift", () => {
       } as unknown as EnvironmentInspectReport),
     );
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "Settings");
     await expect(page.getByRole("heading", { name: "Drift" })).toBeVisible();
     await expect(page.getByText("This server does not report drift.")).toHaveCount(0);
     const card = page
@@ -168,7 +171,8 @@ test.describe("environment drift", () => {
       } as unknown as EnvironmentInspectReport),
     );
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "Settings");
     const table = drift(page);
     await expect(table.getByRole("cell", { name: "Deployment/api", exact: true })).toBeVisible();
     await expect(
@@ -215,7 +219,8 @@ test.describe("environment drift on a phone", () => {
       } as unknown as EnvironmentInspectReport),
     );
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "Settings");
     await expect(page.getByRole("heading", { name: "Drift" })).toBeVisible();
     await expect(drift(page).getByRole("cell", { name: "drifted", exact: true })).toBeVisible();
     expect(await page.locator("body").textContent()).not.toMatch(

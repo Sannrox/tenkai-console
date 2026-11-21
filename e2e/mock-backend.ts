@@ -108,3 +108,31 @@ export const openApp = async (
   await apps.click();
   await page.getByRole("link", { name, exact: true }).click();
 };
+
+/** List, then the named environment object page. */
+export const openEnvironment = async (page: Page, name = "prod") => {
+  await openApp(page, "Environments");
+  await page
+    .getByRole("region", { name: "Environments" })
+    .getByRole("row")
+    .filter({ has: page.getByRole("cell", { name, exact: true }) })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+};
+
+export type EnvironmentTab =
+  | "Overview"
+  | "Instances"
+  | "History"
+  | "Settings"
+  | "Security"
+  | "Linked";
+
+/** Object-page tab by visible name. */
+export const openEnvironmentTab = async (page: Page, tab: EnvironmentTab) => {
+  await page
+    .getByRole("navigation", { name: "Environment" })
+    .getByRole("link", { name: tab, exact: true })
+    .click();
+};

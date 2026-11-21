@@ -11,7 +11,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  openEnvironment,
   serveConsole,
 } from "./mock-backend";
 
@@ -156,7 +156,7 @@ const section = (page: Page) => page.getByRole("region", { name: "Next change fo
 
 const openExplain = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await openApp(page, "Environments");
+  await openEnvironment(page);
   await page.getByRole("button", { name: "Why is api behind" }).click();
   await expect(section(page)).toBeVisible();
 };
@@ -176,7 +176,7 @@ test.describe("what blocks an instance's next change", () => {
   test("only rows behind head offer it, and nothing is read until asked", async ({ page }) => {
     app = await serveConsole(server(report([HOLD])));
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
     await expect(page.getByRole("button", { name: "Why is api behind" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Why is web behind" })).toHaveCount(0);
     expect(app.sent.some((sent) => sent.path.endsWith("/explain"))).toBe(false);

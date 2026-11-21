@@ -6,7 +6,8 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  openEnvironment,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -195,7 +196,8 @@ const capture = (page: Page, name: string) =>
 
 const open = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await openApp(page, "Environments");
+  await openEnvironment(page);
+  await openEnvironmentTab(page, "Instances");
 };
 
 test.describe("stop and start an instance", () => {
@@ -257,7 +259,9 @@ test.describe("stop and start an instance", () => {
     await expect(row).not.toContainText("unknown");
     await expect(row).toContainText("upgrade held: drain for maintenance");
     await expect(row.getByRole("button", { name: /Why/ })).toHaveCount(0);
+    await openEnvironmentTab(page, "Overview");
     await expect(rollup(page)).toHaveText("1 stopped");
+    await openEnvironmentTab(page, "Instances");
     await expect(page.getByRole("button", { name: "Start" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Stop" })).toHaveCount(0);
     await capture(page, "stop-stopped");

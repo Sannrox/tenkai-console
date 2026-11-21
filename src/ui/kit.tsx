@@ -162,7 +162,7 @@ export const ObjectPage = ({
   linked?: ReactNode;
   children?: ReactNode;
 }) => (
-  <div>
+  <div className="min-w-0 max-w-full">
     {kind && <div className="text-xs text-muted">{kind}</div>}
     <div className="mb-3 flex flex-wrap items-center gap-3">
       <h1 className="m-0 text-lg font-semibold">{name}</h1>
@@ -186,8 +186,8 @@ export const ObjectPage = ({
     )}
     {tabs}
     {children ?? (
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
-        <div>
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
+        <div className="min-w-0">
           {attention}
           {main}
         </div>

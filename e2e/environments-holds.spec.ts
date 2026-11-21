@@ -11,7 +11,8 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  openEnvironment,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -136,9 +137,13 @@ const open = async (page: Page, app: MockBackend) => {
   const loaded = page.waitForResponse((response) =>
     response.url().endsWith("/v1/environments/prod/hold"),
   );
-  await openApp(page, "Environments");
+  await openEnvironment(page);
   await loaded;
   await expect(row(page, "delivery hold")).toBeVisible();
+};
+
+const openSettings = async (page: Page) => {
+  await openEnvironmentTab(page, "Settings");
 };
 
 test.describe("environment holds", () => {
@@ -154,6 +159,7 @@ test.describe("environment holds", () => {
     await expect(row(page, "delivery hold")).toHaveText("none");
     await expect(row(page, "lifts")).toHaveCount(0);
     await expect(page.getByLabel("Hold history")).toHaveCount(0);
+    await openSettings(page);
     await expect(threshold(page)).toHaveText("none");
     await expectDesignRules(page);
   });
@@ -178,6 +184,7 @@ test.describe("environment holds", () => {
     await expect(hold).toContainText("web-3 (exit 1)");
     await expect(row(page, "lifts")).toHaveText("lifts itself at 2 or fewer failed targets in 1h");
     await expect(page.getByLabel("Hold history")).toContainText("set by automatic");
+    await openSettings(page);
     await expect(threshold(page)).toHaveText(
       "more than 2 failed targets in 1h, set by alice at 2023-11-14T22:13:20.000Z",
     );
@@ -229,6 +236,7 @@ test.describe("environment holds", () => {
     app = await serveConsole(server(AUTOMATIC, view({ hold: AUTOMATIC, audit: [] })));
     await open(page, app);
     await expect(row(page, "lifts")).toHaveText("does not lift itself while no threshold is set");
+    await openSettings(page);
     await expect(threshold(page)).toHaveText("none");
     await expectDesignRules(page);
   });
@@ -239,6 +247,7 @@ test.describe("environment holds", () => {
     await expect(row(page, "delivery hold")).toContainText("held by alice");
     await expect(row(page, "hold history")).toHaveText("Could not load");
     await expect(row(page, "lifts")).toHaveCount(0);
+    await openSettings(page);
     await expect(threshold(page)).toHaveCount(0);
     await expectDesignRules(page);
   });
@@ -246,6 +255,7 @@ test.describe("environment holds", () => {
   test("declares a threshold with the lease generation", async ({ page }) => {
     app = await serveConsole(server(undefined, view({ audit: [] })));
     await open(page, app);
+    await openSettings(page);
     const section = page
       .getByRole("heading", { name: "Failure threshold" })
       .locator("xpath=ancestor::div[2]");
@@ -301,13 +311,16 @@ test.describe("environment holds on a phone", () => {
       page.locator("dl", { has: page.locator("dt", { hasText: "delivery hold" }) }),
       row(page, "delivery hold"),
       row(page, "hold history"),
-      threshold(page),
     ]) {
       const box = await element.evaluate((node) => ({
         overflow: node.scrollWidth - node.clientWidth,
       }));
       expect(box.overflow).toBeLessThanOrEqual(0);
     }
+    await openSettings(page);
+    expect(
+      await threshold(page).evaluate((node) => node.scrollWidth - node.clientWidth),
+    ).toBeLessThanOrEqual(0);
     expect(await page.locator("body").textContent()).not.toMatch(
       /\bADR\b|#\d+|HTTP \d{3}|\/v1\/|\bat \w+ \(|Error:|—/,
     );

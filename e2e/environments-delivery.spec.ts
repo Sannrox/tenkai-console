@@ -6,7 +6,8 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  openEnvironment,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -171,7 +172,8 @@ const metrics = (page: Page) => page.getByRole("table", { name: "Delivery metric
 
 const openEnvironments = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await openApp(page, "Environments");
+  await openEnvironment(page);
+  await openEnvironmentTab(page, "History");
   await expect(page.getByRole("heading", { name: "Delivery metrics" })).toBeVisible();
 };
 

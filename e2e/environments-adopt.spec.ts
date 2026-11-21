@@ -11,7 +11,8 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  openEnvironment,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -168,7 +169,8 @@ const managed = (page: Page) =>
 
 const open = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await openApp(page, "Environments");
+  await openEnvironment(page);
+  await openEnvironmentTab(page, "Instances");
 };
 
 const shot = (page: Page, name: string) =>
@@ -198,14 +200,16 @@ test.describe("unmanaged workloads and adoption", () => {
         bodies.push(request.postDataJSON());
       }
     });
-    await open(page, app);
+    await page.goto(app.url);
+    await openEnvironment(page);
+    await expect(
+      page.locator("dt", { hasText: /^health$/ }).locator("xpath=following-sibling::dd[1]"),
+    ).toHaveText("1 healthy");
+    await openEnvironmentTab(page, "Instances");
     await expect(section(page)).toBeVisible();
     await expect(section(page).getByRole("row").nth(1)).toHaveText(/helm.*api/);
     await expect(managed(page).getByRole("row").nth(1)).toContainText("web");
     await expect(managed(page)).not.toContainText("helm");
-    await expect(
-      page.locator("dt", { hasText: /^health$/ }).locator("xpath=following-sibling::dd[1]"),
-    ).toHaveText("1 healthy");
     await expect(
       section(page).getByText(
         "Adoption records the matching workload as deployed. It does not change the target.",
