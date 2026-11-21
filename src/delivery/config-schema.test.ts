@@ -80,6 +80,48 @@ describe("overlayRows", () => {
     ]);
   });
 
+  it("marks keys the plan says come from a preset", () => {
+    const heads = schemaHeads(REPORT);
+    expect(
+      overlayRows(parseInspectConfig(REPORT), heads, [
+        { product: "api", fromPreset: ["replicas", "size"] },
+      ]),
+    ).toEqual([
+      {
+        product: "api",
+        key: "region",
+        value: "eu",
+        source: "overlay",
+        check: "checked",
+        schema: "2.0.0",
+      },
+      {
+        product: "api",
+        key: "replicas",
+        value: "",
+        source: "preset",
+        check: "checked",
+        schema: "2.0.0",
+      },
+      {
+        product: "api",
+        key: "size",
+        value: "",
+        source: "preset",
+        check: "checked",
+        schema: "2.0.0",
+      },
+      {
+        product: "api",
+        key: "db-password",
+        value: "",
+        source: "secret",
+        check: "declared",
+        schema: "2.0.0",
+      },
+    ]);
+  });
+
   it("does not treat overlay-only products as schema-checked", () => {
     const rows = overlayRows(
       [{ product: "api", overlay: { colour: "blue" } }],

@@ -91,4 +91,49 @@ describe("EnvironmentOverlays", () => {
     await render(<EnvironmentOverlays report={{ name: "prod" }} />);
     expect(container.textContent).toBe("");
   });
+
+  it("marks preset keys and names the selected preset", async () => {
+    await render(
+      <EnvironmentOverlays
+        report={{
+          ...REPORT,
+          latest_plan: {
+            id: "tenkai:plan:1",
+            state: "computed",
+            created_at: 1,
+            step_count: 1,
+            config_presets: [
+              {
+                product: "api",
+                preset: "large",
+                from_preset: ["replicas"],
+                overridden: ["region"],
+              },
+            ],
+          },
+        }}
+      />,
+    );
+    expect(container.textContent).toContain("api preset large");
+    expect(cells()).toStrictEqual([
+      "api",
+      "region",
+      "eu",
+      "overlay",
+      "checked",
+      "2.0.0",
+      "api",
+      "replicas",
+      "·",
+      "preset",
+      "checked",
+      "2.0.0",
+      "api",
+      "db-password",
+      "·",
+      "secret",
+      "declared",
+      "2.0.0",
+    ]);
+  });
 });

@@ -1,3 +1,4 @@
+import { inspectPresets } from "../delivery/config-presets";
 import {
   type OverlayRefusal,
   overlayRows,
@@ -17,7 +18,8 @@ const CHECK_TONE = {
 
 /**
  * Overlay keys, defaults, and declared secret names from inspect, plus a
- * plan or overlay-set refusal when the server named a failing key.
+ * plan or overlay-set refusal when the server named a failing key. When
+ * the latest plan names a preset, those keys are marked as such.
  */
 export const EnvironmentOverlays = ({
   report,
@@ -28,52 +30,64 @@ export const EnvironmentOverlays = ({
 }) => {
   const config = parseInspectConfig(report);
   const heads = schemaHeads(report);
-  const rows = withRefusal(overlayRows(config, heads), refusal, config, heads);
-  if (rows.length === 0) {
+  const presets = inspectPresets(report);
+  const rows = withRefusal(overlayRows(config, heads, presets), refusal, config, heads);
+  if (rows.length === 0 && presets.length === 0) {
     return null;
   }
   return (
     <>
       <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Overlays</h2>
-      <Card className="overflow-x-auto">
-        <table className="w-full border-collapse text-xs" aria-label="Overlays">
-          <thead>
-            <tr>
-              <th className={th}>Product</th>
-              <th className={th}>Key</th>
-              <th className={th}>Value</th>
-              <th className={th}>Source</th>
-              <th className={th}>Check</th>
-              <th className={th}>Schema</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const passing = row.check === "checked" || row.check === "declared";
-              return (
-                <tr
-                  key={`${row.product}:${row.source}:${row.key}`}
-                  className="[&:last-child>td]:border-b-0"
-                >
-                  <td className={td}>{row.product}</td>
-                  <td className={`${td} font-mono`}>{row.key}</td>
-                  <td className={`${td} font-mono ${row.value === "" ? "text-muted" : ""}`}>
-                    {row.source === "secret" || row.value === "" ? "·" : row.value}
-                  </td>
-                  <td className={td}>{row.source}</td>
-                  <td
-                    className={`${td} ${passing ? CHECK_TONE[row.check === "declared" ? "declared" : "checked"] : "text-danger"}`}
-                    {...(passing ? {} : { role: "alert" })}
+      {presets.length > 0 && (
+        <p className="m-0 mb-2 font-mono text-xs">
+          {presets.map((row) => (
+            <span key={row.product} className="mr-3">
+              {row.product} preset {row.preset}
+            </span>
+          ))}
+        </p>
+      )}
+      {rows.length > 0 && (
+        <Card className="overflow-x-auto">
+          <table className="w-full border-collapse text-xs" aria-label="Overlays">
+            <thead>
+              <tr>
+                <th className={th}>Product</th>
+                <th className={th}>Key</th>
+                <th className={th}>Value</th>
+                <th className={th}>Source</th>
+                <th className={th}>Check</th>
+                <th className={th}>Schema</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const passing = row.check === "checked" || row.check === "declared";
+                return (
+                  <tr
+                    key={`${row.product}:${row.source}:${row.key}`}
+                    className="[&:last-child>td]:border-b-0"
                   >
-                    {row.check}
-                  </td>
-                  <td className={`${td} font-mono`}>{row.schema}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </Card>
+                    <td className={td}>{row.product}</td>
+                    <td className={`${td} font-mono`}>{row.key}</td>
+                    <td className={`${td} font-mono ${row.value === "" ? "text-muted" : ""}`}>
+                      {row.source === "secret" || row.value === "" ? "·" : row.value}
+                    </td>
+                    <td className={td}>{row.source}</td>
+                    <td
+                      className={`${td} ${passing ? CHECK_TONE[row.check === "declared" ? "declared" : "checked"] : "text-danger"}`}
+                      {...(passing ? {} : { role: "alert" })}
+                    >
+                      {row.check}
+                    </td>
+                    <td className={`${td} font-mono`}>{row.schema}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </Card>
+      )}
     </>
   );
 };

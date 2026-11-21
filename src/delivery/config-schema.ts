@@ -27,7 +27,13 @@ const ProductConfig = type({
 
 export type ProductConfig = typeof ProductConfig.infer;
 
-export type OverlaySource = "overlay" | "default" | "secret";
+export type OverlaySource = "overlay" | "preset" | "default" | "secret";
+
+/** Keys a plan says come from the selected preset, not an override. */
+export type OverlayPreset = {
+  product: string;
+  fromPreset: readonly string[];
+};
 export type OverlayFailureReason =
   | "not declared"
   | "must be an integer"
@@ -97,16 +103,22 @@ export const schemaHeads = (report: unknown): ReadonlyMap<string, string> => {
 const schemaPresent = (product: ProductConfig): boolean =>
   (product.secrets?.length ?? 0) > 0 || Object.keys(product.defaults ?? {}).length > 0;
 
-/** Overlay, default, and declared secret rows for one inspect body. */
+/** Overlay, preset, default, and declared secret rows for one inspect body. */
 export const overlayRows = (
   config: ProductConfig[],
   heads: ReadonlyMap<string, string>,
+  presets: readonly OverlayPreset[] = [],
 ): OverlayRow[] => {
   const rows: OverlayRow[] = [];
+  const seen = new Set<string>();
   for (const product of config) {
+    seen.add(product.product);
     const schema = heads.get(product.product) ?? "none";
     const overlay = product.overlay ?? {};
     const defaults = product.defaults ?? {};
+    const fromPreset = new Set(
+      presets.find((row) => row.product === product.product)?.fromPreset ?? [],
+    );
     const checked: OverlayCheck = schemaPresent(product) ? "checked" : "declared";
     for (const [key, value] of Object.entries(overlay).toSorted(byKey)) {
       rows.push({
@@ -118,8 +130,21 @@ export const overlayRows = (
         schema,
       });
     }
-    for (const [key, value] of Object.entries(defaults).toSorted(byKey)) {
+    for (const key of [...fromPreset].toSorted()) {
       if (Object.hasOwn(overlay, key)) {
+        continue;
+      }
+      rows.push({
+        product: product.product,
+        key,
+        value: "",
+        source: "preset",
+        check: checked,
+        schema,
+      });
+    }
+    for (const [key, value] of Object.entries(defaults).toSorted(byKey)) {
+      if (Object.hasOwn(overlay, key) || fromPreset.has(key)) {
         continue;
       }
       rows.push({
@@ -141,6 +166,22 @@ export const overlayRows = (
         key: name,
         value: "",
         source: "secret",
+        check: "declared",
+        schema,
+      });
+    }
+  }
+  for (const preset of presets) {
+    if (seen.has(preset.product)) {
+      continue;
+    }
+    const schema = heads.get(preset.product) ?? "none";
+    for (const key of [...preset.fromPreset].toSorted()) {
+      rows.push({
+        product: preset.product,
+        key,
+        value: "",
+        source: "preset",
         check: "declared",
         schema,
       });
