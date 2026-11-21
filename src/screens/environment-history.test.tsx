@@ -65,7 +65,7 @@ const serve = (
   vi.stubGlobal(
     "fetch",
     vi.fn<typeof fetch>(async (input) => {
-      const url = String(input instanceof Request ? input.url : input);
+      const url = input instanceof URL ? input.href : input instanceof Request ? input.url : input;
       const reply = rest?.(url) ?? { status, body };
       return new Response(JSON.stringify(reply.body), { status: reply.status });
     }),

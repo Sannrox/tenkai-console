@@ -47,6 +47,7 @@ import { EnvironmentStopStart } from "./environment-stop";
 import { FleetTable } from "./fleet-table";
 import { HealthChecks } from "./health-checks";
 
+const EnvironmentDelivery = lazy(() => import("./environment-delivery"));
 const EnvironmentDependencies = lazy(() => import("./environment-dependencies"));
 const EnvironmentHistory = lazy(() => import("./environment-history"));
 const EnvironmentSecrets = lazy(() => import("./environment-secrets"));
@@ -522,6 +523,7 @@ const Detail = ({
         />
       </Suspense>
       <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
+        <EnvironmentDelivery environment={report.name} token={token} />
         <EnvironmentHistory
           environment={report.name}
           report={report}

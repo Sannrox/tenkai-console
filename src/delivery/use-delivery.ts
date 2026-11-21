@@ -102,5 +102,6 @@ export const useEnvironmentStatus = (token: string | undefined, name: string | u
       import("./identity-status").then((mod) => mod.fetchStatus(name ?? "", token ?? "")),
     enabled: token !== undefined && Boolean(name),
     retry: false,
+    staleTime: 30_000,
     refetchInterval: 30_000,
   });
