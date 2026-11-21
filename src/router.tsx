@@ -18,6 +18,10 @@ import { Centered, Title } from "./ui/kit";
 
 // Screens other than home load on first visit, so the initial bundle stays small.
 // Environments is eager: the fleet table must paint within the load budget.
+const EnvironmentPage = lazyRouteComponent(
+  () => import("./screens/environment-page"),
+  "EnvironmentPage",
+);
 const PlanPage = lazyRouteComponent(() => import("./screens/plan-page"), "PlanPage");
 const Releases = lazyRouteComponent(() => import("./screens/releases"), "Releases");
 const Runners = lazyRouteComponent(() => import("./screens/runners"), "Runners");
@@ -81,6 +85,11 @@ const appRoute = createRoute({
 
 const indexRoute = createRoute({ getParentRoute: () => appRoute, path: "/", component: Home });
 
+const environmentSearch = (search: Record<string, unknown>): { instance?: string } => {
+  const instance = typeof search.instance === "string" ? search.instance : undefined;
+  return instance === undefined ? {} : { instance };
+};
+
 const planRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/environments/$environment/plan",
@@ -89,6 +98,48 @@ const planRoute = createRoute({
     const token = useSession((state) => state.session?.accessToken);
     return token !== undefined ? <PlanPage environment={environment} token={token} /> : null;
   },
+});
+
+const environmentRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/environments/$environment",
+  validateSearch: environmentSearch,
+  component: EnvironmentPage,
+});
+
+const environmentInstancesRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/environments/$environment/instances",
+  validateSearch: environmentSearch,
+  component: EnvironmentPage,
+});
+
+const environmentHistoryRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/environments/$environment/history",
+  validateSearch: environmentSearch,
+  component: EnvironmentPage,
+});
+
+const environmentSettingsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/environments/$environment/settings",
+  validateSearch: environmentSearch,
+  component: EnvironmentPage,
+});
+
+const environmentSecurityRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/environments/$environment/security",
+  validateSearch: environmentSearch,
+  component: EnvironmentPage,
+});
+
+const environmentLinkedRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/environments/$environment/linked",
+  validateSearch: environmentSearch,
+  component: EnvironmentPage,
 });
 
 const environmentsRoute = createRoute({
@@ -203,6 +254,12 @@ export const router = createRouter({
     appRoute.addChildren([
       indexRoute,
       planRoute,
+      environmentRoute,
+      environmentInstancesRoute,
+      environmentHistoryRoute,
+      environmentSettingsRoute,
+      environmentSecurityRoute,
+      environmentLinkedRoute,
       environmentsRoute,
       releasesRoute,
       exposureRoute,

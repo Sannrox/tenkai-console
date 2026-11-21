@@ -6,7 +6,8 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  openEnvironment,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -150,7 +151,8 @@ test.describe("environment history", () => {
   test("shows attempts, collapsed detail, and a hold link", async ({ page }) => {
     app = await serveConsole(server(ok(ATTEMPTS)));
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "History");
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
     const history = page
       .locator("table")
@@ -162,7 +164,9 @@ test.describe("environment history", () => {
     await expect(page.getByText("raw output that must stay collapsed")).toBeHidden();
     await page.getByText("probe failed", { exact: true }).click();
     await expect(page.getByText("raw output that must stay collapsed")).toBeVisible();
-    await expect(page.getByRole("link", { name: "History" })).toBeVisible();
+    await expect(
+      page.getByRole("navigation", { name: "Environment" }).getByRole("link", { name: "History" }),
+    ).toBeVisible();
     await expectDesignRules(page);
     expect(
       app.sent.some(
@@ -189,12 +193,11 @@ test.describe("environment history", () => {
       }),
     );
     await page.goto(app.url);
-    await openApp(page, "Environments");
-    const historyLink = page.getByRole("link", { name: "History" });
+    await openEnvironment(page);
+    const historyLink = page.locator("table").getByRole("link", { name: "History" });
     await expect(historyLink).toBeVisible();
-    const href = await historyLink.getAttribute("href");
-    expect(href).toContain("instance=api");
-    await page.goto(new URL(href ?? "", app.url).toString());
+    expect(await historyLink.getAttribute("href")).toContain("instance=api");
+    await historyLink.click();
     await expect(
       page
         .locator("table")
@@ -221,7 +224,8 @@ test.describe("environment history", () => {
       }),
     );
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "History");
     const history = page
       .locator("table")
       .filter({ has: page.getByRole("columnheader", { name: "From -> to" }) });
@@ -236,7 +240,8 @@ test.describe("environment history", () => {
   test("says none when there are no attempts", async ({ page }) => {
     app = await serveConsole(server(ok({ items: [] })));
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "History");
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
     await expect(page.getByText("This server does not report deployment history.")).toHaveCount(0);
     await expect(page.getByText("none").first()).toBeVisible();
@@ -277,7 +282,8 @@ test.describe("environment history", () => {
       ),
     );
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "History");
     const history = page
       .locator("table")
       .filter({ has: page.getByRole("columnheader", { name: "Cause" }) });
@@ -294,7 +300,8 @@ test.describe("environment history", () => {
   test("says the route is missing without a status code", async ({ page }) => {
     app = await serveConsole(server({ status: 404, body: { error: "not found" } }));
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "History");
     await expect(page.getByText("This server does not report deployment history.")).toBeVisible();
     await expect(page.getByText("not found")).toHaveCount(0);
     await expectDesignRules(page);
@@ -314,7 +321,8 @@ test.describe("environment history on a phone", () => {
   test("shows history without leaking internals", async ({ page }) => {
     app = await serveConsole(server(ok(ATTEMPTS)));
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "History");
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
     const history = page
       .locator("table")

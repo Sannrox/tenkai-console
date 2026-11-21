@@ -188,7 +188,6 @@ export const exposureFigure = (row: DeliveryMetrics): Figure | undefined => {
 };
 
 /** History search for the attempts behind one product row. */
-export const historySearch = (environment: string, product: string) => ({
-  environment,
+export const historySearch = (_environment: string, product: string) => ({
   instance: product,
 });

@@ -13,6 +13,8 @@ import {
   type Reply,
   expectDesignRules,
   openApp,
+  openEnvironment,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -202,7 +204,8 @@ const open = async (page: Page, app: MockBackend) => {
     response.url().endsWith("/webhooks/deliveries"),
   );
   await page.goto(app.url);
-  await openApp(page, "Environments");
+  await openEnvironment(page);
+  await openEnvironmentTab(page, "Linked");
   await expect(owner(page)).toBeVisible();
   await deliveries;
   await expect(owner(page)).not.toContainText("Loading");
@@ -233,6 +236,7 @@ test.describe("owners and notification routing", () => {
     await expect(owner(page).getByLabel("Owner routing")).toHaveText("No owner and no webhooks");
     await expect(owner(page)).toContainText("contactnone");
     await expect(owner(page).getByRole("table", { name: "Webhook deliveries" })).toHaveCount(0);
+    await openApp(page, "Environments");
     await expect(page.getByRole("region", { name: "Environments" })).not.toContainText("ops@");
     await capture(page, "owner-none");
     await expectDesignRules(page);
@@ -245,7 +249,9 @@ test.describe("owners and notification routing", () => {
     await expect(owner(page)).toContainText("ops@example.test");
     await expect(owner(page)).toContainText("https://hooks.example.test/a");
     await expect(owner(page)).toContainText("api-team@example.test");
+    await openEnvironmentTab(page, "History");
     await expect(page.getByLabel("History owner")).toHaveText("owner ops@example.test");
+    await openApp(page, "Environments");
     await expect(
       page.getByRole("row", { name: /prod/ }).filter({ hasText: "ops@example.test" }).first(),
     ).toBeVisible();

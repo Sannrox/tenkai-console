@@ -5,7 +5,7 @@ import {
   type MockBackend,
   type Reply,
   expectDesignRules,
-  openApp,
+  openEnvironment,
   serveConsole,
 } from "./mock-backend";
 
@@ -132,7 +132,7 @@ const serve = (world: World) =>
 
 const openPlan = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await openApp(page, "Environments");
+  await openEnvironment(page);
   await page.getByRole("link", { name: "Open plan" }).first().click();
 };
 

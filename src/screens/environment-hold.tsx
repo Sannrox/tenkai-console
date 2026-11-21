@@ -82,8 +82,9 @@ export const SubscriptionHold = ({
         <>
           <span className="text-danger">{error ?? "retry held"}</span>
           <Link
-            to="/environments"
-            search={{ environment: report.name, instance }}
+            to="/environments/$environment/history"
+            params={{ environment: report.name }}
+            search={{ instance }}
             className="text-xs font-medium text-muted"
           >
             History

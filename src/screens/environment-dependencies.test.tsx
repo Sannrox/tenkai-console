@@ -125,6 +125,7 @@ describe("EnvironmentDependencies", () => {
     expect(container.textContent).toContain("unmet");
     expect(container.textContent).toContain("waiting");
     expect(container.textContent).toContain("reports@1.0.0");
+    expect(container.textContent).toContain("reports@1.0.0, analytics >= 2.0.0");
     expect(container.textContent).toContain("held at 2023-11-14T22:13:20.000Z");
     expect(container.textContent).toContain("no known provider");
     expect(container.textContent).toContain("analytics >= 2.0.0");

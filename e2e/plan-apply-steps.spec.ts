@@ -6,7 +6,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  openEnvironment,
   serveConsole,
 } from "./mock-backend";
 
@@ -209,7 +209,7 @@ const pasteAndApply = async (page: import("@playwright/test").Page) => {
 
 const openPlan = async (page: import("@playwright/test").Page, app: MockBackend) => {
   await page.goto(app.url);
-  await openApp(page, "Environments");
+  await openEnvironment(page);
   await page.getByRole("link", { name: "Open plan" }).click();
 };
 

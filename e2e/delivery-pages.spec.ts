@@ -14,6 +14,8 @@ import {
   type Reply,
   expectDesignRules,
   openApp,
+  openEnvironment as openEnvObject,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -163,7 +165,8 @@ const openEnvironment = async (page: Page, app: MockBackend) => {
     response.url().endsWith("/environments/prod/webhooks/deliveries"),
   );
   await page.goto(app.url);
-  await openApp(page, "Environments");
+  await openEnvObject(page);
+  await openEnvironmentTab(page, "Linked");
   await deliveries;
   await expect(owner(page)).toBeVisible();
   await expect(owner(page)).not.toContainText("Loading");

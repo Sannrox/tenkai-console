@@ -6,7 +6,8 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  openEnvironment,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -105,7 +106,8 @@ test.describe("environment identity issuer", () => {
       } as unknown as EnvironmentInspectReport),
     );
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "Security");
     await expect(page.getByRole("heading", { name: "Identity issuer" })).toBeVisible();
     await expect(page.getByText("This server does not report an identity issuer.")).toBeVisible();
     await expect(issuer(page)).toHaveCount(0);
@@ -121,7 +123,8 @@ test.describe("environment identity issuer", () => {
       } as unknown as EnvironmentInspectReport),
     );
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "Security");
     await expect(page.getByRole("heading", { name: "Identity issuer" })).toBeVisible();
     const card = page
       .getByRole("heading", { name: "Identity issuer" })
@@ -151,7 +154,8 @@ test.describe("environment identity issuer", () => {
       } as unknown as EnvironmentInspectReport),
     );
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "Security");
     const table = issuer(page);
     await expect(table.getByRole("cell", { name: "current", exact: true })).toBeVisible();
     await expect(table.getByRole("cell", { name: "lost", exact: true })).toBeVisible();
@@ -182,7 +186,8 @@ test.describe("environment identity issuer on a phone", () => {
       } as unknown as EnvironmentInspectReport),
     );
     await page.goto(app.url);
-    await openApp(page, "Environments");
+    await openEnvironment(page);
+    await openEnvironmentTab(page, "Security");
     await expect(page.getByRole("heading", { name: "Identity issuer" })).toBeVisible();
     await expect(issuer(page).getByRole("cell", { name: "ab", exact: true })).toBeVisible();
     expect(await page.locator("body").textContent()).not.toMatch(

@@ -68,23 +68,17 @@ const render = async (ui: ReactNode) => {
     path: "/",
     component: () => ui,
   });
-  const environments = createRoute({
+  const history = createRoute({
     getParentRoute: () => rootRoute,
-    path: "/environments",
-    validateSearch: (
-      search: Record<string, unknown>,
-    ): { environment?: string; instance?: string } => {
-      const environment = typeof search.environment === "string" ? search.environment : undefined;
+    path: "/environments/$environment/history",
+    validateSearch: (search: Record<string, unknown>): { instance?: string } => {
       const instance = typeof search.instance === "string" ? search.instance : undefined;
-      return {
-        ...(environment === undefined ? {} : { environment }),
-        ...(instance === undefined ? {} : { instance }),
-      };
+      return instance === undefined ? {} : { instance };
     },
     component: () => null,
   });
   const router = createRouter({
-    routeTree: rootRoute.addChildren([route, environments]),
+    routeTree: rootRoute.addChildren([route, history]),
     history: createMemoryHistory({ initialEntries: ["/"] }),
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -127,7 +121,8 @@ describe("EnvironmentDelivery", () => {
     expect(container.textContent).toContain("1 restored · 0 unrestored");
     expect(container.textContent).toContain("5d");
     expect(container.textContent).toContain("3 open");
-    const link = container.querySelector('a[href*="environment=prod"]');
+    const link = container.querySelector('a[href*="/environments/prod/history"]');
+    expect(link).not.toBeNull();
     expect(link?.getAttribute("href")).toContain("instance=api");
     expect(link?.getAttribute("aria-label")).toContain(
       "2026-10-22T00:00:00.000Z to 2026-11-21T00:00:00.000Z",

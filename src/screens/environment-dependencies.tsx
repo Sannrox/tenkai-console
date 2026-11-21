@@ -10,6 +10,7 @@ import {
   holdProviderLine,
   impactLines,
   providerTone,
+  waitingLine,
 } from "../delivery/dependencies";
 import {
   type BindingRow,
@@ -39,6 +40,8 @@ const COPY = {
 } as const;
 
 const NO_SUBSCRIPTIONS: InstanceSubscription[] = [];
+const ALL_PARTS = ["holds", "graph", "bindings", "grants"] as const;
+export type DependencyPart = (typeof ALL_PARTS)[number];
 
 /**
  * Plan-order requires table for the selected environment.
@@ -48,17 +51,21 @@ export const EnvironmentDependencies = ({
   environment,
   token,
   subscriptions = NO_SUBSCRIPTIONS,
+  parts = ALL_PARTS,
 }: {
   environment: string;
   token: string;
   subscriptions?: InstanceSubscription[];
+  parts?: readonly DependencyPart[];
 }) => {
   const query = useEnvironmentDependencies(token, environment);
   const load = query.data;
+  const show = (part: DependencyPart) => parts.includes(part);
   const waiting = load?.kind === "ok" ? load.value.holds.length : 0;
   const health = healthByInstance(subscriptions);
   const bindings = load?.kind === "ok" ? bindingRows(load.value, health) : [];
   const grants = load?.kind === "ok" ? grantRows(load.value) : [];
+  const linked = show("holds") || show("graph") || show("bindings");
   const body =
     query.isPending || load === undefined ? (
       <p className="m-0 px-3.5 py-3 text-xs text-muted">{COPY.loading}</p>
@@ -76,25 +83,34 @@ export const EnvironmentDependencies = ({
 
   return (
     <>
-      <div className="mt-[18px] mb-2 flex items-baseline gap-2">
-        <h2 className="m-0 text-[13px] font-semibold">Dependencies</h2>
-        {waiting > 0 && (
-          <span className="text-[13px] font-medium text-muted">{waiting} waiting</span>
-        )}
-      </div>
-      {body ? (
+      {linked && (
+        <div className="mt-[18px] mb-2 flex items-baseline gap-2">
+          <h2 className="m-0 text-[13px] font-semibold">Dependencies</h2>
+          {waiting > 0 && (
+            <span className="text-[13px] font-medium text-muted">{waiting} waiting</span>
+          )}
+        </div>
+      )}
+      {show("holds") && load?.kind === "ok" && load.value.holds.length > 0 && (
+        <p className="mt-0 mb-2 text-xs text-warning">{waitingLine(load.value.holds)}</p>
+      )}
+      {body && linked ? (
         <Card className="overflow-x-auto">{body}</Card>
       ) : load?.kind === "ok" ? (
         <>
-          {load.value.holds.length > 0 && <Holds report={load.value} />}
-          {load.value.products.length > 0 && (
+          {show("holds") && load.value.holds.length > 0 && <Holds report={load.value} />}
+          {show("graph") && load.value.products.length > 0 && (
             <Card className="overflow-x-auto">
               <Graph report={load.value} />
             </Card>
           )}
-          {bindings.length > 0 && <Bindings rows={bindings} />}
-          {bindings.length > 0 && <Grants rows={grants} />}
+          {show("bindings") && bindings.length > 0 && <Bindings rows={bindings} />}
+          {show("grants") && (bindings.length > 0 || grants.length > 0 || !linked) && (
+            <Grants rows={grants} />
+          )}
         </>
+      ) : show("grants") && body ? (
+        <Card className="overflow-x-auto">{body}</Card>
       ) : null}
     </>
   );
