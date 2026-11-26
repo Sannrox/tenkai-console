@@ -322,17 +322,15 @@ test.describe("recall rule edit", () => {
   });
 });
 
-const facts = (page: Page) => recall(page).getByRole("definition");
-
 const openRecall = async (page: Page, app: MockBackend, release: string) => {
   await openReleases(page, app);
   await page.getByRole("button", { name: `Detail ${release}` }).click();
-  await expect(facts(page).first()).toHaveText(release);
+  await expect(recall(page)).toContainText(release);
   await page.waitForLoadState("networkidle");
 };
 
-const progress = (page: Page) =>
-  recall(page).getByRole("table", { name: "Removal progress" }).getByRole("row");
+const environments = (page: Page) =>
+  recall(page).getByRole("table", { name: "Environments" }).getByRole("row");
 
 test.describe("recall measures and removal counts", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
@@ -346,16 +344,18 @@ test.describe("recall measures and removal counts", () => {
   }) => {
     app = await serveConsole(server(["read"]));
     await openRecall(page, app, "api@1.4.0");
-    await expect(facts(page)).toHaveText([
-      "api@1.4.0",
+    await expect(recall(page).getByRole("paragraph").first()).toContainText(
       "policy channel-promotion-policy:api/stable v2 at 2026-11-14T10:05Z",
-      "failing share over threshold",
-      "healthy 88% · failing 12%",
-      "failing > 5%, exceeded",
-      "this release only",
+    );
+    await expect(recall(page)).toContainText("failing share over threshold");
+    await expect(recall(page).getByLabel("Measured")).toHaveText(
+      "healthy 88% · failing 12% · failing > 5%, exceeded",
+    );
+    await expect(recall(page).getByLabel("Range")).toHaveText("Range this release only");
+    await expect(recall(page).getByLabel("Removal", { exact: true })).toHaveText(
       "in progress, 1 environment left · 3 of 5 instances removed",
-    ]);
-    await expect(progress(page)).toHaveText([
+    );
+    await expect(environments(page)).toHaveText([
       "EnvironmentRemovedStill running",
       "lab2 of 2none",
       "prod1 of 3api-b, api-c",
@@ -367,14 +367,16 @@ test.describe("recall measures and removal counts", () => {
   test("an operator recall has counts and no shares", async ({ page }) => {
     app = await serveConsole(server(["read"]));
     await openRecall(page, app, "billing@2.0.0");
-    await expect(facts(page)).toHaveText([
-      "billing@2.0.0",
-      "oidc:alice",
-      "bad migration",
-      "this release only",
+    await expect(recall(page).getByRole("paragraph").first()).toContainText("oidc:alice");
+    await expect(recall(page)).toContainText("bad migration");
+    await expect(recall(page).getByLabel("Range")).toHaveText("Range this release only");
+    await expect(recall(page).getByLabel("Removal", { exact: true })).toHaveText(
       "complete, no instance runs it · 1 of 1 instances removed",
+    );
+    await expect(environments(page)).toHaveText([
+      "EnvironmentRemovedStill running",
+      "prod1 of 1none",
     ]);
-    await expect(progress(page)).toHaveText(["EnvironmentRemovedStill running", "prod1 of 1none"]);
     await expectDesignRules(page);
   });
 
@@ -382,11 +384,13 @@ test.describe("recall measures and removal counts", () => {
   test("a policy recall recorded before measures says so instead of a stall", async ({ page }) => {
     app = await serveConsole(server(["read"]));
     await openRecall(page, app, "web@3.0.0");
-    await expect(facts(page).nth(2)).toHaveText(
+    await expect(recall(page)).toContainText(
       "not recorded, recalled before this server kept measures",
     );
-    await expect(facts(page).last()).toHaveText("in progress, 1 environment left");
-    await expect(progress(page)).toHaveText([
+    await expect(recall(page).getByLabel("Removal", { exact: true })).toHaveText(
+      "in progress, 1 environment left",
+    );
+    await expect(environments(page)).toHaveText([
       "EnvironmentRemovedStill running",
       "prodnot recordedweb",
     ]);

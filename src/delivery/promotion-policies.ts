@@ -80,6 +80,7 @@ const Evidence = type({
   "health_slo?": "boolean",
   "healthy_min_share?": "number",
   "failing_max_share?": "number",
+  "failing_max_instances?": "number",
   "recall_on_failing?": "boolean",
 });
 
@@ -162,10 +163,16 @@ export const evidenceLine = (evidence: PolicyView["evidence"]): string =>
  * exceeds `failing_max_share` recalls the soaking release instead of only
  * resetting the soak. Instances without health evidence never count.
  */
-export const recallRule = (view: PolicyView): string =>
-  view.evidence.recall_on_failing
-    ? `when failing > ${share(view.evidence.failing_max_share ?? 0)} of ${ageMs(view.soak_duration_ms)} soak`
-    : "off, a failing soak only resets";
+export const recallRule = (view: PolicyView): string => {
+  if (!view.evidence.recall_on_failing) {
+    return "off, a failing soak only resets";
+  }
+  const soak = `when failing > ${share(view.evidence.failing_max_share ?? 0)} of ${ageMs(view.soak_duration_ms)} soak`;
+  const count = view.evidence.failing_max_instances;
+  return count === undefined
+    ? soak
+    : `${soak}, or ${count} ${count === 1 ? "instance" : "instances"}`;
+};
 
 /** A 0..1 time share as a whole percent. */
 export const share = (value: number): string => `${Math.round(value * 100)}%`;
@@ -228,19 +235,26 @@ export const pauseOutcome = (
 };
 
 // Recall rule write (Tenkai #1287): `PUT .../channels/{channel}/policy`
-// replaces soak, failing threshold, and recall-on-failing, keeping the rest of
-// the policy and its pause. It is fenced by the policy version the operator
-// read; another version is refused with 409, never merged.
+// replaces soak, failing share, optional failing instance count, and
+// recall-on-failing, keeping the rest of the policy and its pause. It is
+// fenced by the policy version the operator read; another version is refused
+// with 409, never merged.
 
-export type RecallRuleInput = { soak: string; failingMax: string; recall: boolean };
+export type RecallRuleInput = {
+  soak: string;
+  failingMax: string;
+  instances: string;
+  recall: boolean;
+};
 
 export type RecallRule = Pick<
   ChannelRecallRuleRequest,
-  "soak_duration_ms" | "failing_max_share" | "recall_on_failing"
+  "soak_duration_ms" | "failing_max_share" | "recall_on_failing" | "failing_max_instances"
 >;
 
 const SOAK = /^(\d+)(ms|d|h|m|s)$/;
 const SHARE = /^(?:\d+\.?\d*|\.\d+)$/;
+const INSTANCES = /^[1-9]\d{0,8}$/;
 const SOAK_UNIT_MS: Record<string, number> = {
   ms: 1,
   s: 1_000,
@@ -253,6 +267,10 @@ const SOAK_UNIT_MS: Record<string, number> = {
 export const recallRuleInput = (view: PolicyView): RecallRuleInput => ({
   soak: graceWindow(view.soak_duration_ms),
   failingMax: String(view.evidence.failing_max_share ?? 0),
+  instances:
+    view.evidence.failing_max_instances === undefined
+      ? ""
+      : String(view.evidence.failing_max_instances),
   recall: view.evidence.recall_on_failing === true,
 });
 
@@ -265,14 +283,28 @@ export const parseRecallRule = (input: RecallRuleInput): RecallRule | undefined 
   const soak = SOAK.exec(input.soak.trim());
   const failingText = input.failingMax.trim();
   const failing = SHARE.test(failingText) ? Number(failingText) : Number.NaN;
+  const instancesText = input.instances.trim();
   const size = SOAK_UNIT_MS[soak?.[2] ?? ""];
-  if (!soak?.[1] || size === undefined || !(failing >= 0 && failing <= 1)) {
+  if (
+    !soak?.[1] ||
+    size === undefined ||
+    !(failing >= 0 && failing <= 1) ||
+    (instancesText !== "" && !INSTANCES.test(instancesText))
+  ) {
     return undefined;
   }
   const ms = Number(soak[1]) * size;
-  return Number.isSafeInteger(ms)
+  if (!Number.isSafeInteger(ms)) {
+    return undefined;
+  }
+  return instancesText === ""
     ? { soak_duration_ms: ms, failing_max_share: failing, recall_on_failing: input.recall }
-    : undefined;
+    : {
+        soak_duration_ms: ms,
+        failing_max_share: failing,
+        recall_on_failing: input.recall,
+        failing_max_instances: Number(instancesText),
+      };
 };
 
 /** The PUT body, fenced by the policy version the operator read. */
@@ -287,8 +319,13 @@ export const recallRuleBody = (
 });
 
 /** The rule as the confirmation names it, so the confirmation is the preview. */
-export const recallRuleLine = (rule: RecallRule): string =>
-  `soak ${graceWindow(rule.soak_duration_ms)}, ${rule.recall_on_failing ? "recall" : "reset only"} when failing > ${rule.failing_max_share}`;
+export const recallRuleLine = (rule: RecallRule): string => {
+  const shareLine = `soak ${graceWindow(rule.soak_duration_ms)}, ${rule.recall_on_failing ? "recall" : "reset only"} when failing > ${rule.failing_max_share}`;
+  const count = rule.failing_max_instances;
+  return count === undefined
+    ? shareLine
+    : `${shareLine} or ${count} ${count === 1 ? "instance" : "instances"}`;
+};
 
 /**
  * What a recall rule write answer means. No answer, or a 5xx that may have

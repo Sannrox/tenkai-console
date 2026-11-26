@@ -110,7 +110,8 @@ const EVENTS = [
 ];
 
 const detail = (page: Page) => page.getByRole("region", { name: "Recall detail" });
-const facts = (page: Page) => detail(page).getByRole("definition");
+const environments = (page: Page) =>
+  detail(page).getByRole("table", { name: "Environments" }).getByRole("row");
 
 const openReleases = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
@@ -151,19 +152,20 @@ test.describe("recall detail", () => {
       page.getByRole("list", { name: "Recalled releases" }).getByRole("listitem"),
     ).toHaveText(["api@1.4.0", "web@3.0.0", "billing@2.0.0"]);
     await openRecall(page, "api@1.4.0");
-    await expect(facts(page)).toHaveText([
-      "api@1.4.0",
+    await expect(detail(page).getByRole("paragraph").first()).toContainText(
       "policy tenkai:channel-promotion-policy:api/stable:3 v3 at 2026-11-14T10:05Z",
-      "failing share 0.120 > 0.050; healthy share 0.880",
-      "edge-1 (http: 503 on /ready)edge-2 (disk: 97% used)",
-      "api [1.4.0, ∞) · open, covers future releases",
+    );
+    await expect(detail(page)).toContainText("failing share 0.120 > 0.050; healthy share 0.880");
+    await expect(detail(page).getByLabel("Failing instances")).toHaveText(
+      "edge-1 (http: 503 on /ready), edge-2 (disk: 97% used)",
+    );
+    await expect(detail(page).getByLabel("Range")).toHaveText(
+      "Range api [1.4.0, ∞) · open, covers future releases",
+    );
+    await expect(detail(page).getByLabel("Removal", { exact: true })).toHaveText(
       "in progress, 2 environments left",
-    ]);
-    await expect(
-      detail(page).getByRole("list", { name: "Failing instances" }).getByRole("listitem"),
-    ).toHaveText(["edge-1 (http: 503 on /ready)", "edge-2 (disk: 97% used)"]);
-    const progress = detail(page).getByRole("table", { name: "Removal progress" });
-    await expect(progress.getByRole("row")).toHaveText([
+    );
+    await expect(environments(page)).toHaveText([
       "EnvironmentStill running",
       "edgeapi-1, api-2",
       "stageapi",
@@ -178,13 +180,16 @@ test.describe("recall detail", () => {
     app = await serveConsole(server(EVENTS));
     await openReleases(page, app);
     await openRecall(page, "billing@2.0.0");
-    await expect(facts(page)).toHaveText([
-      "billing@2.0.0",
+    await expect(detail(page).getByRole("paragraph").first()).toContainText(
       "oidc:alice at 2026-11-13T08:00Z",
-      "bad migration",
-      "billing [2.0.0, 2.0.1) · closed",
+    );
+    await expect(detail(page)).toContainText("bad migration");
+    await expect(detail(page).getByLabel("Range")).toHaveText(
+      "Range billing [2.0.0, 2.0.1) · closed",
+    );
+    await expect(detail(page).getByLabel("Removal", { exact: true })).toHaveText(
       "complete, no instance runs it",
-    ]);
+    );
     await expect(detail(page).getByRole("table")).toHaveCount(0);
     await shot(page, "recall-complete");
     await expectDesignRules(page);

@@ -197,6 +197,17 @@ const RecallRuleForm = ({
         />
       </label>
       <label className="flex items-center gap-1.5">
+        <span className="text-muted">Failing instances</span>
+        <input
+          aria-label="Failing max instances"
+          placeholder="optional"
+          inputMode="numeric"
+          value={input.instances}
+          onChange={(event) => setInput({ ...input, instances: event.target.value })}
+          className={`${field} w-20`}
+        />
+      </label>
+      <label className="flex items-center gap-1.5">
         <input
           type="checkbox"
           checked={input.recall}

@@ -157,6 +157,14 @@ describe("policy detail lines", () => {
         }),
       ),
     ).toBe("when failing > 5% of 1h soak");
+    expect(
+      recallRule(
+        view({
+          evidence: { failing_max_share: 0.05, failing_max_instances: 3, recall_on_failing: true },
+          soak_duration_ms: 3_600_000,
+        }),
+      ),
+    ).toBe("when failing > 5% of 1h soak, or 3 instances");
   });
 
   it("shows elapsed soak, the reset cause, and the policy as promoter", () => {
@@ -213,15 +221,27 @@ describe("pauseOutcome", () => {
 
 describe("recall rule edit", () => {
   it("starts from the rule the policy holds", () => {
-    expect(recallRuleInput(view({}))).toEqual({ soak: "1h", failingMax: "0.05", recall: false });
+    expect(recallRuleInput(view({}))).toEqual({
+      soak: "1h",
+      failingMax: "0.05",
+      instances: "",
+      recall: false,
+    });
     expect(
       recallRuleInput(view({ soak_duration_ms: 90_000, evidence: { recall_on_failing: true } })),
-    ).toEqual({ soak: "90s", failingMax: "0", recall: true });
+    ).toEqual({ soak: "90s", failingMax: "0", instances: "", recall: true });
+    expect(
+      recallRuleInput(
+        view({
+          evidence: { failing_max_share: 0.05, failing_max_instances: 3, recall_on_failing: true },
+        }),
+      ),
+    ).toEqual({ soak: "1h", failingMax: "0.05", instances: "3", recall: true });
   });
 
   it("checks shape only: a whole duration with a unit and a share from 0 to 1", () => {
-    const rule = (soak: string, failingMax: string) =>
-      parseRecallRule({ soak, failingMax, recall: true });
+    const rule = (soak: string, failingMax: string, instances = "") =>
+      parseRecallRule({ soak, failingMax, instances, recall: true });
     expect(rule(" 90m ", "0.1")).toEqual({
       soak_duration_ms: 5_400_000,
       failing_max_share: 0.1,
@@ -229,6 +249,14 @@ describe("recall rule edit", () => {
     });
     expect(rule("2d", "1")?.soak_duration_ms).toBe(172_800_000);
     expect(rule("0s", "0")?.soak_duration_ms).toBe(0);
+    expect(rule("1h", "0.05", "3")).toEqual({
+      soak_duration_ms: 3_600_000,
+      failing_max_share: 0.05,
+      recall_on_failing: true,
+      failing_max_instances: 3,
+    });
+    expect(rule("1h", "0.05", "0")).toBeUndefined();
+    expect(rule("1h", "0.05", "1.5")).toBeUndefined();
     for (const [soak, share] of [
       ["1h", ""],
       ["1h", "1.5"],
@@ -258,6 +286,9 @@ describe("recall rule edit", () => {
     expect(recallRuleLine(rule)).toBe("soak 1h, recall when failing > 0.05");
     expect(recallRuleLine({ ...rule, recall_on_failing: false })).toBe(
       "soak 1h, reset only when failing > 0.05",
+    );
+    expect(recallRuleLine({ ...rule, failing_max_instances: 3 })).toBe(
+      "soak 1h, recall when failing > 0.05 or 3 instances",
     );
   });
 
