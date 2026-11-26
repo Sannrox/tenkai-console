@@ -19,7 +19,7 @@ export const Environments = ({ focus, instance }: { focus?: string; instance?: s
   const delivery = useDelivery(token);
   const rows = fleetTableRows(delivery.fleet, delivery.list);
   const [adding, setAdding] = useState(false);
-  const failed = delivery.error !== undefined;
+  const failed = Boolean(delivery.error);
   const incomplete = failed && rows.length > 0;
   if (focus !== undefined) {
     return (

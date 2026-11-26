@@ -147,6 +147,8 @@ test.describe("environment object page", () => {
     await page.goto(app.url);
     await openApp(page, "Environments");
     await expect(page.getByRole("heading", { name: "Environments" })).toBeVisible();
+    await expect(page.getByText("1 active")).toBeVisible();
+    await expect(page.getByText("list incomplete")).toHaveCount(0);
     await openEnvironment(page);
     await expect(page.getByRole("heading", { name: "prod", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Open plan" })).toHaveCount(0);
