@@ -232,6 +232,11 @@ Rows beyond `## Testing Guidelines`:
   Never commit them.
 - Mocks and states galleries: publish with postplan and link them from the
   Issue and Pull Request. Re-upload the same file to keep the link stable.
+- Visual Pull Requests carry inspected before/after captures of the running
+  product (base branch vs the change) in the Pull Request body as a postplan
+  URL. Re-upload the same file to keep the link stable. A comment counts only
+  when the body links to it. Do not commit the captures or paste GitHub image
+  attachments. Playwright output and CI artifact links do not substitute.
 
 ### Release audit
 
