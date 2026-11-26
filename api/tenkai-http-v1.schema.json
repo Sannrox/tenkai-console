@@ -725,6 +725,34 @@
       ],
       "type": "object"
     },
+    "BranchPin": {
+      "additionalProperties": false,
+      "properties": {
+        "branch_id": {
+          "type": "string"
+        },
+        "contract": {
+          "type": "string"
+        },
+        "head_revision": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "pin_digest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract",
+        "namespace",
+        "branch_id",
+        "head_revision",
+        "pin_digest"
+      ],
+      "type": "object"
+    },
     "CanaryCohort": {
       "description": "The cohort of the active canary policy for one release and target\nchannel, and the selector it was configured by.",
       "properties": {
@@ -1137,6 +1165,12 @@
           "default": false,
           "type": "boolean"
         },
+        "failing_max_instances": {
+          "description": "Optional maximum currently failing instances during soak. Absent\nmeans the rule uses only `failing_max_share`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
         "failing_max_share": {
           "default": 0.0,
           "description": "Maximum share of soak time with any replica failing (0.0–1.0).",
@@ -1155,7 +1189,7 @@
         },
         "recall_on_failing": {
           "default": false,
-          "description": "When true, exceeding `failing_max_share` recalls the soaking source\nrelease instead of only resetting the soak.",
+          "description": "When true, exceeding `failing_max_share` or reaching\n`failing_max_instances` recalls the soaking source release instead of\nonly resetting the soak.",
           "type": "boolean"
         }
       },
@@ -1314,6 +1348,12 @@
           "minimum": 0,
           "type": "integer"
         },
+        "failing_max_instances": {
+          "description": "Optional maximum currently failing instances during soak. Absent\nmeans the rule uses only `failing_max_share`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
         "failing_max_share": {
           "description": "Maximum share of soak time with any replica failing (0.0–1.0).",
           "format": "double",
@@ -1323,7 +1363,7 @@
           "type": "string"
         },
         "recall_on_failing": {
-          "description": "When true, exceeding `failing_max_share` recalls the soaking release.",
+          "description": "When true, exceeding `failing_max_share` or reaching\n`failing_max_instances` recalls the soaking release.",
           "type": "boolean"
         },
         "soak_duration_ms": {
@@ -1473,6 +1513,92 @@
         "state",
         "warn_ms",
         "refuse_ms"
+      ],
+      "type": "object"
+    },
+    "ClosePreviewRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/environments/{environment}/close-preview`.",
+      "properties": {
+        "operation": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation"
+      ],
+      "type": "object"
+    },
+    "ClusterNamespaceSpec": {
+      "additionalProperties": false,
+      "description": "Labels, quota, and limit range of one declared cluster namespace.",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "limit_range": {
+          "items": {
+            "$ref": "#/$defs/LimitRangeItem"
+          },
+          "type": "array"
+        },
+        "quota": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "ResourceQuota `.spec.hard` quantities, for example `cpu` or `pods`.",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "ClusterNamespaceStatus": {
+      "description": "Inspect/status row: one cluster namespace and the instances in it.",
+      "properties": {
+        "instances": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "name": {
+          "type": "string"
+        },
+        "quota": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "state": {
+          "description": "`declared`, `applied`, or `pending_delete`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "state"
       ],
       "type": "object"
     },
@@ -2175,6 +2301,434 @@
         "critical"
       ],
       "type": "string"
+    },
+    "DebugElevation": {
+      "description": "An elevation as returned by the management API.",
+      "properties": {
+        "active_from": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "approvals": {
+          "description": "Approvals collected so far, whether or not they still count.",
+          "items": {
+            "$ref": "#/$defs/DebugElevationApproval"
+          },
+          "type": "array"
+        },
+        "duration_ms": {
+          "description": "Requested length, counted from activation.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "end_reason": {
+          "type": "string"
+        },
+        "ended_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "not_after": {
+          "description": "When write access ends, once active.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "requested_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "requested_by": {
+          "description": "The human principal that asked; its own approval never counts.",
+          "type": "string"
+        },
+        "requester": {
+          "description": "The audit principal of the request.",
+          "type": "string"
+        },
+        "revoked_by": {
+          "type": "string"
+        },
+        "session": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/DebugElevationState"
+        }
+      },
+      "required": [
+        "id",
+        "session",
+        "environment",
+        "requested_by",
+        "requester",
+        "reason",
+        "requested_at",
+        "duration_ms",
+        "state",
+        "approvals"
+      ],
+      "type": "object"
+    },
+    "DebugElevationApproval": {
+      "description": "One counted or collected approval.",
+      "properties": {
+        "approved_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "key_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "identity",
+        "key_id",
+        "approved_at"
+      ],
+      "type": "object"
+    },
+    "DebugElevationApproveRequest": {
+      "additionalProperties": false,
+      "description": "`POST /v1/debug-sessions/{session}/elevations/{elevation}/approvals`.",
+      "properties": {
+        "approval": {
+          "$ref": "#/$defs/DebugElevationStatementEnvelope"
+        }
+      },
+      "required": [
+        "approval"
+      ],
+      "type": "object"
+    },
+    "DebugElevationList": {
+      "properties": {
+        "elevations": {
+          "items": {
+            "$ref": "#/$defs/DebugElevation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "elevations"
+      ],
+      "type": "object"
+    },
+    "DebugElevationOpenRequest": {
+      "additionalProperties": false,
+      "description": "`POST /v1/debug-sessions/{session}/elevations`.",
+      "properties": {
+        "duration_ms": {
+          "default": null,
+          "description": "Write access length from activation. Default 30 minutes; never past\nthe session's bound.",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reason": {
+          "description": "Why write access is needed; recorded and audited.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "type": "object"
+    },
+    "DebugElevationRevokeRequest": {
+      "additionalProperties": false,
+      "description": "`POST /v1/debug-sessions/{session}/elevations/{elevation}/revoke`.",
+      "properties": {
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "type": "object"
+    },
+    "DebugElevationState": {
+      "description": "Where an elevation stands.",
+      "oneOf": [
+        {
+          "const": "pending",
+          "description": "Waiting for its quorum.",
+          "type": "string"
+        },
+        {
+          "const": "active",
+          "description": "Write commands run.",
+          "type": "string"
+        },
+        {
+          "const": "ended",
+          "description": "Over: revoked, bound reached, or the session ended. Final.",
+          "type": "string"
+        }
+      ]
+    },
+    "DebugElevationStatement": {
+      "additionalProperties": false,
+      "description": "What an approver signs: one elevation of one session in one environment.",
+      "properties": {
+        "elevation": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "issued_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "purpose": {
+          "description": "Always [`APPROVAL_PURPOSE`].",
+          "type": "string"
+        },
+        "session": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "elevation",
+        "environment",
+        "purpose",
+        "issued_at",
+        "expires_at"
+      ],
+      "type": "object"
+    },
+    "DebugElevationStatementEnvelope": {
+      "additionalProperties": false,
+      "description": "A signed approval: a statement, the key that signed it and the\nsignature. Plan approvals use [`ApprovalStatement`]; package migration\napprovals sign their own statement in the same envelope, under their own\nschema, purpose and domain ([`SignedApproval`]).",
+      "properties": {
+        "key_id": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "signature": {
+          "type": "string"
+        },
+        "statement": {
+          "$ref": "#/$defs/DebugElevationStatement"
+        }
+      },
+      "required": [
+        "schema",
+        "key_id",
+        "statement",
+        "signature"
+      ],
+      "type": "object"
+    },
+    "DebugSession": {
+      "description": "A debug session as stored and as returned by the management API.",
+      "properties": {
+        "close_reason": {
+          "type": "string"
+        },
+        "closed_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "closed_by": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/DebugSessionMode"
+        },
+        "not_after": {
+          "description": "Unix ms after which the session is over, whoever notices first.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "opened_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "opened_by": {
+          "description": "The audit principal: subject and every delegating actor.",
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "runtime": {
+          "$ref": "#/$defs/DebugSessionRuntime",
+          "description": "The runtime holding the session; absent until one picks it up."
+        },
+        "state": {
+          "$ref": "#/$defs/DebugSessionState"
+        },
+        "subject": {
+          "description": "The human principal that opened the session.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "environment",
+        "instance",
+        "subject",
+        "opened_by",
+        "mode",
+        "reason",
+        "opened_at",
+        "not_after",
+        "state"
+      ],
+      "type": "object"
+    },
+    "DebugSessionCloseRequest": {
+      "additionalProperties": false,
+      "description": "`POST /v1/debug-sessions/{session}/close`.",
+      "properties": {
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "type": "object"
+    },
+    "DebugSessionList": {
+      "properties": {
+        "sessions": {
+          "items": {
+            "$ref": "#/$defs/DebugSession"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "sessions"
+      ],
+      "type": "object"
+    },
+    "DebugSessionMode": {
+      "description": "Access a session grants. Write needs a live elevation (#1560).",
+      "enum": [
+        "read"
+      ],
+      "type": "string"
+    },
+    "DebugSessionOpenRequest": {
+      "additionalProperties": false,
+      "description": "`POST /v1/debug-sessions`.",
+      "properties": {
+        "duration_ms": {
+          "default": null,
+          "description": "Session length; default and maximum are the environment's\n`debug_session_max_ms` (four hours unless lower).",
+          "format": "int64",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "environment": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "reason": {
+          "description": "Why the session is needed; recorded and audited.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "environment",
+        "instance",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "DebugSessionRuntime": {
+      "description": "The runtime instance a session reached, and when it closed it.",
+      "properties": {
+        "attached_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "closed_at": {
+          "description": "When the runtime reported closing the session on its own clock.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "stream_error": {
+          "description": "Why the runtime last failed to open the terminal stream, such as a\nTLS terminator that refuses the WebSocket upgrade (#1558).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "instance",
+        "attached_at"
+      ],
+      "type": "object"
+    },
+    "DebugSessionState": {
+      "description": "Lifecycle of a session. `closed` and `expired` are final.",
+      "enum": [
+        "open",
+        "closed",
+        "expired"
+      ],
+      "type": "string"
+    },
+    "DebugSessions": {
+      "description": "Debug sessions an environment allows (ADR 0061 §3).",
+      "oneOf": [
+        {
+          "const": "forbid",
+          "description": "No session opens.",
+          "type": "string"
+        },
+        {
+          "const": "read",
+          "description": "Read-only sessions.",
+          "type": "string"
+        },
+        {
+          "const": "elevate",
+          "description": "Read-only sessions, and write after a `debug_elevate` quorum.",
+          "type": "string"
+        }
+      ]
     },
     "DeclaredCriticality": {
       "description": "Operator-declared criticality, with who set it and why.",
@@ -2951,6 +3505,16 @@
         "configured": {
           "type": "boolean"
         },
+        "debug_session_max_ms": {
+          "description": "Longest debug session, in milliseconds; absent from servers before\nit existed.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "debug_sessions": {
+          "$ref": "#/$defs/DebugSessions",
+          "default": "forbid",
+          "description": "`forbid` when no policy is configured or the policy omits it."
+        },
         "digest": {
           "type": "string"
         },
@@ -3579,6 +4143,104 @@
             "key"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Declare or replace a cluster namespace (#1096). Does not create it in the cluster.",
+          "properties": {
+            "kind": {
+              "const": "set_cluster_namespace",
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "spec": {
+              "$ref": "#/$defs/ClusterNamespaceSpec"
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "spec"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Drop a cluster namespace declaration. The namespace stays in the cluster.",
+          "properties": {
+            "kind": {
+              "const": "clear_cluster_namespace",
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Queue an approved delete of a cluster namespace.",
+          "properties": {
+            "kind": {
+              "const": "delete_cluster_namespace",
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Bind an instance to a declared cluster namespace.",
+          "properties": {
+            "instance": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "bind_cluster_namespace",
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "instance",
+            "name"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Restore the default cluster namespace (the environment name) for an instance.",
+          "properties": {
+            "instance": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "unbind_cluster_namespace",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "instance"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -3798,6 +4460,13 @@
         "approval_policy": {
           "description": "The plan approval policy file this environment uses, as configured,\nwhen one is set (#820).",
           "type": "string"
+        },
+        "cluster_namespaces": {
+          "description": "Declared cluster namespaces and the instances bound to them (#1096).",
+          "items": {
+            "$ref": "#/$defs/ClusterNamespaceStatus"
+          },
+          "type": "array"
         },
         "config": {
           "description": "Effective non-secret config and declared secret names per product (#1019).",
@@ -4392,6 +5061,10 @@
         "environment": {
           "type": "string"
         },
+        "supported_engines": {
+          "$ref": "#/$defs/SupportedEngines",
+          "description": "What the processes that run this environment's steps can serve\n(model engines). Independent of `supported_executors`."
+        },
         "supported_executors": {
           "$ref": "#/$defs/SupportedExecutors",
           "description": "What the processes that run this environment's steps can execute\n(ADR 0057): its runtime's set, or the server replicas' common set."
@@ -4610,6 +5283,10 @@
           ]
         },
         "product": {
+          "type": "string"
+        },
+        "recall": {
+          "description": "Present when this instance still runs a recalled release whose\nremoval is not in scope. A warning, not a hold or gate.",
           "type": "string"
         },
         "spec_drift": {
@@ -5265,7 +5942,7 @@
           "type": "integer"
         },
         "runtimes": {
-          "description": "The environment's runtime instances and their recorded executors\n(ADR 0057). Empty when no runtime runs it.",
+          "description": "The environment's runtime instances and their recorded executors\nand engines (ADR 0057). Empty when no runtime runs it.",
           "items": {
             "$ref": "#/$defs/ProcessExecutors"
           },
@@ -5342,7 +6019,7 @@
           "type": "array"
         },
         "replicas": {
-          "description": "Server replicas that checked in recently and their installed\nexecutors (ADR 0057). Empty on a single-replica server.",
+          "description": "Server replicas that checked in recently and their installed\nexecutors and engines (ADR 0057). Empty on a single-replica server.",
           "items": {
             "$ref": "#/$defs/ProcessExecutors"
           },
@@ -5986,6 +6663,43 @@
       },
       "required": [
         "value"
+      ],
+      "type": "object"
+    },
+    "LimitRangeItem": {
+      "additionalProperties": false,
+      "description": "One LimitRange `.spec.limits` entry.",
+      "properties": {
+        "default": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "defaultRequest": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "max": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "min": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
       ],
       "type": "object"
     },
@@ -7238,12 +7952,20 @@
       "type": "object"
     },
     "ProcessExecutors": {
-      "description": "One process's recorded executor set.",
+      "description": "One process's recorded executor and engine sets.",
       "properties": {
         "checked_in_at": {
           "description": "Last check-in, Unix milliseconds.",
           "format": "int64",
           "type": "integer"
+        },
+        "engines": {
+          "description": "Configured model engines. Absent when the process recorded none, as\na version before engines were part of the set does.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
         },
         "executors": {
           "description": "Installed executor kinds. Absent when the process recorded none, as\na version before ADR 0057 does.",
@@ -7461,6 +8183,46 @@
         }
       ]
     },
+    "ProvisionPreviewRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/environments/preview`.",
+      "properties": {
+        "description": {
+          "default": "",
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "expires_at": {
+          "description": "RFC 3339 expiry. Teardown never deletes a non-preview environment.",
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "pin": {
+          "$ref": "#/$defs/BranchPin"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "environment",
+        "pin",
+        "expires_at",
+        "reason"
+      ],
+      "type": "object"
+    },
     "PublishInputEntry": {
       "additionalProperties": false,
       "description": "One file or directory from the release workdir, relative to the manifest.",
@@ -7539,7 +8301,8 @@
         "execute_plan",
         "rollback",
         "skip_gates",
-        "downgrade"
+        "downgrade",
+        "debug_elevate"
       ],
       "type": "string"
     },
@@ -7627,6 +8390,22 @@
       ],
       "type": "object"
     },
+    "RecallOutOfScopeHolder": {
+      "description": "An environment still running a recalled release whose removal is not in\nscope. A warning, not a hold or gate.",
+      "properties": {
+        "environment": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "environment",
+        "status"
+      ],
+      "type": "object"
+    },
     "RecallRangeCloseRequest": {
       "additionalProperties": false,
       "description": "Body of `POST /v1/products/{product}/recall-range/close`.",
@@ -7655,6 +8434,101 @@
         "product",
         "from",
         "before"
+      ],
+      "type": "object"
+    },
+    "RecallRangeExcludeRemoveRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/products/{product}/recall-range/exclude/remove`.",
+      "properties": {
+        "excluded_version": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "product",
+        "from",
+        "excluded_version",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "RecallRangeExcludeRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/products/{product}/recall-range/exclude`.",
+      "properties": {
+        "excluded_version": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "product",
+        "from",
+        "excluded_version",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "RecallRangeExclusionView": {
+      "description": "One version subtracted from a recorded recall range at lookup time.",
+      "properties": {
+        "actor": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "recorded_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "reason",
+        "actor",
+        "recorded_at"
       ],
       "type": "object"
     },
@@ -7719,6 +8593,13 @@
         "covers_future": {
           "type": "boolean"
         },
+        "exclusions": {
+          "description": "Versions subtracted from this range at lookup. Omitted when none,\nincluding ranges recorded before exclusions.",
+          "items": {
+            "$ref": "#/$defs/RecallRangeExclusionView"
+          },
+          "type": "array"
+        },
         "from": {
           "type": "string"
         },
@@ -7770,6 +8651,13 @@
     "RecallRequest": {
       "additionalProperties": false,
       "properties": {
+        "environments": {
+          "description": "Environments whose already-deployed instances roll off. Omitted covers\nthe fleet. Older servers refuse this field (`deny_unknown_fields`).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "operation": {
           "type": "string"
         },
@@ -7791,12 +8679,24 @@
         "covers_future": {
           "type": "boolean"
         },
+        "failing_instance_count": {
+          "description": "Measured failing instance count when the count threshold fired.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
         "failing_instances": {
           "default": [],
           "items": {
             "type": "string"
           },
           "type": "array"
+        },
+        "failing_max_instances": {
+          "description": "The policy's `failing_max_instances` threshold that the failing\ninstance count reached. Omitted when the recall tripped on share or\nwas not a promotion-policy recall.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
         },
         "failing_max_share": {
           "description": "The policy's `failing_max_share` threshold that `failing_share` exceeded.",
@@ -7812,6 +8712,13 @@
           "description": "Share of soak time with every replica healthy when a promotion policy\nrecalled the release. Omitted for other recalls.",
           "format": "double",
           "type": "number"
+        },
+        "out_of_scope": {
+          "description": "Environments that still run the release and are not in the removal\nscope. Each row's `status` is [`REMOVAL_NOT_IN_SCOPE`].",
+          "items": {
+            "$ref": "#/$defs/RecallOutOfScopeHolder"
+          },
+          "type": "array"
         },
         "policy_id": {
           "type": "string"
@@ -7839,7 +8746,7 @@
           "type": "string"
         },
         "removal_environments": {
-          "description": "Per-environment removal counts, sorted by environment.",
+          "description": "Per-environment removal counts, sorted by environment. Counts only\nenvironments in the removal scope; omitted scope is fleet-wide.",
           "items": {
             "$ref": "#/$defs/RecallEnvironmentRemoval"
           },
@@ -7851,11 +8758,95 @@
             "$ref": "#/$defs/RecallRemovalProgress"
           },
           "type": "array"
+        },
+        "removal_scope": {
+          "description": "Environments this recall's removal covers. Omitted when fleet-wide,\nincluding recalls recorded before scoped removal.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "widenings": {
+          "description": "Later audited writes that appended environments or switched the recall\nto fleet-wide. Oldest first. Empty when none.",
+          "items": {
+            "$ref": "#/$defs/RecallWidening"
+          },
+          "type": "array"
         }
       },
       "required": [
         "release",
         "covers_future"
+      ],
+      "type": "object"
+    },
+    "RecallWidenRequest": {
+      "additionalProperties": false,
+      "description": "Body of `POST /v1/releases/{release}/recall/widen`.",
+      "properties": {
+        "environments": {
+          "description": "Environments to append. Empty when `fleet_wide` is true.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "fleet_wide": {
+          "description": "Switch the recall to fleet-wide. Mutually exclusive with `environments`.",
+          "type": "boolean"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "operation",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "RecallWidening": {
+      "description": "One audited widening of a recall's removal scope.",
+      "properties": {
+        "environments": {
+          "description": "Environments appended by this write. Empty when the write switched\nthe recall to fleet-wide.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "fleet_wide": {
+          "type": "boolean"
+        },
+        "principal_kind": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "widened_at": {
+          "format": "int64",
+          "type": "integer"
+        },
+        "widened_by": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "widened_at",
+        "widened_by",
+        "principal_kind",
+        "reason",
+        "fleet_wide"
       ],
       "type": "object"
     },
@@ -9093,6 +10084,10 @@
         "channel": {
           "type": "string"
         },
+        "cluster_namespace": {
+          "description": "Cluster namespace this instance deploys into (#1096). Omitted when it\nis the environment name and no cluster namespaces are declared.",
+          "type": "string"
+        },
         "delivery_hold": {
           "$ref": "#/$defs/DeliveryHold",
           "description": "Present while the subscribed channel is held."
@@ -9148,6 +10143,10 @@
           "type": "string"
         },
         "product": {
+          "type": "string"
+        },
+        "recall": {
+          "description": "Present when this instance still runs a recalled release whose\nremoval is not in scope. A warning, not a hold or gate.",
           "type": "string"
         },
         "spec_drift": {
@@ -9238,6 +10237,62 @@
         "spec"
       ],
       "type": "object"
+    },
+    "SupportedEngines": {
+      "description": "What an environment's executing processes can run for model engines.",
+      "oneOf": [
+        {
+          "description": "Every process that may run a step has these engines configured.",
+          "properties": {
+            "engines": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "processes": {
+              "items": {
+                "$ref": "#/$defs/ProcessExecutors"
+              },
+              "type": "array"
+            },
+            "state": {
+              "const": "known",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "engines",
+            "processes"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Planning cannot tell; apply checks on the process that runs it.",
+          "properties": {
+            "processes": {
+              "items": {
+                "$ref": "#/$defs/ProcessExecutors"
+              },
+              "type": "array"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "state": {
+              "const": "unknown",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "SupportedExecutors": {
       "description": "What an environment's executing processes can run.",
@@ -10138,6 +11193,28 @@
       }
     },
     {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/environments/preview",
+      "request": {
+        "$ref": "#/$defs/ProvisionPreviewRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/environments/{environment}/close-preview",
+      "request": {
+        "$ref": "#/$defs/ClosePreviewRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
       "auth": "read",
       "method": "GET",
       "path": "/v1/releases",
@@ -10625,6 +11702,61 @@
       }
     },
     {
+      "auth": "management",
+      "method": "PUT",
+      "path": "/v1/environments/{environment}/cluster-namespaces/{name}",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "DELETE",
+      "path": "/v1/environments/{environment}/cluster-namespaces/{name}",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "PUT",
+      "path": "/v1/environments/{environment}/cluster-namespaces/{name}/delete",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "PUT",
+      "path": "/v1/environments/{environment}/cluster-namespace-bindings",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "DELETE",
+      "path": "/v1/environments/{environment}/cluster-namespace-bindings",
+      "request": {
+        "$ref": "#/$defs/EnvironmentConfigRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
       "auth": "read",
       "method": "GET",
       "path": "/v1/environments/{environment}/sealed-secrets",
@@ -11054,6 +12186,88 @@
     },
     {
       "auth": "management",
+      "method": "POST",
+      "path": "/v1/debug-sessions",
+      "request": {
+        "$ref": "#/$defs/DebugSessionOpenRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/DebugSession"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/debug-sessions",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/DebugSessionList"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/debug-sessions/{session}",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/DebugSession"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/debug-sessions/{session}/close",
+      "request": {
+        "$ref": "#/$defs/DebugSessionCloseRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/DebugSession"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/debug-sessions/{session}/elevations",
+      "request": {
+        "$ref": "#/$defs/DebugElevationOpenRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/DebugElevation"
+      }
+    },
+    {
+      "auth": "read",
+      "method": "GET",
+      "path": "/v1/debug-sessions/{session}/elevations",
+      "request": null,
+      "response": {
+        "$ref": "#/$defs/DebugElevationList"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/debug-sessions/{session}/elevations/{elevation}/approvals",
+      "request": {
+        "$ref": "#/$defs/DebugElevationApproveRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/DebugElevation"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/debug-sessions/{session}/elevations/{elevation}/revoke",
+      "request": {
+        "$ref": "#/$defs/DebugElevationRevokeRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/DebugElevation"
+      }
+    },
+    {
+      "auth": "management",
       "method": "GET",
       "path": "/v1/runners",
       "request": null,
@@ -11288,6 +12502,17 @@
       }
     },
     {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/releases/{release}/recall/widen",
+      "request": {
+        "$ref": "#/$defs/RecallWidenRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
       "auth": "read",
       "method": "GET",
       "path": "/v1/products/{product}/recall-ranges",
@@ -11313,6 +12538,28 @@
       "path": "/v1/products/{product}/recall-range/close",
       "request": {
         "$ref": "#/$defs/RecallRangeCloseRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/products/{product}/recall-range/exclude",
+      "request": {
+        "$ref": "#/$defs/RecallRangeExcludeRequest"
+      },
+      "response": {
+        "$ref": "#/$defs/ManagementLifecycleResult"
+      }
+    },
+    {
+      "auth": "management",
+      "method": "POST",
+      "path": "/v1/products/{product}/recall-range/exclude/remove",
+      "request": {
+        "$ref": "#/$defs/RecallRangeExcludeRemoveRequest"
       },
       "response": {
         "$ref": "#/$defs/ManagementLifecycleResult"

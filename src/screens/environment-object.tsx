@@ -95,6 +95,9 @@ export const InstanceTable = ({
   waiting,
   explain,
   onExplain,
+  debug,
+  onDebug,
+  showDebug,
 }: {
   report: EnvironmentInspectReport;
   token: string;
@@ -104,6 +107,9 @@ export const InstanceTable = ({
   waiting: ReadonlySet<string>;
   explain: string | undefined;
   onExplain: (instance: string | undefined) => void;
+  debug: string | undefined;
+  onDebug: (instance: string | undefined) => void;
+  showDebug: boolean;
 }) => {
   if (report.subscriptions.length === 0) {
     return <p className="m-0 px-3.5 py-3 text-xs text-muted">none</p>;
@@ -166,6 +172,17 @@ export const InstanceTable = ({
                     onClick={() => onExplain(explain === instance ? undefined : instance)}
                   >
                     Why
+                  </button>
+                )}
+                {showDebug && (
+                  <button
+                    type="button"
+                    className="ml-2 cursor-pointer font-sans font-semibold text-muted"
+                    aria-label={`Debug ${instance}`}
+                    aria-pressed={debug === instance}
+                    onClick={() => onDebug(debug === instance ? undefined : instance)}
+                  >
+                    Debug
                   </button>
                 )}
               </td>
