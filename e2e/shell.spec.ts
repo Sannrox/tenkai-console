@@ -49,7 +49,7 @@ const signIn = async (page: Page, url: string) => {
   await page.goto(url);
   await page.getByLabel("Platform token").fill("fixture-token");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Environments" })).toBeVisible();
 };
 
 const capture = (page: Page, name: string) =>
@@ -62,18 +62,19 @@ test.describe("shell at desktop width", () => {
     await app.close();
   });
 
-  test("sidebar replaces top tabs and keeps every current path", async ({ page }) => {
+  test("sidebar is places with a search field and no Home or Apps heading", async ({ page }) => {
     app = await serveConsole(routes);
     await signIn(page, app.url);
     const main = page.getByRole("navigation", { name: "Main" });
-    await expect(main.getByRole("link", { name: "Home" })).toBeVisible();
-    await expect(main.getByRole("link", { name: "Search" })).toBeVisible();
-    await expect(main.getByRole("link", { name: "Attention" })).toBeVisible();
+    await expect(main.getByRole("button", { name: "Search" })).toBeVisible();
     await expect(main.getByRole("link", { name: "Environments" })).toBeVisible();
     await expect(main.getByRole("link", { name: "Releases" })).toBeVisible();
     await expect(main.getByRole("link", { name: "Exposure" })).toBeVisible();
     await expect(main.getByRole("link", { name: "Runners" })).toBeVisible();
     await expect(main.getByRole("link", { name: "Platform" })).toBeVisible();
+    await expect(main.getByRole("link", { name: "Home" })).toHaveCount(0);
+    await expect(main.getByRole("link", { name: "Attention" })).toHaveCount(0);
+    await expect(main.getByText("Apps", { exact: true })).toHaveCount(0);
     await expect(main.getByRole("link", { name: "Delivery" })).toHaveCount(0);
     await expect(main.getByRole("link", { name: "Access" })).toHaveCount(0);
     await expectDesignRules(page);
@@ -85,9 +86,6 @@ test.describe("shell at desktop width", () => {
       await expectDesignRules(page);
       await capture(page, `${id}-desktop`);
     };
-    await open("environments", "Environments", () =>
-      main.getByRole("link", { name: "Environments" }).click(),
-    );
     await open("releases", "Releases", () => main.getByRole("link", { name: "Releases" }).click());
     await open("exposure", "Exposure", () => main.getByRole("link", { name: "Exposure" }).click());
     await open("runners", "Runners", () => main.getByRole("link", { name: "Runners" }).click());
@@ -105,11 +103,13 @@ test.describe("shell at desktop width", () => {
     );
     await open("access", "Access", () => platform.getByRole("link", { name: "Access" }).click());
     await expect(page.locator("dl")).toContainText("bearer token");
-    await open("search", "Search", () => main.getByRole("link", { name: "Search" }).click());
-    await open("attention", "Attention", () =>
-      main.getByRole("link", { name: "Attention" }).click(),
+    await main.getByRole("button", { name: "Search" }).click();
+    await expect(page.getByRole("dialog", { name: "Search" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Search" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await open("environments", "Environments", () =>
+      main.getByRole("link", { name: "Environments" }).click(),
     );
-    await open("home", "Home", () => main.getByRole("link", { name: "Home" }).click());
   });
 
   test("collapsed sidebar is icons only and remembered", async ({ page }) => {
@@ -139,31 +139,35 @@ test.describe("shell at phone width", () => {
     await app.close();
   });
 
-  test("bottom bar is Home, Attention, Search, Apps and does not overflow", async ({ page }) => {
+  test("bottom bar is Search, Env, Rel, More and does not overflow", async ({ page }) => {
     app = await serveConsole(routes);
     await signIn(page, app.url);
     const bar = page.getByRole("navigation", { name: "Main" });
-    await expect(bar.getByRole("link", { name: "Home" })).toBeVisible();
-    await expect(bar.getByRole("link", { name: "Attention" })).toBeVisible();
-    await expect(bar.getByRole("link", { name: "Search" })).toBeVisible();
-    await expect(bar.getByRole("link", { name: "Apps" })).toBeVisible();
+    await expect(bar.getByRole("button", { name: "Search" })).toBeVisible();
+    await expect(bar.getByRole("link", { name: "Env" })).toBeVisible();
+    await expect(bar.getByRole("link", { name: "Rel" })).toBeVisible();
+    await expect(bar.getByRole("link", { name: "More" })).toBeVisible();
+    await expect(bar.getByRole("link", { name: "Home" })).toHaveCount(0);
+    await expect(bar.getByRole("link", { name: "Apps" })).toHaveCount(0);
     await expect(bar.getByRole("link", { name: "Environments" })).toHaveCount(0);
     await expectDesignRules(page);
     await capture(page, "home-phone");
 
-    await bar.getByRole("link", { name: "Apps" }).click();
-    await expect(page.getByRole("heading", { name: "Apps" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Environments" })).toBeVisible();
+    await bar.getByRole("link", { name: "More" }).click();
+    await expect(page.getByRole("heading", { name: "More" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Exposure" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Runners" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Platform" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Attention" })).toBeVisible();
     await expectDesignRules(page);
     await capture(page, "apps-phone");
 
-    await page.getByRole("link", { name: "Environments" }).click();
+    await bar.getByRole("link", { name: "Env" }).click();
     await expect(page.getByRole("heading", { name: "Environments" })).toBeVisible();
     await expectDesignRules(page);
     await capture(page, "environments-phone");
 
-    await page.getByRole("link", { name: "Apps" }).click();
+    await bar.getByRole("link", { name: "More" }).click();
     await page.getByRole("link", { name: "Platform" }).click();
     await expect(page.getByRole("heading", { name: "Server" })).toBeVisible();
     await expect(

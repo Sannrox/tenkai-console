@@ -92,7 +92,7 @@ test.describe("signed in", () => {
   test("a host account over SSH is signed in with its groups and grants", async ({ page }) => {
     app = await serveConsole(server({ host: true, oidc: false }));
     await page.goto(app.url);
-    await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Environments" })).toBeVisible();
     await expectDesignRules(page);
 
     await page.getByRole("button", { name: /alice/ }).click();

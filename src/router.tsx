@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  Navigate,
   Outlet,
   createRootRoute,
   createRoute,
@@ -11,14 +12,15 @@ import { signInWithHost } from "./auth/identity";
 import { useSession } from "./auth/session";
 import { useSessionRefresh } from "./auth/use-session-refresh";
 import { Environments } from "./screens/environments";
-import { Home } from "./screens/home";
 import { findingSearch, objectEnvironment } from "./screens/objects";
 import { ServerStatus } from "./screens/server-status";
+import { SearchEntry } from "./screens/shell";
 import { SignedIn } from "./screens/signed-in";
 import { Centered, Title } from "./ui/kit";
 
-// Screens other than home load on first visit, so the initial bundle stays small.
-// Environments is eager: the fleet table must paint within the load budget.
+// Screens other than the environments landing load on first visit, so the
+// initial bundle stays small. Environments is eager: the fleet table must
+// paint within the load budget.
 const EnvironmentPage = lazyRouteComponent(
   () => import("./screens/environment-page"),
   "EnvironmentPage",
@@ -38,9 +40,8 @@ const Imports = lazyRouteComponent(() => import("./screens/imports"), "Imports")
 const Access = lazyRouteComponent(() => import("./screens/access"), "Access");
 const Exposure = lazyRouteComponent(() => import("./screens/exposure"), "Exposure");
 const AuthCallback = lazyRouteComponent(() => import("./screens/auth-callback"), "AuthCallback");
-const SearchPage = lazyRouteComponent(() => import("./screens/search"), "SearchPage");
 const AttentionPage = lazyRouteComponent(() => import("./screens/attention"), "AttentionPage");
-const AppsPage = lazyRouteComponent(() => import("./screens/placeholders"), "AppsPage");
+const MorePage = lazyRouteComponent(() => import("./screens/placeholders"), "MorePage");
 
 const useServer = () =>
   useQuery({
@@ -89,7 +90,11 @@ const appRoute = createRoute({
   },
 });
 
-const indexRoute = createRoute({ getParentRoute: () => appRoute, path: "/", component: Home });
+const indexRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/",
+  component: Environments,
+});
 
 const environmentSearch = (search: Record<string, unknown>): { instance?: string } => {
   const instance = typeof search.instance === "string" ? search.instance : undefined;
@@ -161,14 +166,23 @@ const environmentsRoute = createRoute({
       ...(instance === undefined ? {} : { instance }),
     };
   },
-  component: function EnvironmentsPage() {
+  component: function EnvironmentsRedirect() {
     const { environment, instance } = environmentsRoute.useSearch();
-    return (
-      <Environments
-        {...(environment === undefined ? {} : { focus: environment })}
-        {...(instance === undefined ? {} : { instance })}
-      />
-    );
+    if (environment !== undefined) {
+      return (
+        <Navigate
+          to={
+            instance === undefined
+              ? "/environments/$environment"
+              : "/environments/$environment/history"
+          }
+          params={{ environment }}
+          search={instance === undefined ? {} : { instance }}
+          replace
+        />
+      );
+    }
+    return <Navigate to="/" replace />;
   },
 });
 
@@ -288,7 +302,7 @@ const accessRoute = createRoute({
 const searchRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/search",
-  component: SearchPage,
+  component: SearchEntry,
 });
 
 const attentionRoute = createRoute({
@@ -300,7 +314,7 @@ const attentionRoute = createRoute({
 const appsRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/apps",
-  component: AppsPage,
+  component: MorePage,
 });
 
 const callbackRoute = createRoute({

@@ -157,14 +157,20 @@ const signIn = async (page: Page, url: string) => {
   await page.goto(url);
   await page.getByLabel("Platform token").fill("fixture-token");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Home", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Environments", level: 1 })).toBeVisible();
 };
 
 const openAttention = async (page: Page) => {
-  await page
-    .getByRole("navigation", { name: "Main" })
-    .getByRole("link", { name: "Attention" })
-    .click();
+  const main = page.getByRole("navigation", { name: "Main" });
+  const fromRail = main.getByRole("link", { name: "Attention" });
+  const more = main.getByRole("link", { name: "More" });
+  await fromRail.or(more).waitFor();
+  if (await fromRail.isVisible()) {
+    await fromRail.click();
+  } else {
+    await more.click();
+    await page.getByRole("link", { name: "Attention" }).click();
+  }
   await expect(page.getByRole("heading", { name: "Attention", level: 1 })).toBeVisible();
 };
 
@@ -178,20 +184,24 @@ test.describe("home attention and search at desktop width", () => {
     await app.close();
   });
 
-  test("home shows fleet counts, top attention, and empty pin and recent", async ({ page }) => {
+  test("landing is the Environments table with Reconcile in Actions", async ({ page }) => {
     app = await serveConsole(server());
     await signIn(page, app.url);
-    await expect(page.getByRole("heading", { name: "Home", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Environments", exact: true })).toBeVisible();
     await expect(page.getByText("2 environments, 1 behind")).toBeVisible();
     const homeActions = await openActions(page);
     await expect(homeActions.getByRole("button", { name: "Reconcile" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Reconcile" })).toHaveCount(1);
     await page.getByRole("button", { name: "Actions" }).click();
-    await expect(page.getByRole("heading", { name: "Fleet" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Environments" })).toBeVisible();
     await expect(page.locator("table tbody tr").first()).toBeVisible();
-    await expect(page.getByRole("list", { name: "Attention" })).toContainText("prod");
-    await expect(page.getByRole("heading", { name: "Pinned" })).toBeVisible();
-    await expect(page.getByText("None yet.")).toHaveCount(2);
+    await expect(page.getByRole("list", { name: "Attention" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Pinned" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Recent" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Add environment" })).toHaveCount(0);
+    await expect(
+      page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Attention" }),
+    ).toBeVisible();
     await expectDesignRules(page);
     await shot(page, "home");
   });
@@ -243,30 +253,58 @@ test.describe("home attention and search at desktop width", () => {
     await shot(page, "attention-partial");
   });
 
-  test("search page and Control-K find objects and open a plan by id", async ({ page }) => {
+  test("search overlay from the rail and Control-K find objects and open a plan by id", async ({
+    page,
+  }) => {
     app = await serveConsole(server());
     await signIn(page, app.url);
     await page
       .getByRole("navigation", { name: "Main" })
-      .getByRole("link", { name: "Search" })
+      .getByRole("button", { name: "Search" })
       .click();
-    await expect(page.getByRole("heading", { name: "Search" })).toBeVisible();
-    await page.getByRole("textbox", { name: "Search" }).fill("api");
-    const results = page.getByRole("list", { name: "Results" });
+    const dialog = page.getByRole("dialog", { name: "Search" });
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Search" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Environments", level: 1 })).toBeVisible();
+    await dialog.getByRole("textbox", { name: "Search" }).fill("api");
+    const results = dialog.getByRole("list", { name: "Results" });
     await expect(results.getByRole("link", { name: /api/ }).first()).toBeVisible();
     await expect(results).toContainText("product");
     await expect(results).toContainText("api@1.1.0");
     await expect(results).toContainText("TENKAI-2026-1");
-    await page.getByRole("textbox", { name: "Search" }).fill("tenkai:plan:1");
+    await dialog.getByRole("textbox", { name: "Search" }).fill("tenkai:plan:1");
     await results.getByRole("link", { name: /tenkai:plan:1/ }).click();
     await expect(page.getByRole("heading", { name: "api 1.0.0 → 1.1.0" })).toBeVisible();
     await page.keyboard.press("Control+k");
-    const dialog = page.getByRole("dialog", { name: "Search" });
     await expect(dialog).toBeVisible();
     await dialog.getByRole("textbox", { name: "Search" }).fill("prod");
     await expect(dialog.getByRole("list", { name: "Results" })).toContainText("prod");
     await expectDesignRules(page);
     await shot(page, "search");
+  });
+
+  test("/search opens the overlay on Environments and /environments redirects home", async ({
+    page,
+  }) => {
+    app = await serveConsole(server());
+    await signIn(page, app.url);
+    await page.evaluate(() => {
+      const base = location.pathname.endsWith("/") ? location.pathname : `${location.pathname}/`;
+      history.pushState({}, "", `${base}search`);
+      dispatchEvent(new PopStateEvent("popstate"));
+    });
+    await expect(page.getByRole("dialog", { name: "Search" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Environments", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Search" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => {
+      const base = location.pathname.endsWith("/") ? location.pathname : `${location.pathname}/`;
+      history.pushState({}, "", `${base}environments`);
+      dispatchEvent(new PopStateEvent("popstate"));
+    });
+    await expect(page.getByRole("heading", { name: "Environments", level: 1 })).toBeVisible();
+    expect(new URL(page.url()).pathname.endsWith("/environments")).toBe(false);
+    await expectDesignRules(page);
   });
 });
 

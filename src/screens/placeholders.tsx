@@ -1,16 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { ObjectPage } from "../ui/kit";
 import { objectKey, objectTypeLabel, useSaved } from "../ui/saved";
-import { APP_ITEMS } from "./nav";
+import { MORE_ITEMS } from "./nav";
 import { SavedLink } from "./object-link";
 
-/** Phone Apps tab: the same destinations the desktop sidebar lists under Apps. */
-export const AppsPage = () => {
+/** Phone More tab: Exposure, Runners, Platform, Attention, and pins. */
+export const MorePage = () => {
   const pins = useSaved((state) => state.pins);
   return (
-    <ObjectPage name="Apps">
+    <ObjectPage name="More">
       <nav className="flex flex-col text-[13px] font-medium">
-        {APP_ITEMS.map((item) => (
+        {MORE_ITEMS.map((item) => (
           <Link key={item.label} to={item.to} className="py-1.5 text-fg no-underline">
             {item.label}
           </Link>

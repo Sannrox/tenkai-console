@@ -92,21 +92,26 @@ export const expectDesignRules = async (page: Page) => {
   expect(overflow).toBeLessThanOrEqual(0);
 };
 
-/** Opens a sidebar app. On a phone, Apps is a bottom-bar page first. */
+/** Opens a sidebar place. On a phone, Env and Rel are on the bar; the rest go through More. */
 export const openApp = async (
   page: Page,
   name: "Environments" | "Releases" | "Exposure" | "Runners" | "Platform",
 ) => {
   const main = page.getByRole("navigation", { name: "Main" });
   const fromMain = main.getByRole("link", { name, exact: true });
-  const apps = main.getByRole("link", { name: "Apps" });
-  await fromMain.or(apps).waitFor();
+  const short = name === "Environments" ? "Env" : name === "Releases" ? "Rel" : undefined;
+  const fromPhone = short
+    ? main.getByRole("link", { name: short, exact: true })
+    : main.getByRole("link", { name: "More" });
+  await fromMain.or(fromPhone).waitFor();
   if (await fromMain.isVisible()) {
     await fromMain.click();
     return;
   }
-  await apps.click();
-  await page.getByRole("link", { name, exact: true }).click();
+  await fromPhone.click();
+  if (!short) {
+    await page.getByRole("link", { name, exact: true }).click();
+  }
 };
 
 /** List, then the named environment object page. */

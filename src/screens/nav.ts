@@ -9,57 +9,49 @@ export const PLATFORM_TABS = [
   { label: "Access", to: "/access" },
 ] as const;
 
-/** Apps in the sidebar and on the phone Apps page. */
+/** Places in the desktop rail. Environments is `/`. */
 export const APP_ITEMS = [
-  { label: "Environments", to: "/environments", icon: "environments" },
+  { label: "Environments", to: "/", icon: "environments" },
   { label: "Releases", to: "/releases", icon: "releases" },
   { label: "Exposure", to: "/exposure", icon: "exposure" },
   { label: "Runners", to: "/runners", icon: "runners" },
   { label: "Platform", to: "/server", icon: "platform" },
 ] as const;
 
-export const MAIN_ITEMS = [
-  { label: "Search", to: "/search", icon: "search" },
-  { label: "Home", to: "/", icon: "home" },
+/** Phone More list: catalog and platform, plus Attention. */
+export const MORE_ITEMS = [
+  { label: "Exposure", to: "/exposure", icon: "exposure" },
+  { label: "Runners", to: "/runners", icon: "runners" },
+  { label: "Platform", to: "/server", icon: "platform" },
   { label: "Attention", to: "/attention", icon: "attention" },
 ] as const;
 
-/** Phone bottom bar: the same Main items plus Apps. */
-export const PHONE_ITEMS = [...MAIN_ITEMS, { label: "Apps", to: "/apps", icon: "apps" }] as const;
+/** Phone bottom bar after Search (overlay). */
+export const PHONE_ITEMS = [
+  { label: "Env", to: "/", icon: "environments" },
+  { label: "Rel", to: "/releases", icon: "releases" },
+  { label: "More", to: "/apps", icon: "apps" },
+] as const;
 
 export const isPlatformPath = (path: string) => PLATFORM_TABS.some((tab) => tab.to === path);
 
-export const isAppPath = (path: string) =>
-  path === "/apps" ||
-  path.startsWith("/environments") ||
-  path.startsWith("/releases") ||
-  path.startsWith("/products") ||
-  path.startsWith("/plans") ||
-  path.startsWith("/findings") ||
-  path.startsWith("/exposure") ||
-  path.startsWith("/runners") ||
-  isPlatformPath(path);
-
-/** Which bottom-bar / primary item the current path belongs to. */
-export const activeMain = (path: string): "Search" | "Home" | "Attention" | "Apps" => {
-  if (path === "/search") {
-    return "Search";
+/** Which phone-bar place the current path belongs to. */
+export const activePhone = (path: string): "Env" | "Rel" | "More" => {
+  if (path === "/" || path.startsWith("/environments") || path.startsWith("/plans")) {
+    return "Env";
   }
-  if (path === "/attention") {
-    return "Attention";
+  if (path.startsWith("/releases") || path.startsWith("/products")) {
+    return "Rel";
   }
-  if (isAppPath(path)) {
-    return "Apps";
-  }
-  return "Home";
+  return "More";
 };
 
 export const appItemActive = (path: string, to: string) => {
   if (to === "/server") {
     return isPlatformPath(path);
   }
-  if (to === "/environments") {
-    return path.startsWith("/environments") || path.startsWith("/plans");
+  if (to === "/") {
+    return path === "/" || path.startsWith("/environments") || path.startsWith("/plans");
   }
   if (to === "/releases") {
     return path.startsWith("/releases") || path.startsWith("/products");
