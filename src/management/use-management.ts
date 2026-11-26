@@ -108,6 +108,8 @@ export const useManagementCall = <T>(
         queryClient.invalidateQueries({ queryKey: ["webhook-deliveries"] }),
         queryClient.invalidateQueries({ queryKey: ["promotion-policy"] }),
         queryClient.invalidateQueries({ queryKey: ["canaries"] }),
+        queryClient.invalidateQueries({ queryKey: ["debug-sessions"] }),
+        queryClient.invalidateQueries({ queryKey: ["debug-elevations"] }),
       ]),
   });
   // By status, not data: some routes answer success with JSON `null`.

@@ -1,4 +1,4 @@
-// Generated from Sannrox/tenkai commit 3a05a95aa7e1bde8a50909a723a37462d30b498c tenkai-http-v1.schema.json (sha256 ec03076e2801a7312f7e26ea9004f5f8d44b7801744a0cd286a959698e80fb6d, contract tenkai.http.v1).
+// Generated from Sannrox/tenkai commit 313ab89efc1ddc9f37b22176ccccb2de11219cce tenkai-http-v1.schema.json (sha256 724d8ee011746f2969de65a322081adbcbd64053e2498ebc0d6e0f74530a06c8, contract tenkai.http.v1).
 // Do not edit: run `pnpm api:gen`.
 
 /**
@@ -165,6 +165,34 @@ export type ConnectivityClass = ("connected" | "intermittent" | "isolated")
  */
 export type CriticalityLevel = ("low" | "medium" | "high" | "critical")
 /**
+ * Where an elevation stands.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugElevationState".
+ */
+export type DebugElevationState = ("pending" | "active" | "ended")
+/**
+ * Access a session grants. Write needs a live elevation (#1560).
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugSessionMode".
+ */
+export type DebugSessionMode = "read"
+/**
+ * Lifecycle of a session. `closed` and `expired` are final.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugSessionState".
+ */
+export type DebugSessionState = ("open" | "closed" | "expired")
+/**
+ * Debug sessions an environment allows (ADR 0061 §3).
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugSessions".
+ */
+export type DebugSessions = ("forbid" | "read" | "elevate")
+/**
  * Configuration that caused a delivery: an environment's or a product's
  * endpoint list. A URL on both is one delivery with both sources.
  * 
@@ -192,7 +220,7 @@ export type ReachabilityVerdict = ("unconfigured" | "unreachable" | "reachable" 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "QuorumPurpose".
  */
-export type QuorumPurpose = ("execute_plan" | "rollback" | "skip_gates" | "downgrade")
+export type QuorumPurpose = ("execute_plan" | "rollback" | "skip_gates" | "downgrade" | "debug_elevate")
 /**
  * One configuration change. The variant decides the route: its resource
  * path and whether it is a `PUT` or a `DELETE`.
@@ -296,6 +324,23 @@ key: string
 kind: "delete_sealed_secret"
 present_in_target?: boolean
 secret: string
+} | {
+kind: "set_cluster_namespace"
+name: string
+spec: ClusterNamespaceSpec
+} | {
+kind: "clear_cluster_namespace"
+name: string
+} | {
+kind: "delete_cluster_namespace"
+name: string
+} | {
+instance: string
+kind: "bind_cluster_namespace"
+name: string
+} | {
+instance: string
+kind: "unbind_cluster_namespace"
 })
 /**
  * Stable apply-lifecycle events a webhook endpoint may subscribe to.
@@ -474,6 +519,21 @@ export type RunnerAuth = ("client_certificate" | "bearer")
  */
 export type SignerValidity = ("not_recorded" | "recorded")
 /**
+ * What an environment's executing processes can run for model engines.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "SupportedEngines".
+ */
+export type SupportedEngines = ({
+engines: string[]
+processes: ProcessExecutors[]
+state: "known"
+} | {
+processes?: ProcessExecutors[]
+reason: string
+state: "unknown"
+})
+/**
  * What an environment's executing processes can run.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -515,6 +575,7 @@ BackupHealth?: BackupHealth
 BackupManifest?: BackupManifest
 BackupStatus?: BackupStatus
 BindPreview?: BindPreview
+BranchPin?: BranchPin
 CanaryCohort?: CanaryCohort
 CanaryDesignation?: CanaryDesignation
 CanaryDesignationRequest?: CanaryDesignationRequest
@@ -541,6 +602,9 @@ CheckpointDecl?: CheckpointDecl
 CheckpointReceipt?: CheckpointReceipt
 ClearProductWebhooksQuery?: ClearProductWebhooksQuery
 ClockHealth?: ClockHealth
+ClosePreviewRequest?: ClosePreviewRequest
+ClusterNamespaceSpec?: ClusterNamespaceSpec
+ClusterNamespaceStatus?: ClusterNamespaceStatus
 CollectedApproval?: CollectedApproval
 CommandRefusalReason?: CommandRefusalReason
 CompatibilityEvidence?: CompatibilityEvidence
@@ -558,6 +622,23 @@ ContentItem?: ContentItem
 CreateGrantRuleRequest?: CreateGrantRuleRequest
 CredentialRunway?: CredentialRunway
 CriticalityLevel?: CriticalityLevel
+DebugElevation?: DebugElevation
+DebugElevationApproval?: DebugElevationApproval
+DebugElevationApproveRequest?: DebugElevationApproveRequest
+DebugElevationList?: DebugElevationList
+DebugElevationOpenRequest?: DebugElevationOpenRequest
+DebugElevationRevokeRequest?: DebugElevationRevokeRequest
+DebugElevationState?: DebugElevationState
+DebugElevationStatement?: DebugElevationStatement
+DebugElevationStatementEnvelope?: DebugElevationStatementEnvelope
+DebugSession?: DebugSession
+DebugSessionCloseRequest?: DebugSessionCloseRequest
+DebugSessionList?: DebugSessionList
+DebugSessionMode?: DebugSessionMode
+DebugSessionOpenRequest?: DebugSessionOpenRequest
+DebugSessionRuntime?: DebugSessionRuntime1
+DebugSessionState?: DebugSessionState
+DebugSessions?: DebugSessions
 DeclaredCriticality?: DeclaredCriticality
 DeliveryFailureThresholdRequest?: DeliveryFailureThresholdRequest
 DeliveryFreeze?: DeliveryFreeze
@@ -655,6 +736,7 @@ IssuerSummary?: IssuerSummary
 LabelAction?: LabelAction
 LabelChange?: LabelChange
 LabelView?: LabelView
+LimitRangeItem?: LimitRangeItem
 LiveWorkload?: LiveWorkload
 ManagementLifecycleResult?: ManagementLifecycleResult
 MatchedExposure?: MatchedExposure
@@ -703,6 +785,7 @@ ProductImpact?: ProductImpact
 PromoteRequest?: PromoteRequest
 Provenance?: Provenance
 ProviderView?: ProviderView
+ProvisionPreviewRequest?: ProvisionPreviewRequest
 PublishInputEntry?: PublishInputEntry
 PublishInputKind?: PublishInputKind
 PublishRequest?: PublishRequest
@@ -710,13 +793,19 @@ QuorumPurpose?: QuorumPurpose
 QuorumRule?: QuorumRule
 ReachabilityVerdict?: ReachabilityVerdict
 RecallEnvironmentRemoval?: RecallEnvironmentRemoval
+RecallOutOfScopeHolder?: RecallOutOfScopeHolder
 RecallRangeCloseRequest?: RecallRangeCloseRequest
+RecallRangeExcludeRemoveRequest?: RecallRangeExcludeRemoveRequest
+RecallRangeExcludeRequest?: RecallRangeExcludeRequest
+RecallRangeExclusionView?: RecallRangeExclusionView
 RecallRangePage?: RecallRangePage
 RecallRangeRequest?: RecallRangeRequest
 RecallRangeView?: RecallRangeView
 RecallRemovalProgress?: RecallRemovalProgress
 RecallRequest?: RecallRequest
 RecallView?: RecallView
+RecallWidenRequest?: RecallWidenRequest
+RecallWidening?: RecallWidening
 RecipientWrap?: RecipientWrap
 ReconcileDeploymentRequest?: ReconcileDeploymentRequest
 RegisterEnvironmentRequest?: RegisterEnvironmentRequest
@@ -762,6 +851,7 @@ StatusDependencyHold?: StatusDependencyHold
 StatusRow?: StatusRow
 StopRequest?: StopRequest
 SubscribeRequest?: SubscribeRequest
+SupportedEngines?: SupportedEngines
 SupportedExecutors?: SupportedExecutors
 TargetChange?: TargetChange
 TargetFieldChange?: TargetFieldChange
@@ -1306,6 +1396,17 @@ stdout_sha256: string
 summary: string
 }
 /**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "BranchPin".
+ */
+export interface BranchPin {
+branch_id: string
+contract: string
+head_revision: string
+namespace: string
+pin_digest: string
+}
+/**
  * The cohort of the active canary policy for one release and target
  * channel, and the selector it was configured by.
  * 
@@ -1568,6 +1669,11 @@ export interface ChannelPromotionEvidence {
 canary?: boolean
 evaluation?: boolean
 /**
+ * Optional maximum currently failing instances during soak. Absent
+ * means the rule uses only `failing_max_share`.
+ */
+failing_max_instances?: number
+/**
  * Maximum share of soak time with any replica failing (0.0–1.0).
  */
 failing_max_share?: number
@@ -1577,8 +1683,9 @@ health_slo?: boolean
  */
 healthy_min_share?: number
 /**
- * When true, exceeding `failing_max_share` recalls the soaking source
- * release instead of only resetting the soak.
+ * When true, exceeding `failing_max_share` or reaching
+ * `failing_max_instances` recalls the soaking source release instead of
+ * only resetting the soak.
  */
 recall_on_failing?: boolean
 }
@@ -1655,12 +1762,18 @@ selector?: HoldSelector
 export interface ChannelRecallRuleRequest {
 expected_generation: number
 /**
+ * Optional maximum currently failing instances during soak. Absent
+ * means the rule uses only `failing_max_share`.
+ */
+failing_max_instances?: number
+/**
  * Maximum share of soak time with any replica failing (0.0–1.0).
  */
 failing_max_share: number
 operation: string
 /**
- * When true, exceeding `failing_max_share` recalls the soaking release.
+ * When true, exceeding `failing_max_share` or reaching
+ * `failing_max_instances` recalls the soaking release.
  */
 recall_on_failing: boolean
 soak_duration_ms: number
@@ -1729,6 +1842,78 @@ skew_ms?: number
  */
 state: string
 warn_ms: number
+}
+/**
+ * Body of `POST /v1/environments/{environment}/close-preview`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ClosePreviewRequest".
+ */
+export interface ClosePreviewRequest {
+operation: string
+version: number
+}
+/**
+ * Labels, quota, and limit range of one declared cluster namespace.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ClusterNamespaceSpec".
+ */
+export interface ClusterNamespaceSpec {
+annotations?: {
+[k: string]: string
+}
+labels?: {
+[k: string]: string
+}
+limit_range?: LimitRangeItem[]
+/**
+ * ResourceQuota `.spec.hard` quantities, for example `cpu` or `pods`.
+ */
+quota?: {
+[k: string]: string
+}
+}
+/**
+ * One LimitRange `.spec.limits` entry.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "LimitRangeItem".
+ */
+export interface LimitRangeItem {
+default?: {
+[k: string]: string
+}
+defaultRequest?: {
+[k: string]: string
+}
+max?: {
+[k: string]: string
+}
+min?: {
+[k: string]: string
+}
+type: string
+}
+/**
+ * Inspect/status row: one cluster namespace and the instances in it.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ClusterNamespaceStatus".
+ */
+export interface ClusterNamespaceStatus {
+instances?: string[]
+labels?: {
+[k: string]: string
+}
+name: string
+quota?: {
+[k: string]: string
+}
+/**
+ * `declared`, `applied`, or `pending_delete`.
+ */
+state: string
 }
 /**
  * One collected, still-detached envelope for a plan.
@@ -2010,6 +2195,230 @@ export interface CredentialRunway {
 credential: string
 expires_at_ms: number
 window_opens_at_ms: number
+}
+/**
+ * An elevation as returned by the management API.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugElevation".
+ */
+export interface DebugElevation {
+active_from?: number
+/**
+ * Approvals collected so far, whether or not they still count.
+ */
+approvals: DebugElevationApproval[]
+/**
+ * Requested length, counted from activation.
+ */
+duration_ms: number
+end_reason?: string
+ended_at?: number
+environment: string
+id: string
+/**
+ * When write access ends, once active.
+ */
+not_after?: number
+reason: string
+requested_at: number
+/**
+ * The human principal that asked; its own approval never counts.
+ */
+requested_by: string
+/**
+ * The audit principal of the request.
+ */
+requester: string
+revoked_by?: string
+session: string
+state: DebugElevationState
+}
+/**
+ * One counted or collected approval.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugElevationApproval".
+ */
+export interface DebugElevationApproval {
+approved_at: number
+identity: string
+key_id: string
+}
+/**
+ * `POST /v1/debug-sessions/{session}/elevations/{elevation}/approvals`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugElevationApproveRequest".
+ */
+export interface DebugElevationApproveRequest {
+approval: DebugElevationStatementEnvelope
+}
+/**
+ * A signed approval: a statement, the key that signed it and the
+ * signature. Plan approvals use [`ApprovalStatement`]; package migration
+ * approvals sign their own statement in the same envelope, under their own
+ * schema, purpose and domain ([`SignedApproval`]).
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugElevationStatementEnvelope".
+ */
+export interface DebugElevationStatementEnvelope {
+key_id: string
+schema: string
+signature: string
+statement: DebugElevationStatement
+}
+/**
+ * What an approver signs: one elevation of one session in one environment.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugElevationStatement".
+ */
+export interface DebugElevationStatement {
+elevation: string
+environment: string
+expires_at: number
+issued_at: number
+/**
+ * Always [`APPROVAL_PURPOSE`].
+ */
+purpose: string
+session: string
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugElevationList".
+ */
+export interface DebugElevationList {
+elevations: DebugElevation[]
+}
+/**
+ * `POST /v1/debug-sessions/{session}/elevations`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugElevationOpenRequest".
+ */
+export interface DebugElevationOpenRequest {
+/**
+ * Write access length from activation. Default 30 minutes; never past
+ * the session's bound.
+ */
+duration_ms?: (number | null)
+/**
+ * Why write access is needed; recorded and audited.
+ */
+reason: string
+}
+/**
+ * `POST /v1/debug-sessions/{session}/elevations/{elevation}/revoke`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugElevationRevokeRequest".
+ */
+export interface DebugElevationRevokeRequest {
+reason: string
+}
+/**
+ * A debug session as stored and as returned by the management API.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugSession".
+ */
+export interface DebugSession {
+close_reason?: string
+closed_at?: number
+closed_by?: string
+environment: string
+id: string
+instance: string
+mode: DebugSessionMode
+/**
+ * Unix ms after which the session is over, whoever notices first.
+ */
+not_after: number
+opened_at: number
+/**
+ * The audit principal: subject and every delegating actor.
+ */
+opened_by: string
+reason: string
+runtime?: DebugSessionRuntime
+state: DebugSessionState
+/**
+ * The human principal that opened the session.
+ */
+subject: string
+}
+/**
+ * The runtime holding the session; absent until one picks it up.
+ */
+export interface DebugSessionRuntime {
+attached_at: number
+/**
+ * When the runtime reported closing the session on its own clock.
+ */
+closed_at?: number
+instance: string
+/**
+ * Why the runtime last failed to open the terminal stream, such as a
+ * TLS terminator that refuses the WebSocket upgrade (#1558).
+ */
+stream_error?: string
+}
+/**
+ * `POST /v1/debug-sessions/{session}/close`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugSessionCloseRequest".
+ */
+export interface DebugSessionCloseRequest {
+reason: string
+}
+/**
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugSessionList".
+ */
+export interface DebugSessionList {
+sessions: DebugSession[]
+}
+/**
+ * `POST /v1/debug-sessions`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugSessionOpenRequest".
+ */
+export interface DebugSessionOpenRequest {
+/**
+ * Session length; default and maximum are the environment's
+ * `debug_session_max_ms` (four hours unless lower).
+ */
+duration_ms?: (number | null)
+environment: string
+instance: string
+/**
+ * Why the session is needed; recorded and audited.
+ */
+reason: string
+}
+/**
+ * The runtime instance a session reached, and when it closed it.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "DebugSessionRuntime".
+ */
+export interface DebugSessionRuntime1 {
+attached_at: number
+/**
+ * When the runtime reported closing the session on its own clock.
+ */
+closed_at?: number
+instance: string
+/**
+ * Why the runtime last failed to open the terminal stream, such as a
+ * TLS terminator that refuses the WebSocket upgrade (#1558).
+ */
+stream_error?: string
 }
 /**
  * Operator-declared criticality, with who set it and why.
@@ -2400,6 +2809,15 @@ applied: number
 export interface EffectiveApprovalPolicy {
 auto_signers?: string[]
 configured: boolean
+/**
+ * Longest debug session, in milliseconds; absent from servers before
+ * it existed.
+ */
+debug_session_max_ms?: number
+/**
+ * Debug sessions an environment allows (ADR 0061 §3).
+ */
+debug_sessions?: ("forbid" | "read" | "elevate")
 digest?: string
 mode: string
 quorums?: QuorumRule[]
@@ -2650,6 +3068,10 @@ export interface EnvironmentInspectReport {
  * when one is set (#820).
  */
 approval_policy?: string
+/**
+ * Declared cluster namespaces and the instances bound to them (#1096).
+ */
+cluster_namespaces?: ClusterNamespaceStatus[]
 /**
  * Effective non-secret config and declared secret names per product (#1019).
  */
@@ -3077,6 +3499,11 @@ health?: (string | null)
 instance?: string
 overlay_digest?: (string | null)
 product: string
+/**
+ * Present when this instance still runs a recalled release whose
+ * removal is not in scope. A warning, not a hold or gate.
+ */
+recall?: string
 spec_drift?: SpecDriftView
 state: string
 }
@@ -3284,6 +3711,19 @@ export interface EnvironmentRuntimeReport {
 components: ObservedRuntimeComponent[]
 environment: string
 /**
+ * What the processes that run this environment's steps can serve
+ * (model engines). Independent of `supported_executors`.
+ */
+supported_engines?: ({
+engines: string[]
+processes: ProcessExecutors[]
+state: "known"
+} | {
+processes?: ProcessExecutors[]
+reason: string
+state: "unknown"
+})
+/**
  * What the processes that run this environment's steps can execute
  * (ADR 0057): its runtime's set, or the server replicas' common set.
  */
@@ -3347,7 +3787,7 @@ restart_policy: string
 running: boolean
 }
 /**
- * One process's recorded executor set.
+ * One process's recorded executor and engine sets.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
  * via the `definition` "ProcessExecutors".
@@ -3357,6 +3797,11 @@ export interface ProcessExecutors {
  * Last check-in, Unix milliseconds.
  */
 checked_in_at: number
+/**
+ * Configured model engines. Absent when the process recorded none, as
+ * a version before engines were part of the set does.
+ */
+engines?: string[]
 /**
  * Installed executor kinds. Absent when the process recorded none, as
  * a version before ADR 0057 does.
@@ -3693,7 +4138,7 @@ products_current: number
 products_missing: number
 /**
  * The environment's runtime instances and their recorded executors
- * (ADR 0057). Empty when no runtime runs it.
+ * and engines (ADR 0057). Empty when no runtime runs it.
  */
 runtimes?: ProcessExecutors[]
 subscription_count: number
@@ -3769,7 +4214,7 @@ environments_unhealthy: number
 promotion_policies?: ChannelPromotionPolicyStatus[]
 /**
  * Server replicas that checked in recently and their installed
- * executors (ADR 0057). Empty on a single-replica server.
+ * executors and engines (ADR 0057). Empty on a single-replica server.
  */
 replicas?: ProcessExecutors[]
 /**
@@ -4565,6 +5010,24 @@ revision: string
 source_uri: string
 }
 /**
+ * Body of `POST /v1/environments/preview`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "ProvisionPreviewRequest".
+ */
+export interface ProvisionPreviewRequest {
+description?: string
+environment: string
+/**
+ * RFC 3339 expiry. Teardown never deletes a non-preview environment.
+ */
+expires_at: string
+operation: string
+pin: BranchPin
+reason: string
+version: number
+}
+/**
  * One file or directory from the release workdir, relative to the manifest.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -4631,6 +5094,17 @@ environment: string
 total: number
 }
 /**
+ * An environment still running a recalled release whose removal is not in
+ * scope. A warning, not a hold or gate.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RecallOutOfScopeHolder".
+ */
+export interface RecallOutOfScopeHolder {
+environment: string
+status: string
+}
+/**
  * Body of `POST /v1/products/{product}/recall-range/close`.
  * 
  * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
@@ -4642,6 +5116,46 @@ from: string
 operation: string
 product: string
 version: number
+}
+/**
+ * Body of `POST /v1/products/{product}/recall-range/exclude/remove`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RecallRangeExcludeRemoveRequest".
+ */
+export interface RecallRangeExcludeRemoveRequest {
+excluded_version: string
+from: string
+operation: string
+product: string
+reason: string
+version: number
+}
+/**
+ * Body of `POST /v1/products/{product}/recall-range/exclude`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RecallRangeExcludeRequest".
+ */
+export interface RecallRangeExcludeRequest {
+excluded_version: string
+from: string
+operation: string
+product: string
+reason: string
+version: number
+}
+/**
+ * One version subtracted from a recorded recall range at lookup time.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RecallRangeExclusionView".
+ */
+export interface RecallRangeExclusionView {
+actor: string
+reason: string
+recorded_at: number
+version: string
 }
 /**
  * Recorded recall ranges for one product.
@@ -4662,6 +5176,11 @@ export interface RecallRangeView {
 actor: string
 before?: string
 covers_future: boolean
+/**
+ * Versions subtracted from this range at lookup. Omitted when none,
+ * including ranges recorded before exclusions.
+ */
+exclusions?: RecallRangeExclusionView[]
 from: string
 product: string
 reason: string
@@ -4698,6 +5217,11 @@ remaining: boolean
  * via the `definition` "RecallRequest".
  */
 export interface RecallRequest {
+/**
+ * Environments whose already-deployed instances roll off. Omitted covers
+ * the fleet. Older servers refuse this field (`deny_unknown_fields`).
+ */
+environments?: string[]
 operation: string
 version: number
 }
@@ -4709,7 +5233,17 @@ version: number
  */
 export interface RecallView {
 covers_future: boolean
+/**
+ * Measured failing instance count when the count threshold fired.
+ */
+failing_instance_count?: number
 failing_instances?: string[]
+/**
+ * The policy's `failing_max_instances` threshold that the failing
+ * instance count reached. Omitted when the recall tripped on share or
+ * was not a promotion-policy recall.
+ */
+failing_max_instances?: number
 /**
  * The policy's `failing_max_share` threshold that `failing_share` exceeded.
  */
@@ -4723,6 +5257,11 @@ failing_share?: number
  * recalled the release. Omitted for other recalls.
  */
 healthy_share?: number
+/**
+ * Environments that still run the release and are not in the removal
+ * scope. Each row's `status` is [`REMOVAL_NOT_IN_SCOPE`].
+ */
+out_of_scope?: RecallOutOfScopeHolder[]
 policy_id?: string
 policy_version?: string
 principal_kind?: string
@@ -4732,10 +5271,58 @@ recalled_at?: number
 recalled_by?: string
 release: string
 /**
- * Per-environment removal counts, sorted by environment.
+ * Per-environment removal counts, sorted by environment. Counts only
+ * environments in the removal scope; omitted scope is fleet-wide.
  */
 removal_environments?: RecallEnvironmentRemoval[]
 removal_progress?: RecallRemovalProgress[]
+/**
+ * Environments this recall's removal covers. Omitted when fleet-wide,
+ * including recalls recorded before scoped removal.
+ */
+removal_scope?: string[]
+/**
+ * Later audited writes that appended environments or switched the recall
+ * to fleet-wide. Oldest first. Empty when none.
+ */
+widenings?: RecallWidening[]
+}
+/**
+ * One audited widening of a recall's removal scope.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RecallWidening".
+ */
+export interface RecallWidening {
+/**
+ * Environments appended by this write. Empty when the write switched
+ * the recall to fleet-wide.
+ */
+environments?: string[]
+fleet_wide: boolean
+principal_kind: string
+reason: string
+widened_at: number
+widened_by: string
+}
+/**
+ * Body of `POST /v1/releases/{release}/recall/widen`.
+ * 
+ * This interface was referenced by `TenkaiHttpV1`'s JSON-Schema
+ * via the `definition` "RecallWidenRequest".
+ */
+export interface RecallWidenRequest {
+/**
+ * Environments to append. Empty when `fleet_wide` is true.
+ */
+environments?: string[]
+/**
+ * Switch the recall to fleet-wide. Mutually exclusive with `environments`.
+ */
+fleet_wide?: boolean
+operation: string
+reason: string
+version: number
 }
 /**
  * A wrap a runtime made for an approved recipient (ADR 0045 §5), for one
@@ -5370,6 +5957,11 @@ release_id: string
 export interface StatusRow {
 certificate?: CertificateStatus1
 channel: string
+/**
+ * Cluster namespace this instance deploys into (#1096). Omitted when it
+ * is the environment name and no cluster namespaces are declared.
+ */
+cluster_namespace?: string
 delivery_hold?: DeliveryHold3
 dependency_hold?: StatusDependencyHold1
 deployed?: (string | null)
@@ -5398,6 +5990,11 @@ overlay_stale?: boolean
  */
 owner?: string
 product: string
+/**
+ * Present when this instance still runs a recalled release whose
+ * removal is not in scope. A warning, not a hold or gate.
+ */
+recall?: string
 spec_drift?: SpecDriftView2
 unmanaged?: LiveWorkload1
 }

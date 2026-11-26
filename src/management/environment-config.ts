@@ -56,6 +56,11 @@ const SEGMENT: Record<EnvironmentConfigChange["kind"], string> = {
   set_sealed_secret: "sealed-secrets",
   set_sealed_recovery_key: "sealed-secrets",
   delete_sealed_secret: "sealed-secrets",
+  set_cluster_namespace: "cluster-namespaces",
+  clear_cluster_namespace: "cluster-namespaces",
+  delete_cluster_namespace: "cluster-namespaces",
+  bind_cluster_namespace: "cluster-namespace-bindings",
+  unbind_cluster_namespace: "cluster-namespace-bindings",
 };
 
 const CLEARS = new Set<EnvironmentConfigChange["kind"]>([
@@ -70,6 +75,9 @@ const CLEARS = new Set<EnvironmentConfigChange["kind"]>([
   "clear_criticality",
   "unbind",
   "delete_sealed_secret",
+  "clear_cluster_namespace",
+  "delete_cluster_namespace",
+  "unbind_cluster_namespace",
 ]);
 
 /** The route, method and body of one change, as the server routes it. */

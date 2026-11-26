@@ -12,8 +12,10 @@ import type {
   ManagementLifecycleResult,
   RetireEnvironmentRequest,
 } from "../api/tenkai.gen";
+import { useAuthSession } from "../auth/identity";
 import { useSession } from "../auth/session";
 import { channelMatrix } from "../delivery/configuration";
+import { offerDebug } from "../delivery/debug-sessions";
 import { heldProducts } from "../delivery/dependencies";
 import { healthRollup, instanceName, withHealth } from "../delivery/instances";
 import { previousRelease, rollbackSummary } from "../delivery/rollback";
@@ -51,6 +53,7 @@ const EnvironmentDependencies = lazy(() => import("./environment-dependencies"))
 const EnvironmentHistory = lazy(() => import("./environment-history"));
 const EnvironmentSecrets = lazy(() => import("./environment-secrets"));
 const InstanceExplain = lazy(() => import("./instance-explain"));
+const InstanceDebug = lazy(() => import("./instance-debug"));
 const RecalledUpgrade = lazy(() => import("./environment-recalled-upgrade"));
 const EnvironmentAdopt = lazy(() => import("./environment-adopt"));
 const EnvironmentIdentity = lazy(() => import("./environment-identity"));
@@ -197,6 +200,8 @@ const LoadedPage = ({
   const [product, setProduct] = useState("");
   const [channel, setChannel] = useState("");
   const [explain, setExplain] = useState<string | undefined>();
+  const [debug, setDebug] = useState<string | undefined>();
+  const me = useAuthSession(token);
   const deployed = report.subscriptions.filter((subscription) => subscription.deployed);
   const [rollbackProduct, setRollbackProduct] = useState(deployed[0]?.product ?? "");
   const selectedProduct = deployed.some((subscription) => subscription.product === rollbackProduct)
@@ -254,6 +259,9 @@ const LoadedPage = ({
       waiting={waiting}
       explain={explain}
       onExplain={setExplain}
+      debug={debug}
+      onDebug={setDebug}
+      showDebug={offerDebug(me.data)}
     />
   );
 
@@ -521,6 +529,17 @@ const LoadedPage = ({
                 instance={explain}
                 token={token}
                 onClose={() => setExplain(undefined)}
+              />
+            </Suspense>
+          )}
+          {debug !== undefined && (tab === "overview" || tab === "instances") && (
+            <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
+              <InstanceDebug
+                key={debug}
+                environment={report.name}
+                instance={debug}
+                token={token}
+                onClose={() => setDebug(undefined)}
               />
             </Suspense>
           )}

@@ -20,7 +20,7 @@ export type Session = {
 export type Scope = "fleet" | `environment:${string}`;
 
 /** Delivery capability the server enforces after authentication. */
-export type DeliveryCapability = "read" | "publish" | "management";
+export type DeliveryCapability = "read" | "publish" | "management" | "debug";
 
 export type Refusal = { scope: Scope; capability: DeliveryCapability };
 

@@ -12,7 +12,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: { outDir: "dist", assetsDir: "assets" },
   server: {
-    proxy: { "/v1": tenkai, "/healthz": tenkai },
+    proxy: { "/v1": { target: tenkai, ws: true }, "/healthz": tenkai },
   },
   // perf/ and e2e/ hold Playwright suites (`pnpm perf:load`, `pnpm e2e`), not unit tests.
   test: { exclude: [...configDefaults.exclude, "perf/**", "e2e/**"] },
