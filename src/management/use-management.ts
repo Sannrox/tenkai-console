@@ -51,7 +51,7 @@ export const newRequestId = (): string =>
  * mutations (main.tsx). A credential refusal hides that capability's controls
  * for the session, and every settled call refreshes the environment, hold,
  * status, dependency, runtime, migration, runner, owner, delivery, promotion policy,
- * canary, and history reads so the screen shows the server's state. History is reset, not invalidated, so extra
+ * canary, recall, and history reads so the screen shows the server's state. History is reset, not invalidated, so extra
  * cursor pages are dropped instead of refetched against a shifted list.
  */
 export const useManagementCall = <T>(
@@ -110,6 +110,8 @@ export const useManagementCall = <T>(
         queryClient.invalidateQueries({ queryKey: ["canaries"] }),
         queryClient.invalidateQueries({ queryKey: ["debug-sessions"] }),
         queryClient.invalidateQueries({ queryKey: ["debug-elevations"] }),
+        queryClient.invalidateQueries({ queryKey: ["recall"] }),
+        queryClient.invalidateQueries({ queryKey: ["recall-ranges"] }),
       ]),
   });
   // By status, not data: some routes answer success with JSON `null`.
