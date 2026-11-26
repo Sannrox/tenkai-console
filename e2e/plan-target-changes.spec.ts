@@ -11,6 +11,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openActions,
   openEnvironment,
   serveConsole,
 } from "./mock-backend";
@@ -201,7 +202,7 @@ const planFetches = (app: MockBackend) =>
 const openPlan = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
   await openEnvironment(page);
-  await page.getByRole("link", { name: "Open plan" }).click();
+  await (await openActions(page)).getByRole("link", { name: "Open plan" }).click();
   await expect(page.getByRole("heading", { name: "Approval", exact: true })).toBeVisible();
   await page.waitForLoadState("networkidle");
 };

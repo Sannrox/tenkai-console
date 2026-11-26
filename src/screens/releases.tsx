@@ -19,7 +19,7 @@ import {
   type Outcome,
 } from "../management/use-management";
 import { expectedGeneration, holdBody, releaseHoldBody } from "../plan/requests";
-import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
+import { ActionsMenu, Button, Card, ConfirmButton, Notice, ObjectPage } from "../ui/kit";
 import { td } from "../ui/posture";
 import { Canaries } from "./canaries";
 import { Compatibility } from "./compatibility";
@@ -46,23 +46,40 @@ const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-no
  */
 export const Releases = () => {
   const token = useSession((state) => state.session?.accessToken);
+  const queryClient = useQueryClient();
   const delivery = useDelivery(token);
   const table = channelMatrix(delivery.channels);
   const names = fleetTableRows(delivery.fleet, delivery.list).map((row) => row.name);
   const failed = delivery.channelsError ?? delivery.error;
 
   return (
-    <>
-      <div className="mb-4 flex items-center gap-3">
-        <h1 className="m-0 text-lg font-semibold">Releases</h1>
-        <span className="text-xs text-muted">
-          {failed
-            ? failed.message
-            : delivery.channelsLoading
-              ? "Loading"
-              : `${table.channels.length} ${table.channels.length === 1 ? "channel" : "channels"}`}
-        </span>
-      </div>
+    <ObjectPage
+      name="Releases"
+      status={
+        failed
+          ? failed.message
+          : delivery.channelsLoading
+            ? "Loading"
+            : `${table.channels.length} ${table.channels.length === 1 ? "channel" : "channels"}`
+      }
+      actions={
+        failed ? (
+          <ActionsMenu
+            needed
+            items={[
+              {
+                label: "Retry",
+                onClick: () => {
+                  void queryClient.invalidateQueries({ queryKey: ["channels", token] });
+                  void queryClient.invalidateQueries({ queryKey: ["fleet", token] });
+                  void queryClient.invalidateQueries({ queryKey: ["environments", token] });
+                },
+              },
+            ]}
+          />
+        ) : undefined
+      }
+    >
       <Card className="overflow-x-auto">
         <table className="w-full border-collapse text-xs">
           <thead>
@@ -123,7 +140,7 @@ export const Releases = () => {
         <RecallFollow token={token} fleet={fleetTableRows(delivery.fleet, delivery.list)} />
       )}
       {token !== undefined && <Migrations token={token} environments={names} />}
-    </>
+    </ObjectPage>
   );
 };
 

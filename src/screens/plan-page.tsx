@@ -44,7 +44,7 @@ import {
   signCommand,
 } from "../plan/requests";
 import { rollbackHoldChoice, rollbackOnly } from "../plan/rollback-hold";
-import { Button, Card, ObjectPage } from "../ui/kit";
+import { ActionsMenu, Button, Card, ObjectPage } from "../ui/kit";
 import { ApplyCancel } from "./apply-cancel";
 import { ApprovalBrief } from "./approval-brief";
 import { ArtifactAvailability } from "./artifact-availability";
@@ -171,20 +171,22 @@ export const PlanPage = ({ environment, token }: { environment: string; token: s
           name={plan ? planSummary(plan) : "No plan"}
           id={environment}
           status={plan?.state}
-          primary={
+          actions={
             plan?.state !== "running" ? (
-              <Button
-                variant={drift && !awaiting ? "primary" : "plain"}
-                disabled={run.isPending}
-                onClick={() =>
-                  run.mutate({
-                    path: `v1/environments/${env}/plans`,
-                    body: planBody(environment, generation),
-                  })
-                }
-              >
-                {plan ? "Plan again" : "Plan"}
-              </Button>
+              <ActionsMenu
+                needed={drift && !awaiting}
+                items={[
+                  {
+                    label: plan ? "Plan again" : "Plan",
+                    disabled: run.isPending,
+                    onClick: () =>
+                      run.mutate({
+                        path: `v1/environments/${env}/plans`,
+                        body: planBody(environment, generation),
+                      }),
+                  },
+                ]}
+              />
             ) : undefined
           }
           properties={[

@@ -7,6 +7,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openActions,
   openApp,
   openEnvironment,
   serveConsole,
@@ -261,7 +262,7 @@ test.describe("object pages at desktop width", () => {
     await expect(page.getByRole("heading", { name: runnerLabel, exact: true })).toBeVisible();
     expect(new URL(page.url()).pathname.includes("/runners/")).toBe(true);
     await shot(page, "runner-overview");
-    await page.getByRole("button", { name: "Revoke" }).click();
+    await (await openActions(page)).getByRole("button", { name: "Revoke" }).click();
     await page.getByLabel(`Revoke reason for ${runnerLabel}`).fill("rotate");
     await page.getByRole("button", { name: "Revoke", exact: true }).click();
     const revoke = page.waitForRequest((request) => request.url().includes("/revoke"));

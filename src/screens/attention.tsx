@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useSession } from "../auth/session";
 import { ATTENTION_KINDS, type AttentionKind } from "../delivery/configuration";
 import { useAttention } from "../delivery/use-attention";
-import { Button } from "../ui/kit";
+import { ActionsMenu, ObjectPage, headingCount } from "../ui/kit";
 import { AttentionList } from "./attention-list";
 
 const KIND_LABEL: Record<AttentionKind, string> = {
@@ -20,24 +20,24 @@ export const AttentionPage = () => {
   const [kind, setKind] = useState<AttentionKind | "all">("all");
   const items =
     kind === "all" ? attention.items : attention.items.filter((item) => item.kind === kind);
+  const incomplete = attention.failed.length > 0;
+  const count = attention.loading
+    ? "Loading"
+    : incomplete
+      ? headingCount(items.length === 0 ? "0 need you" : `${items.length} need you`, "incomplete")
+      : items.length === 0
+        ? "Nothing needs you"
+        : `${items.length} need you`;
   return (
-    <>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <h1 className="m-0 text-lg font-semibold">Attention</h1>
-        <span className="text-xs text-muted">
-          {attention.loading
-            ? "Loading"
-            : items.length === 0
-              ? "Nothing needs you"
-              : `${items.length} need you`}
-        </span>
-      </div>
-      {attention.failed.length > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-warning">
-          <span>The list may be incomplete.</span>
-          <Button onClick={attention.retry}>Retry</Button>
-        </div>
-      )}
+    <ObjectPage
+      name="Attention"
+      status={count}
+      actions={
+        incomplete ? (
+          <ActionsMenu needed items={[{ label: "Retry", onClick: attention.retry }]} />
+        ) : undefined
+      }
+    >
       <p className="mb-3 text-xs text-muted">
         Plan approvals, drift and certificate warnings stay on the environment.
       </p>
@@ -52,7 +52,7 @@ export const AttentionPage = () => {
         ))}
       </nav>
       {!attention.loading && <AttentionList items={items} />}
-    </>
+    </ObjectPage>
   );
 };
 

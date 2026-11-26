@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ActionsMenu, ObjectPage } from "./kit";
+import { ActionsMenu, ConfirmButton, headingCount, ObjectPage } from "./kit";
 import { reloadSaved, useSaved } from "./saved";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -26,14 +26,13 @@ afterEach(async () => {
 });
 
 describe("ObjectPage", () => {
-  it("shows type, name, status, properties, tabs, attention, main and linked", async () => {
+  it("shows one name, status, properties, tabs, attention, main and linked", async () => {
     await act(async () => {
       root.render(
         <ObjectPage
           kind="Environment"
           name="prod"
           status="unhealthy"
-          primary={<button type="button">Open plan</button>}
           actions={<ActionsMenu items={[{ label: "Hold delivery", onClick: () => undefined }]} />}
           properties={[
             { label: "Instances", value: "3" },
@@ -54,10 +53,10 @@ describe("ObjectPage", () => {
         />,
       );
     });
-    expect(container.textContent).toContain("Environment");
     expect(container.querySelector("h1")?.textContent).toBe("prod");
+    expect(container.textContent).not.toMatch(/^Environment/);
+    expect(container.querySelector("h1")?.previousElementSibling).toBeNull();
     expect(container.textContent).toContain("unhealthy");
-    expect(container.textContent).toContain("Open plan");
     expect(container.textContent).toContain("Instances");
     expect(container.textContent).toContain("platform-team");
     expect(container.textContent).toContain("Overview");
@@ -65,7 +64,7 @@ describe("ObjectPage", () => {
     expect(container.textContent).toContain("plan 41");
     await act(async () => {
       [...container.querySelectorAll("button")]
-        .find((button) => button.textContent === "Actions")
+        .find((button) => button.getAttribute("aria-label") === "Actions")
         ?.click();
     });
     expect(container.textContent).toContain("Hold delivery");
@@ -89,5 +88,84 @@ describe("ObjectPage", () => {
     });
     expect(useSaved.getState().pins[0]?.name).toBe("prod");
     expect(container.querySelector('[aria-label="Unpin"]')).toBeTruthy();
+  });
+});
+
+describe("ActionsMenu", () => {
+  it("marks Retry as needed with a static point, not a count", async () => {
+    await act(async () => {
+      root.render(<ActionsMenu needed items={[{ label: "Retry", onClick: () => undefined }]} />);
+    });
+    const trigger = container.querySelector('[aria-label="Actions"]');
+    expect(trigger?.getAttribute("data-needed")).toBe("true");
+    expect(trigger?.querySelector(".bg-danger")).toBeTruthy();
+    expect(trigger?.textContent).toBe("Actions");
+  });
+
+  it("keeps ConfirmButton two-click inside the open menu", async () => {
+    const sent: string[] = [];
+    await act(async () => {
+      root.render(
+        <ActionsMenu>
+          <ConfirmButton
+            label="Reconcile"
+            confirm="Run one reconcile tick"
+            disabled={false}
+            onConfirm={() => sent.push("tick")}
+          />
+        </ActionsMenu>,
+      );
+    });
+    await act(async () => {
+      container
+        .querySelector('[aria-label="Actions"]')
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("Reconcile");
+    await act(async () => {
+      [...container.querySelectorAll("button")]
+        .find((button) => button.textContent === "Reconcile")
+        ?.click();
+    });
+    expect(container.textContent).toContain("Run one reconcile tick");
+    expect(container.textContent).toContain("Cancel");
+    expect(container.querySelector('[aria-label="Actions"]')?.getAttribute("data-needed")).toBe(
+      "true",
+    );
+    expect(sent).toEqual([]);
+    await act(async () => {
+      [...container.querySelectorAll("button")]
+        .find((button) => button.textContent === "Run one reconcile tick")
+        ?.click();
+    });
+    expect(sent).toEqual(["tick"]);
+  });
+
+  it("puts the unknown sentence in the menu as a status line", async () => {
+    await act(async () => {
+      root.render(
+        <ActionsMenu
+          needed
+          status="No answer from the server; the outcome is unknown until the next inspect."
+          items={[{ label: "Reconcile", onClick: () => undefined }]}
+        />,
+      );
+    });
+    await act(async () => {
+      container
+        .querySelector('[aria-label="Actions"]')
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(container.querySelector("[role='status']")?.textContent).toBe(
+      "No answer from the server; the outcome is unknown until the next inspect.",
+    );
+  });
+});
+
+describe("headingCount", () => {
+  it("keeps incomplete and unknown in the count slot", () => {
+    expect(headingCount("4 environments", "incomplete")).toBe("4 environments · list incomplete");
+    expect(headingCount("12 environments", "unknown")).toBe("12 environments · outcome unknown");
+    expect(headingCount("6 instances")).toBe("6 instances");
   });
 });
