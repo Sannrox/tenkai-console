@@ -137,15 +137,11 @@ const instanceRow = (page: Page, name: string) =>
 const rollup = (page: Page) =>
   page.locator("dt", { hasText: /^health$/ }).locator("xpath=following-sibling::dd[1]");
 
-/** Unhealthy and Unknown cells of the fleet roll-up on the delivery page. */
-const fleetCounts = async (page: Page) => {
-  const row = page
-    .locator("table")
-    .filter({ has: page.getByRole("columnheader", { name: "Unknown" }) })
-    .getByRole("row")
-    .nth(1);
-  return { unhealthy: row.getByRole("cell").nth(3), unknown: row.getByRole("cell").nth(4) };
-};
+/** Health cells on the Environments table (error / unknown / ok). */
+const fleetHealth = (page: Page, summary: "error" | "unknown" | "ok") =>
+  page
+    .getByRole("region", { name: "Environments" })
+    .getByRole("cell", { name: summary, exact: true });
 
 const capture = (page: Page, name: string) =>
   page.screenshot({ path: test.info().outputPath(`${name}.png`), fullPage: true });
@@ -186,8 +182,8 @@ test.describe("environment instance health", () => {
       ),
     );
     await page.goto(app.url);
-    const counts = await fleetCounts(page);
-    await expect(counts.unknown).toHaveText("0");
+    await expect(fleetHealth(page, "ok")).toHaveCount(1);
+    await expect(fleetHealth(page, "unknown")).toHaveCount(0);
     await openEnvironment(page);
     await expect(instanceRow(page, "api").getByRole("cell", { name: "healthy" })).toBeVisible();
     await expect(rollup(page)).toHaveText("2 healthy");
@@ -201,9 +197,8 @@ test.describe("environment instance health", () => {
   test("failing checks with their messages; truncation reads as a warning", async ({ page }) => {
     app = await serveConsole(server(FAILING, "error"));
     await page.goto(app.url);
-    const counts = await fleetCounts(page);
-    await expect(counts.unhealthy).toHaveText("1");
-    await expect(counts.unknown).toHaveText("0");
+    await expect(fleetHealth(page, "error")).toHaveCount(1);
+    await expect(fleetHealth(page, "unknown")).toHaveCount(0);
     await openEnvironment(page);
     const api = instanceRow(page, "api");
     await expect(api).toContainText("failing");
@@ -229,9 +224,8 @@ test.describe("environment instance health", () => {
       ),
     );
     await page.goto(app.url);
-    const counts = await fleetCounts(page);
-    await expect(counts.unhealthy).toHaveText("0");
-    await expect(counts.unknown).toHaveText("1");
+    await expect(fleetHealth(page, "error")).toHaveCount(0);
+    await expect(fleetHealth(page, "unknown")).toHaveCount(1);
     await openEnvironment(page);
     const api = instanceRow(page, "api");
     await expect(api.getByRole("cell", { name: "unknown", exact: true })).toBeVisible();
@@ -355,9 +349,8 @@ test.describe("environment instance health", () => {
     ]);
     app = await serveConsole(server(instances, "error", others));
     await page.goto(app.url);
-    const counts = await fleetCounts(page);
-    await expect(counts.unhealthy).toHaveText("21");
-    await expect(counts.unknown).toHaveText("20");
+    await expect(page.getByText("61 environments, all current")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Environments" })).toBeVisible();
     await openEnvironment(page);
     await expect(rollup(page)).toHaveText("10 failing · 10 unknown · 20 healthy");
     await capture(page, "health-dense");

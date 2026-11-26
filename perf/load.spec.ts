@@ -147,7 +147,9 @@ test("fleet-scale screens stay within the load budget", async ({ page }) => {
   await expect(page.getByText(/1000 environments/)).toBeVisible();
   const opened = Date.now();
   await openApp(page, "Environments");
-  await expect(page.getByText("1000 active")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("1000 environments, 334 behind")).toBeVisible({
+    timeout: 30_000,
+  });
   const scroller = page.getByRole("region", { name: "Environments" });
   await expect(scroller.locator("tbody tr").first()).toBeVisible();
   const environments = Date.now() - opened;

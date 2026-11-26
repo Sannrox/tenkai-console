@@ -362,7 +362,7 @@ test.describe("environment dependencies", () => {
     await openEnvironment(page);
     await openEnvironmentTab(page, "Linked");
     await expect(page.getByText("1 waiting")).toBeVisible();
-    await page.getByRole("link", { name: "Home" }).click();
+    await page.getByRole("link", { name: "Environments" }).click();
     const menu = await openActions(page);
     await menu.getByRole("button", { name: "Reconcile" }).click();
     await menu.getByRole("button", { name: "Run one reconcile tick" }).click();

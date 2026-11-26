@@ -7,7 +7,7 @@ import { SearchHitLink } from "./search-hits";
 const field =
   "min-w-0 w-full rounded-md border border-field bg-white/4 px-2.5 py-1.5 text-xs text-fg placeholder:text-muted";
 
-/** Overlay opened with Control or Meta K. Same catalog as the Search page. */
+/** Overlay opened with Control or Meta K, the sidebar field, or /search. */
 export const QuickSearch = ({ onClose }: { onClose: () => void }) => {
   const token = useSession((state) => state.session?.accessToken);
   const catalog = useSearchCatalog(token);

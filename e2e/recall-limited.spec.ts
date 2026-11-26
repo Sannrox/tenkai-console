@@ -197,7 +197,7 @@ const openRecall = async (page: Page, app: MockBackend) => {
 
 const openReleaseWiden = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Environments" })).toBeVisible();
   await page.evaluate(() => {
     history.pushState({}, "", `${location.pathname}releases/api/1.2.0`);
     dispatchEvent(new PopStateEvent("popstate"));

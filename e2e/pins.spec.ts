@@ -116,7 +116,7 @@ const server = (): Routes => (raw) => {
 
 const signIn = async (page: Page, url: string) => {
   await page.goto(url);
-  await expect(page.getByRole("heading", { name: "Home", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Environments", level: 1 })).toBeVisible();
 };
 
 const shot = (page: Page, name: string) =>
@@ -148,55 +148,44 @@ test.describe("pins and recent at desktop width", () => {
     await app.close();
   });
 
-  test("star pins an object into the sidebar and Home, and it survives reload", async ({
-    page,
-  }) => {
+  test("star pins an object into the sidebar and it survives reload", async ({ page }) => {
     app = await serveConsole(server());
     await signIn(page, app.url);
-    await expect(page.getByText("None yet.")).toHaveCount(2);
+    const main = page.getByRole("navigation", { name: "Main" });
+    await expect(main.getByText("Pinned")).toHaveCount(0);
     await openEnvironment(page);
     await page.getByRole("button", { name: "Pin" }).click();
     await expect(page.getByRole("button", { name: "Unpin" })).toBeVisible();
     await expectDesignRules(page);
     await shot(page, "env-pinned");
-    const main = page.getByRole("navigation", { name: "Main" });
-    await expect(main.getByRole("link", { name: "prod" })).toBeVisible();
-    await main.getByRole("link", { name: "Home" }).click();
-    await expect(page.getByRole("list", { name: "Pinned" })).toContainText("prod");
-    await expect(page.getByRole("list", { name: "Pinned" })).toContainText("env");
+    await expect(main.getByLabel("Pinned").getByRole("link", { name: "prod" })).toBeVisible();
+    await main.getByRole("link", { name: "Environments" }).click();
+    await expect(page.getByRole("heading", { name: "Environments", level: 1 })).toBeVisible();
+    await expect(main.getByLabel("Pinned").getByRole("link", { name: "prod" })).toBeVisible();
     await expectDesignRules(page);
     await shot(page, "home-pinned");
 
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Home", level: 1 })).toBeVisible();
-    await expect(page.getByRole("list", { name: "Pinned" })).toContainText("prod");
-    await page
-      .getByRole("navigation", { name: "Main" })
-      .getByRole("link", { name: "prod" })
-      .click();
+    await expect(page.getByRole("heading", { name: "Environments", level: 1 })).toBeVisible();
+    await expect(main.getByLabel("Pinned").getByRole("link", { name: "prod" })).toBeVisible();
+    await main.getByLabel("Pinned").getByRole("link", { name: "prod" }).click();
     await page.getByRole("button", { name: "Unpin" }).click();
     await expect(page.getByRole("button", { name: "Pin" })).toBeVisible();
-    await page
-      .getByRole("navigation", { name: "Main" })
-      .getByRole("link", { name: "Home" })
-      .click();
-    await expect(page.getByRole("heading", { name: "Pinned" })).toBeVisible();
-    await expect(page.getByRole("list", { name: "Pinned" })).toHaveCount(0);
+    await main.getByRole("link", { name: "Environments" }).click();
+    await expect(main.getByText("Pinned")).toHaveCount(0);
   });
 
-  test("opening objects fills Recent on Home", async ({ page }) => {
+  test("opening objects fills Recent under pins", async ({ page }) => {
     app = await serveConsole(server());
     await signIn(page, app.url);
     await openEnvironment(page);
     await page.getByRole("link", { name: "api", exact: true }).first().click();
     await expect(page.getByRole("heading", { name: "api", exact: true })).toBeVisible();
-    await page
-      .getByRole("navigation", { name: "Main" })
-      .getByRole("link", { name: "Home" })
-      .click();
-    const recent = page.getByRole("list", { name: "Recent" });
-    await expect(recent).toContainText("api");
-    await expect(recent).toContainText("prod");
+    const main = page.getByRole("navigation", { name: "Main" });
+    await main.getByRole("link", { name: "Environments" }).click();
+    const recent = main.getByLabel("Recent");
+    await expect(recent.getByRole("link", { name: "api" })).toBeVisible();
+    await expect(recent.getByRole("link", { name: "prod" })).toBeVisible();
     await expectDesignRules(page);
     await shot(page, "home-recent");
   });
@@ -205,16 +194,14 @@ test.describe("pins and recent at desktop width", () => {
     app = await serveConsole(server());
     await blockStorage(page);
     await signIn(page, app.url);
-    await expect(page.getByText("None yet.")).toHaveCount(2);
+    const main = page.getByRole("navigation", { name: "Main" });
+    await expect(main.getByText("Pinned")).toHaveCount(0);
     await openEnvironment(page);
     await page.getByRole("button", { name: "Pin" }).click();
     await expect(page.getByRole("button", { name: "Pin" })).toBeVisible();
-    await page
-      .getByRole("navigation", { name: "Main" })
-      .getByRole("link", { name: "Home" })
-      .click();
-    await expect(page.getByText("None yet.")).toHaveCount(2);
-    await expect(page.getByRole("heading", { name: "Home", level: 1 })).toBeVisible();
+    await main.getByRole("link", { name: "Environments" }).click();
+    await expect(main.getByText("Pinned")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Environments", level: 1 })).toBeVisible();
     await expectDesignRules(page);
     await shot(page, "storage-blocked");
   });
@@ -227,16 +214,16 @@ test.describe("pins at phone width", () => {
     await app.close();
   });
 
-  test("Apps lists pinned objects and does not overflow", async ({ page }) => {
+  test("More lists pinned objects and does not overflow", async ({ page }) => {
     app = await serveConsole(server());
     await signIn(page, app.url);
     await openEnvironment(page);
     await page.getByRole("button", { name: "Pin" }).click();
     await page
       .getByRole("navigation", { name: "Main" })
-      .getByRole("link", { name: "Apps" })
+      .getByRole("link", { name: "More" })
       .click();
-    await expect(page.getByRole("heading", { name: "Apps" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "More" })).toBeVisible();
     await expect(page.getByRole("list", { name: "Pinned" })).toContainText("prod");
     await expectDesignRules(page);
     await shot(page, "apps-pinned-phone");

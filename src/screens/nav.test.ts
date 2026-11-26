@@ -1,13 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  activeMain,
-  appItemActive,
-  isAppPath,
-  isPlatformPath,
-  readCollapsed,
-  writeCollapsed,
-} from "./nav";
+import { activePhone, appItemActive, isPlatformPath, readCollapsed, writeCollapsed } from "./nav";
 
 describe("nav", () => {
   afterEach(() => {
@@ -24,39 +17,30 @@ describe("nav", () => {
     expect(isPlatformPath("/")).toBe(false);
   });
 
-  it("keeps the plan page under Environments and Platform under Apps", () => {
-    expect(isAppPath("/environments")).toBe(true);
-    expect(isAppPath("/environments/prod")).toBe(true);
-    expect(isAppPath("/environments/prod/history")).toBe(true);
-    expect(isAppPath("/environments/prod/plan")).toBe(true);
-    expect(isAppPath("/products/api")).toBe(true);
-    expect(isAppPath("/releases/api/1.1.0")).toBe(true);
-    expect(isAppPath("/plans/tenkai:plan:1")).toBe(true);
-    expect(isAppPath("/findings/CVE-1")).toBe(true);
-    expect(isAppPath("/runners/sha256:abc")).toBe(true);
-    expect(isAppPath("/server")).toBe(true);
-    expect(isAppPath("/apps")).toBe(true);
-    expect(isAppPath("/")).toBe(false);
-    expect(isAppPath("/search")).toBe(false);
-    expect(appItemActive("/environments/prod", "/environments")).toBe(true);
-    expect(appItemActive("/environments/prod/plan", "/environments")).toBe(true);
+  it("keeps the plan page under Environments and objects under their place", () => {
+    expect(appItemActive("/", "/")).toBe(true);
+    expect(appItemActive("/environments/prod", "/")).toBe(true);
+    expect(appItemActive("/environments/prod/plan", "/")).toBe(true);
+    expect(appItemActive("/plans/tenkai:plan:1", "/")).toBe(true);
     expect(appItemActive("/trust", "/server")).toBe(true);
     expect(appItemActive("/releases", "/releases")).toBe(true);
     expect(appItemActive("/products/api", "/releases")).toBe(true);
     expect(appItemActive("/releases/api/1.1.0", "/releases")).toBe(true);
     expect(appItemActive("/findings/CVE-1", "/exposure")).toBe(true);
-    expect(appItemActive("/plans/tenkai:plan:1", "/environments")).toBe(true);
-    expect(appItemActive("/releases", "/environments")).toBe(false);
+    expect(appItemActive("/releases", "/")).toBe(false);
+    expect(appItemActive("/attention", "/")).toBe(false);
   });
 
-  it("maps paths onto Home, Search, Attention or Apps", () => {
-    expect(activeMain("/")).toBe("Home");
-    expect(activeMain("/search")).toBe("Search");
-    expect(activeMain("/attention")).toBe("Attention");
-    expect(activeMain("/environments")).toBe("Apps");
-    expect(activeMain("/products/api")).toBe("Apps");
-    expect(activeMain("/access")).toBe("Apps");
-    expect(activeMain("/apps")).toBe("Apps");
+  it("maps paths onto Env, Rel or More on the phone bar", () => {
+    expect(activePhone("/")).toBe("Env");
+    expect(activePhone("/environments/prod")).toBe("Env");
+    expect(activePhone("/plans/tenkai:plan:1")).toBe("Env");
+    expect(activePhone("/releases")).toBe("Rel");
+    expect(activePhone("/products/api")).toBe("Rel");
+    expect(activePhone("/attention")).toBe("More");
+    expect(activePhone("/apps")).toBe("More");
+    expect(activePhone("/exposure")).toBe("More");
+    expect(activePhone("/access")).toBe("More");
   });
 
   it("remembers the collapsed sidebar in this browser", () => {

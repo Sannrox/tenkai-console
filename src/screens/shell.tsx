@@ -1,17 +1,17 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, Navigate, useRouterState } from "@tanstack/react-router";
 import { lazy, Suspense, type ReactNode, useEffect, useState } from "react";
 import type { OidcClientDiscovery } from "../api/tenkai.gen";
 import { HOST_SIGN_OUT, signInMethod } from "../auth/identity";
 import type { Session } from "../auth/session";
 import { useSignOut } from "../auth/use-sign-out";
+import { useAttention } from "../delivery/use-attention";
 import { Button, tabClass } from "../ui/kit";
 import { objectKey, useSaved, type SavedObject } from "../ui/saved";
 import {
   APP_ITEMS,
-  MAIN_ITEMS,
   PHONE_ITEMS,
   PLATFORM_TABS,
-  activeMain,
+  activePhone,
   appItemActive,
   isPlatformPath,
   readCollapsed,
@@ -25,7 +25,6 @@ const QuickSearch = lazy(() =>
 
 const ICONS: Record<string, string> = {
   search: "M11.5 11.5 14 14M7 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z",
-  home: "M2.5 7.5 8 2.5l5.5 5V14H9.5V9.5h-3V14H2.5Z",
   attention: "M8 14A6 6 0 1 0 8 2a6 6 0 0 0 0 12ZM8 5v3.5M8 11h.01",
   environments: "M2.5 2.5h5v5h-5Zm6 0h5v5h-5Zm-6 6h5v5h-5Zm6 0h5v5h-5Z",
   releases: "M3 3.5h10v3H3Zm0 5h10v4.5H3Z",
@@ -53,6 +52,12 @@ const itemClass = (active: boolean, collapsed: boolean) =>
     collapsed ? "justify-center px-0" : "px-2"
   } ${active ? "bg-selected text-fg" : "text-muted"}`;
 
+const searchField =
+  "min-w-0 w-full rounded-md border border-field bg-white/4 px-2.5 py-1.5 text-left text-xs text-muted";
+
+/** `/search` is not a page: open the overlay on `/`. */
+export const SearchEntry = () => <Navigate to="/" replace />;
+
 /**
  * Signed-in frame: left sidebar (icons when collapsed, remembered per browser),
  * Platform tabs on those paths, bottom bar at 390px.
@@ -68,8 +73,14 @@ export const Shell = ({
 }) => {
   const path = useRouterState({ select: (state) => state.location.pathname });
   const [collapsed, setCollapsed] = useState(readCollapsed);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(() => path === "/search");
+  if (path === "/search" && !searchOpen) {
+    setSearchOpen(true);
+  }
   const pins = useSaved((state) => state.pins);
+  const recent = useSaved((state) => state.recent);
+  const attention = useAttention(session.accessToken);
+  const attentionCount = attention.items.length;
   const toggle = () => {
     setCollapsed((current) => {
       const next = !current;
@@ -99,47 +110,39 @@ export const Shell = ({
           {collapsed ? "T" : "Tenkai"}
         </div>
         <nav aria-label="Main" className="flex flex-1 flex-col gap-0.5 px-1.5">
-          {MAIN_ITEMS.map((item) => (
-            <Link
-              key={item.label}
-              to={item.to}
-              title={collapsed ? item.label : undefined}
-              aria-current={activeMain(path) === item.label ? "page" : undefined}
-              className={itemClass(activeMain(path) === item.label, collapsed)}
-            >
-              <Icon name={item.icon} />
-              {!collapsed && item.label}
-            </Link>
-          ))}
-          {!collapsed && <SavedNav items={pins} path={path} />}
           {collapsed ? (
-            APP_ITEMS.map((item) => (
-              <Link
-                key={item.label}
-                to={item.to}
-                title={item.label}
-                aria-current={appItemActive(path, item.to) ? "page" : undefined}
-                className={itemClass(appItemActive(path, item.to), true)}
-              >
-                <Icon name={item.icon} />
-              </Link>
-            ))
+            <button
+              type="button"
+              title="Search"
+              aria-label="Search"
+              aria-expanded={searchOpen}
+              className={`${itemClass(false, true)} w-full cursor-pointer border-0 bg-transparent`}
+              onClick={() => setSearchOpen(true)}
+            >
+              <Icon name="search" />
+            </button>
           ) : (
-            <>
-              <div className="mt-3 px-2 text-[13px] font-medium text-muted">Apps</div>
-              {APP_ITEMS.map((item) => (
-                <Link
-                  key={item.label}
-                  to={item.to}
-                  aria-current={appItemActive(path, item.to) ? "page" : undefined}
-                  className={itemClass(appItemActive(path, item.to), false)}
-                >
-                  <Icon name={item.icon} />
-                  {item.label}
-                </Link>
-              ))}
-            </>
+            <button
+              type="button"
+              aria-label="Search"
+              aria-expanded={searchOpen}
+              className={`mb-1 ${searchField} cursor-pointer`}
+              onClick={() => setSearchOpen(true)}
+            >
+              Search
+            </button>
           )}
+          {!collapsed && <SavedNav title="Pinned" items={pins} path={path} />}
+          {!collapsed && <SavedNav title="Recent" items={recent} path={path} />}
+          {APP_ITEMS.map((item) => (
+            <PlaceLink
+              key={item.label}
+              item={item}
+              path={path}
+              collapsed={collapsed}
+              attentionCount={item.to === "/" ? attentionCount : 0}
+            />
+          ))}
         </nav>
         <div className="mt-auto border-t border-line px-1.5 py-2">
           <Button
@@ -169,13 +172,23 @@ export const Shell = ({
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 hidden border-t border-line bg-page max-phone:flex"
       >
+        <button
+          type="button"
+          aria-label="Search"
+          aria-expanded={searchOpen}
+          className="flex flex-1 cursor-pointer flex-col items-center gap-0.5 border-0 bg-transparent py-2 text-[11px] text-muted"
+          onClick={() => setSearchOpen(true)}
+        >
+          <Icon name="search" />
+          Search
+        </button>
         {PHONE_ITEMS.map((item) => (
           <Link
             key={item.label}
             to={item.to}
-            aria-current={activeMain(path) === item.label ? "page" : undefined}
+            aria-current={activePhone(path) === item.label ? "page" : undefined}
             className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] no-underline ${
-              activeMain(path) === item.label ? "text-fg" : "text-muted"
+              activePhone(path) === item.label ? "text-fg" : "text-muted"
             }`}
           >
             <Icon name={item.icon} />
@@ -187,13 +200,57 @@ export const Shell = ({
   );
 };
 
-const SavedNav = ({ items, path }: { items: readonly SavedObject[]; path: string }) => {
+const PlaceLink = ({
+  item,
+  path,
+  collapsed,
+  attentionCount,
+}: {
+  item: (typeof APP_ITEMS)[number];
+  path: string;
+  collapsed: boolean;
+  attentionCount: number;
+}) => {
+  const active = appItemActive(path, item.to);
+  return (
+    <div className={`flex items-center ${collapsed ? "justify-center" : ""}`}>
+      <Link
+        to={item.to}
+        title={collapsed ? item.label : undefined}
+        aria-current={active ? "page" : undefined}
+        className={`${itemClass(active, collapsed)} min-w-0 ${collapsed ? "" : "flex-1"}`}
+      >
+        <Icon name={item.icon} />
+        {!collapsed && item.label}
+      </Link>
+      {!collapsed && attentionCount > 0 && (
+        <Link
+          to="/attention"
+          aria-label="Attention"
+          className="shrink-0 px-1 text-[13px] font-medium text-muted no-underline"
+        >
+          {attentionCount}
+        </Link>
+      )}
+    </div>
+  );
+};
+
+const SavedNav = ({
+  title,
+  items,
+  path,
+}: {
+  title: "Pinned" | "Recent";
+  items: readonly SavedObject[];
+  path: string;
+}) => {
   if (items.length === 0) {
     return null;
   }
   return (
-    <>
-      <div className="mt-3 px-2 text-[13px] font-medium text-muted">Pinned</div>
+    <div aria-label={title}>
+      <div className="mt-3 px-2 text-[13px] font-medium text-muted">{title}</div>
       {items.map((item) => (
         <SavedLink
           key={objectKey(item)}
@@ -201,7 +258,7 @@ const SavedNav = ({ items, path }: { items: readonly SavedObject[]; path: string
           className={`${itemClass(matchesSaved(path, item), false)} truncate`}
         />
       ))}
-    </>
+    </div>
   );
 };
 

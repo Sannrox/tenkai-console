@@ -153,7 +153,7 @@ const presets = (page: Page) => page.getByRole("region", { name: "Config presets
 
 const openPlan = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await expect(page.getByRole("link", { name: "Home" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Environments" })).toBeVisible();
   await page.evaluate(() => {
     history.pushState({}, "", `${location.pathname}environments/prod/plan`);
     dispatchEvent(new PopStateEvent("popstate"));
