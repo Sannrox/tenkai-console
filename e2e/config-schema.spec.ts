@@ -6,6 +6,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openActions,
   openEnvironment,
   openEnvironmentTab,
   serveConsole,
@@ -170,8 +171,8 @@ test.describe("config schema checks", () => {
     await page.goto(app.url);
     await openEnvironment(page);
     await openEnvironmentTab(page, "Settings");
-    await page.getByRole("link", { name: "Open plan" }).click();
-    await page.getByRole("button", { name: "Plan" }).click();
+    await (await openActions(page)).getByRole("link", { name: "Open plan" }).click();
+    await (await openActions(page)).getByRole("button", { name: "Plan" }).click();
     const table = overlays(page);
     await expect(table.getByRole("cell", { name: "replicas", exact: true })).toBeVisible();
     await expect(table.getByRole("alert")).toHaveText("required");
@@ -180,7 +181,7 @@ test.describe("config schema checks", () => {
     await expectDesignRules(page);
     inspect = FIXED;
     planned = true;
-    await page.getByRole("button", { name: "Plan" }).click();
+    await (await openActions(page)).getByRole("button", { name: "Plan" }).click();
     await expect(table.getByRole("cell", { name: "replicas", exact: true })).toBeVisible();
     await expect(table.getByRole("cell", { name: "2", exact: true })).toBeVisible();
     await expect(table.getByRole("cell", { name: "checked" }).first()).toBeVisible();

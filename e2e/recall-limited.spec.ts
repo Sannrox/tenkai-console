@@ -15,6 +15,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openActions,
   openApp,
   serveConsole,
 } from "./mock-backend";
@@ -177,7 +178,7 @@ const server =
 const detail = (page: Page) => page.getByRole("region", { name: "Recall detail" });
 const editor = (page: Page) =>
   page.getByRole("region", { name: "Policy detail" }).getByRole("group", { name: "Recall rule" });
-const widen = (page: Page) => detail(page).getByRole("group", { name: "Widen removal" });
+const widen = (page: Page) => page.getByRole("group", { name: "Widen removal" });
 const rows = (page: Page) =>
   detail(page).getByRole("table", { name: "Environments" }).getByRole("row");
 
@@ -192,6 +193,18 @@ const openRecall = async (page: Page, app: MockBackend) => {
   await page.getByRole("button", { name: "Detail api@1.2.0" }).click();
   await expect(detail(page).getByRole("table", { name: "Environments" })).toBeVisible();
   await page.waitForLoadState("networkidle");
+};
+
+const openReleaseWiden = async (page: Page, app: MockBackend) => {
+  await page.goto(app.url);
+  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+  await page.evaluate(() => {
+    history.pushState({}, "", `${location.pathname}releases/api/1.2.0`);
+    dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await expect(page.getByRole("heading", { name: "api@1.2.0", exact: true })).toBeVisible();
+  await openActions(page);
+  await expect(widen(page)).toBeVisible();
 };
 
 const shot = (page: Page, name: string) =>
@@ -224,7 +237,7 @@ test.describe("limited recall removal", () => {
     await expect(detail(page).getByLabel("Removal", { exact: true })).toContainText(
       "prod is recalled, removal not in scope",
     );
-    await expect(widen(page).getByRole("button", { name: "Widen removal" })).toBeVisible();
+    await expect(detail(page).getByRole("group", { name: "Widen removal" })).toHaveCount(0);
     await shot(page, "recall-limited");
     await expectDesignRules(page);
   });
@@ -240,7 +253,7 @@ test.describe("limited recall removal", () => {
       }
       await route.fallback();
     });
-    await openRecall(page, app);
+    await openReleaseWiden(page, app);
     await widen(page).getByRole("textbox", { name: "Add to removal" }).fill("prod");
     await widen(page).getByRole("textbox", { name: "Reason" }).fill("lab canary done");
     await widen(page).getByRole("button", { name: "Widen removal" }).click();
@@ -267,14 +280,16 @@ test.describe("limited recall removal", () => {
       }
       await route.fallback();
     });
-    await openRecall(page, app);
+    await openReleaseWiden(page, app);
     await widen(page).getByRole("textbox", { name: "Add to removal" }).fill("prod");
     await widen(page).getByRole("textbox", { name: "Reason" }).fill("lab canary done");
     await widen(page).getByRole("button", { name: "Widen removal" }).click();
     await widen(page).getByRole("button", { name: "Widen removal of api@1.2.0 with prod" }).click();
-    await expect(widen(page).getByRole("status")).toHaveText(/outcome is unknown/);
+    await expect(page.getByRole("status").filter({ hasText: /outcome is unknown/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "api@1.2.0" })).toBeVisible();
+    await expect(page.getByText("outcome unknown")).toBeVisible();
     expect(attempts).toBe(1);
-    await expect(widen(page).getByRole("status")).not.toHaveText(/audited/);
+    await expect(page.getByText("Removal widened and audited.")).toHaveCount(0);
     await shot(page, "recall-lost-widen");
     await expectDesignRules(page);
   });
@@ -288,7 +303,7 @@ test.describe("limited recall removal", () => {
       }
       await route.fallback();
     });
-    await openRecall(page, app);
+    await openReleaseWiden(page, app);
     await widen(page).getByRole("textbox", { name: "Add to removal" }).fill("prod");
     await widen(page).getByRole("textbox", { name: "Reason" }).fill("lab canary done");
     await widen(page).getByRole("button", { name: "Widen removal" }).click();

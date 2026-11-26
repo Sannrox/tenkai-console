@@ -136,3 +136,11 @@ export const openEnvironmentTab = async (page: Page, tab: EnvironmentTab) => {
     .getByRole("link", { name: tab, exact: true })
     .click();
 };
+
+/** Heading corner Actions. The menu stays open until the caller picks an item. */
+export const openActions = async (page: Page) => {
+  await page.getByRole("button", { name: "Actions" }).click();
+  const menu = page.getByRole("menu");
+  await expect(menu).toBeVisible();
+  return menu;
+};

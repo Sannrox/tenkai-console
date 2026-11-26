@@ -48,9 +48,19 @@ export const Input = ({
  * fleet-wide management credential may register; a refusal hides the
  * button and stays visible.
  */
-export const AddEnvironment = ({ token }: { token: string }) => {
+export const AddEnvironment = ({
+  token,
+  open: openProp,
+  onOpen,
+}: {
+  token: string;
+  open?: boolean;
+  onOpen?: (open: boolean) => void;
+}) => {
   const register = useManagementCall(token, "fleet", "management", message);
-  const [open, setOpen] = useState(false);
+  const [internal, setInternal] = useState(false);
+  const open = openProp ?? internal;
+  const setOpen = onOpen ?? setInternal;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [connectivity, setConnectivity] = useState<ConnectivityClass | "">("");
@@ -60,7 +70,7 @@ export const AddEnvironment = ({ token }: { token: string }) => {
   }
   return (
     <>
-      {register.allowed && !open && (
+      {register.allowed && !open && onOpen === undefined && (
         <Button variant="primary" className="ml-auto" onClick={() => setOpen(true)}>
           Add environment
         </Button>

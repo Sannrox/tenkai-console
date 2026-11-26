@@ -7,6 +7,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openActions,
   serveConsole,
 } from "./mock-backend";
 
@@ -229,7 +230,7 @@ for (const viewport of [
         }),
       );
       await openPlan(page, app);
-      await page.getByRole("button", { name: "Plan" }).click();
+      await (await openActions(page)).getByRole("button", { name: "Plan" }).click();
       await expect(page.getByRole("status")).toContainText("sha256:dead");
       await expect(page.getByRole("status")).toContainText("mirror.internal");
       expect(

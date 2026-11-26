@@ -4,6 +4,10 @@ import { type DeliveryCapability, isRefused, type Scope, useSession } from "../a
 
 export type Outcome = { tone: "ok" | "bad" | "unknown"; text: string };
 
+/** Lost write: heading count slot says "outcome unknown"; Actions repeats this sentence. */
+export const UNKNOWN_OUTCOME =
+  "No answer from the server; the outcome is unknown until the next inspect.";
+
 /**
  * What a failed management call means. A generic capability refusal is named
  * so the caller can see which grant was missing; any other server answer is
@@ -11,10 +15,7 @@ export type Outcome = { tone: "ok" | "bad" | "unknown"; text: string };
  */
 export const failure = (error: unknown, capability?: DeliveryCapability): Outcome => {
   if (!(error instanceof ApiError)) {
-    return {
-      tone: "unknown",
-      text: "No answer from the server; the outcome is unknown until the next inspect.",
-    };
+    return { tone: "unknown", text: UNKNOWN_OUTCOME };
   }
   const text =
     error.status === 403 && error.message === "insufficient delivery capability" && capability

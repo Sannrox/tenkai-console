@@ -8,7 +8,7 @@ import { td, th } from "../ui/posture";
 import { Compatibility } from "./compatibility";
 import { EnvironmentLink, LinkedList, PlanLink, ProductLink } from "./object-link";
 import { OBJECT_TABS, releaseSpec, tabAfter } from "./objects";
-import RecallDetail from "./recall-detail";
+import RecallDetail, { useReleaseWiden } from "./recall-detail";
 import ReleaseLabels from "./release-labels";
 
 /**
@@ -34,6 +34,7 @@ export const ReleasePage = () => {
     policyLoad?.kind === "ok" ? policyLoad.rows.filter((row) => row.product === product) : [];
   const failed = delivery.channelsError ?? delivery.error;
   const envSearch = environment === undefined ? {} : { environment };
+  const widen = useReleaseWiden(token, spec);
 
   const linkedItems = [
     { key: "product", node: <ProductLink product={product} {...envSearch} /> },
@@ -53,6 +54,8 @@ export const ReleasePage = () => {
     <ObjectPage
       kind="Release"
       name={spec}
+      status={widen.unknown ? "outcome unknown" : undefined}
+      actions={widen.menu}
       properties={[
         { label: "Product", value: <ProductLink product={product} {...envSearch} /> },
         { label: "Version", value: version },

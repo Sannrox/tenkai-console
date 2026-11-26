@@ -291,6 +291,11 @@ describe("PlanPage artifact availability", () => {
       }),
     );
     await render();
+    await act(async () => {
+      [...container.querySelectorAll("button")]
+        .find((button) => button.getAttribute("aria-label") === "Actions")
+        ?.click();
+    });
     const plan = [...container.querySelectorAll("button")].find(
       (button) => button.textContent === "Plan again",
     );
@@ -339,6 +344,11 @@ describe("PlanPage overlay schema", () => {
       }),
     );
     await render();
+    await act(async () => {
+      [...container.querySelectorAll("button")]
+        .find((button) => button.getAttribute("aria-label") === "Actions")
+        ?.click();
+    });
     const plan = [...container.querySelectorAll("button")].find(
       (button) => button.textContent === "Plan again",
     );

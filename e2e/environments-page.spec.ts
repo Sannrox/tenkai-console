@@ -6,6 +6,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openActions,
   openApp,
   openEnvironment,
   openEnvironmentTab,
@@ -148,6 +149,9 @@ test.describe("environment object page", () => {
     await expect(page.getByRole("heading", { name: "Environments" })).toBeVisible();
     await openEnvironment(page);
     await expect(page.getByRole("heading", { name: "prod", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open plan" })).toHaveCount(0);
+    await expect((await openActions(page)).getByRole("link", { name: "Open plan" })).toBeVisible();
+    await page.getByRole("button", { name: "Actions" }).click();
     await expect(tabs(page).getByRole("link", { name: "Overview" })).toBeVisible();
     expect(new URL(page.url()).pathname.endsWith("/environments/prod")).toBe(true);
     await openEnvironmentTab(page, "Instances");

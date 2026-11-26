@@ -24,8 +24,8 @@ import {
   type EnvironmentRow,
   type RecallView,
 } from "../delivery/recall";
-import { useManagementCall } from "../management/use-management";
-import { Card, ConfirmButton, Notice } from "../ui/kit";
+import { UNKNOWN_OUTCOME, useManagementCall } from "../management/use-management";
+import { ActionsMenu, Card, ConfirmButton, Notice } from "../ui/kit";
 import { parseReleaseSpec } from "./objects";
 
 const LOAD_TEXT = {
@@ -63,11 +63,7 @@ export const RecallDetail = ({ token, release }: { token: string; release: strin
   return (
     <section aria-label="Recall detail" className="mb-2">
       {load === undefined ? null : load.kind === "ok" ? (
-        <Recall
-          token={token}
-          view={load.value}
-          exclusions={exclusionsFor(load.value, ranges.data ?? [])}
-        />
+        <Recall view={load.value} exclusions={exclusionsFor(load.value, ranges.data ?? [])} />
       ) : (
         <p className="m-0 text-xs text-muted">
           {load.kind === "error" ? load.message : LOAD_TEXT[load.kind]}
@@ -78,11 +74,9 @@ export const RecallDetail = ({ token, release }: { token: string; release: strin
 };
 
 const Recall = ({
-  token,
   view,
   exclusions,
 }: {
-  token: string;
   view: RecallView;
   exclusions: ReturnType<typeof exclusionsFor>;
 }) => {
@@ -164,7 +158,6 @@ const Recall = ({
           History {(view.widenings ?? []).map(wideningLine).join("; ")}
         </p>
       )}
-      {view.removal_scope !== undefined && <Widen token={token} release={view.release} />}
     </Card>
   );
 };
@@ -202,26 +195,60 @@ const EnvironmentCells = ({
 
 /**
  * Append environments or cover the fleet. Offered only when the recall named
- * a removal list and `/v1/auth/me` grants management. Each confirmed click
- * is one request.
+ * a removal list and `/v1/auth/me` grants management. Lives in release Actions.
  */
-const Widen = ({ token, release }: { token: string; release: string }) => {
-  const call = useManagementCall(token, "fleet", "management", message);
+export const useReleaseWiden = (token: string | undefined, release: string) => {
+  const query = useQuery({
+    queryKey: ["recall", token, release],
+    queryFn: () => fetchRecall(release, token ?? ""),
+    enabled: token !== undefined,
+    retry: false,
+  });
+  const call = useManagementCall(token ?? "", "fleet", "management", message);
   const me = useAuthSession(token);
+  const view = query.data?.kind === "ok" ? query.data.value : undefined;
   const permitted = call.allowed && me.data?.capabilities.includes("management") === true;
-  const [environments, setEnvironments] = useState("");
-  const [reason, setReason] = useState("");
-  const named = parseEnvironments(environments);
+  const offered = view?.removal_scope !== undefined && permitted && token !== undefined;
   const outcome = call.isSuccess
     ? widenOutcome(undefined)
     : call.error
       ? widenOutcome(call.error)
       : undefined;
-  if (!permitted) {
-    return null;
-  }
+  const unknown = outcome?.tone === "unknown";
+  const menu = offered ? (
+    <WidenForm
+      release={release}
+      pending={call.isPending}
+      outcome={unknown ? undefined : outcome}
+      onWiden={(body) => call.mutate({ path: widenPath(release), body })}
+    />
+  ) : undefined;
+  return {
+    unknown,
+    menu: offered ? (
+      <ActionsMenu needed status={unknown ? UNKNOWN_OUTCOME : undefined}>
+        {menu}
+      </ActionsMenu>
+    ) : undefined,
+  };
+};
+
+const WidenForm = ({
+  release,
+  pending,
+  outcome,
+  onWiden,
+}: {
+  release: string;
+  pending: boolean;
+  outcome: ReturnType<typeof widenOutcome> | undefined;
+  onWiden: (body: ReturnType<typeof widenBody>) => void;
+}) => {
+  const [environments, setEnvironments] = useState("");
+  const [reason, setReason] = useState("");
+  const named = parseEnvironments(environments);
   return (
-    <div aria-label="Widen removal" role="group" className="mt-2 grid gap-2">
+    <div aria-label="Widen removal" role="group" className="grid gap-2 px-1.5 py-1">
       <div className="flex flex-wrap items-center gap-2">
         <input
           aria-label="Add to removal"
@@ -240,24 +267,14 @@ const Widen = ({ token, release }: { token: string; release: string }) => {
         <ConfirmButton
           label="Widen removal"
           confirm={`Widen removal of ${release} with ${named.join(", ")}`}
-          disabled={named.length === 0 || reason.trim() === "" || call.isPending}
-          onConfirm={() =>
-            call.mutate({
-              path: widenPath(release),
-              body: widenBody({ reason: reason.trim(), environments: named }),
-            })
-          }
+          disabled={named.length === 0 || reason.trim() === "" || pending}
+          onConfirm={() => onWiden(widenBody({ reason: reason.trim(), environments: named }))}
         />
         <ConfirmButton
           label="Cover fleet"
           confirm={`Cover fleet for ${release}`}
-          disabled={reason.trim() === "" || call.isPending}
-          onConfirm={() =>
-            call.mutate({
-              path: widenPath(release),
-              body: widenBody({ reason: reason.trim(), fleetWide: true }),
-            })
-          }
+          disabled={reason.trim() === "" || pending}
+          onConfirm={() => onWiden(widenBody({ reason: reason.trim(), fleetWide: true }))}
         />
       </div>
       {outcome && <Notice tone={outcome.tone}>{outcome.text}</Notice>}

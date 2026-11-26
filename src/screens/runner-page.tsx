@@ -5,7 +5,7 @@ import { request } from "../api/http";
 import type { RuntimeRunner } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
 import { age, shortId } from "../delivery/runners";
-import { Card, Notice, ObjectPage, tabClass } from "../ui/kit";
+import { ActionsMenu, Card, Notice, ObjectPage, tabClass } from "../ui/kit";
 import { td, th } from "../ui/posture";
 import { EnvironmentLink, LinkedList } from "./object-link";
 import { OBJECT_TABS, tabAfter } from "./objects";
@@ -81,21 +81,23 @@ export const RunnerPage = () => {
       name={shortId(runner.id)}
       id={runner.id}
       status={runner.state}
-      primary={
+      actions={
         token !== undefined && runner.state === "active" ? (
-          <Revoke
-            row={{
-              id: runner.id,
-              environment: runner.environment,
-              state: runner.state,
-              lastPull: "none",
-              heartbeat,
-              version: "none",
-              lease: "none",
-              revocable: true,
-            }}
-            token={token}
-          />
+          <ActionsMenu>
+            <Revoke
+              row={{
+                id: runner.id,
+                environment: runner.environment,
+                state: runner.state,
+                lastPull: "none",
+                heartbeat,
+                version: "none",
+                lease: "none",
+                revocable: true,
+              }}
+              token={token}
+            />
+          </ActionsMenu>
         ) : undefined
       }
       properties={[

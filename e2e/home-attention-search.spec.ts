@@ -5,6 +5,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  openActions,
   serveConsole,
 } from "./mock-backend";
 
@@ -180,7 +181,12 @@ test.describe("home attention and search at desktop width", () => {
   test("home shows fleet counts, top attention, and empty pin and recent", async ({ page }) => {
     app = await serveConsole(server());
     await signIn(page, app.url);
+    await expect(page.getByRole("heading", { name: "Home", exact: true })).toBeVisible();
     await expect(page.getByText("2 environments, 1 behind")).toBeVisible();
+    const homeActions = await openActions(page);
+    await expect(homeActions.getByRole("button", { name: "Reconcile" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Reconcile" })).toHaveCount(1);
+    await page.getByRole("button", { name: "Actions" }).click();
     await expect(page.getByRole("heading", { name: "Fleet" })).toBeVisible();
     await expect(page.locator("table tbody tr").first()).toBeVisible();
     await expect(page.getByRole("list", { name: "Attention" })).toContainText("prod");
@@ -224,14 +230,14 @@ test.describe("home attention and search at desktop width", () => {
     });
     await signIn(page, app.url);
     await openAttention(page);
-    const incomplete = page.getByText("The list may be incomplete.");
-    await expect(incomplete).toBeVisible();
+    await expect(page.getByText("list incomplete")).toBeVisible();
+    await expect(page.getByText("The list may be incomplete.")).toHaveCount(0);
     await expect(page.getByRole("list", { name: "Attention" })).not.toContainText("Follow through");
-    const retry = page.getByRole("button", { name: "Retry" });
+    const retry = (await openActions(page)).getByRole("button", { name: "Retry" });
     await expect(retry).toBeVisible();
     fail = false;
     await retry.click();
-    await expect(incomplete).toHaveCount(0);
+    await expect(page.getByText("list incomplete")).toHaveCount(0);
     await expect(page.getByRole("list", { name: "Attention" })).toContainText("api@1.0.0");
     await expectDesignRules(page);
     await shot(page, "attention-partial");

@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Link,
   Navigate,
@@ -26,7 +27,7 @@ import {
   useEnvironmentInspect,
   useEnvironmentStatus,
 } from "../delivery/use-delivery";
-import { useManagementCall } from "../management/use-management";
+import { UNKNOWN_OUTCOME, useManagementCall } from "../management/use-management";
 import {
   expectedGeneration,
   holdBody,
@@ -34,7 +35,17 @@ import {
   rollbackBody,
   subscribeBody,
 } from "../plan/requests";
-import { ActionsMenu, Button, Card, ConfirmButton, Notice, ObjectPage, tabClass } from "../ui/kit";
+import {
+  ActionsMenu,
+  Button,
+  Card,
+  ConfirmButton,
+  Notice,
+  ObjectPage,
+  headingCount,
+  menuItemClass,
+  tabClass,
+} from "../ui/kit";
 import { ConfigSections } from "./environment-config";
 import {
   ActionPanel,
@@ -194,6 +205,7 @@ const LoadedPage = ({
   const rollback = useManagementCall(token, scope, "management", message);
   const subscribe = useManagementCall(token, scope, "management", message);
   const hold = useManagementCall(token, scope, "management", message);
+  const queryClient = useQueryClient();
   const [action, setAction] = useState<"hold" | "rollback" | "retire" | undefined>();
   const [reason, setReason] = useState("");
   const [holdReason, setHoldReason] = useState("");
@@ -308,6 +320,7 @@ const LoadedPage = ({
       </div>
     ) : null;
 
+  const incomplete = status.isError || status.data?.kind === "error";
   const actionItems = [
     ...(hold.allowed
       ? [
@@ -321,23 +334,48 @@ const LoadedPage = ({
       ? [{ label: "Roll back", onClick: () => setAction("rollback") }]
       : []),
     ...(retire.allowed ? [{ label: "Retire", onClick: () => setAction("retire") }] : []),
+    ...(incomplete
+      ? [
+          {
+            label: "Retry",
+            onClick: () => {
+              void queryClient.invalidateQueries({ queryKey: ["status", report.name, token] });
+            },
+          },
+        ]
+      : []),
   ];
+  const unknown =
+    hold.outcome?.tone === "unknown" ||
+    rollback.outcome?.tone === "unknown" ||
+    retire.outcome?.tone === "unknown";
+  const heading = unknown
+    ? "outcome unknown"
+    : incomplete
+      ? headingCount(`${instances.length} instances`, "incomplete")
+      : rollup.label;
+  const needed = pendingApproval || incomplete || unknown;
 
   return (
     <ObjectPage
       kind="Environment"
       name={report.name}
-      status={rollup.label}
-      primary={
-        <Link
-          to="/environments/$environment/plan"
-          params={{ environment: report.name }}
-          className="inline-flex items-center rounded-md border border-field px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap text-fg no-underline"
+      status={heading}
+      actions={
+        <ActionsMenu
+          needed={needed}
+          status={unknown ? UNKNOWN_OUTCOME : undefined}
+          items={actionItems}
         >
-          Open plan
-        </Link>
+          <Link
+            to="/environments/$environment/plan"
+            params={{ environment: report.name }}
+            className={`${menuItemClass} no-underline`}
+          >
+            Open plan
+          </Link>
+        </ActionsMenu>
       }
-      actions={actionItems.length > 0 ? <ActionsMenu items={actionItems} /> : undefined}
       properties={[
         { label: "Description", value: report.description || "none" },
         {
