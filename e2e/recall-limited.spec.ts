@@ -15,8 +15,9 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
+  gotoProduct,
   openActions,
-  openApp,
+  openProductTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -184,7 +185,8 @@ const rows = (page: Page) =>
 
 const openReleases = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await openApp(page, "Releases");
+  await gotoProduct(page, "api");
+  await openProductTab(page, "Recalls");
   await expect(page.getByRole("heading", { name: "Recall follow-through" })).toBeVisible();
 };
 
@@ -351,7 +353,8 @@ test.describe("limited recall removal", () => {
       }
       await route.fallback();
     });
-    await openReleases(page, app);
+    await page.goto(app.url);
+    await gotoProduct(page, "api");
     await page.getByRole("button", { name: "Detail api stable" }).click();
     await expect(page.getByRole("region", { name: "Policy detail" })).toContainText(
       "when failing > 5% of 1h soak, or 3 instances",

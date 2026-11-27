@@ -6,7 +6,8 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  gotoProduct,
+  openProductTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -113,9 +114,10 @@ const detail = (page: Page) => page.getByRole("region", { name: "Recall detail" 
 const environments = (page: Page) =>
   detail(page).getByRole("table", { name: "Environments" }).getByRole("row");
 
-const openReleases = async (page: Page, app: MockBackend) => {
+const openReleases = async (page: Page, app: MockBackend, product = "api") => {
   await page.goto(app.url);
-  await openApp(page, "Releases");
+  await gotoProduct(page, product);
+  await openProductTab(page, "Recalls");
   await expect(page.getByRole("heading", { name: "Recall follow-through" })).toBeVisible();
 };
 
@@ -150,7 +152,7 @@ test.describe("recall detail", () => {
     await openReleases(page, app);
     await expect(
       page.getByRole("list", { name: "Recalled releases" }).getByRole("listitem"),
-    ).toHaveText(["api@1.4.0", "web@3.0.0", "billing@2.0.0"]);
+    ).toHaveText(["api@1.4.0"]);
     await openRecall(page, "api@1.4.0");
     await expect(detail(page).getByRole("paragraph").first()).toContainText(
       "policy tenkai:channel-promotion-policy:api/stable:3 v3 at 2026-11-14T10:05Z",
@@ -178,7 +180,7 @@ test.describe("recall detail", () => {
 
   test("an operator recall with nothing left reads complete", async ({ page }) => {
     app = await serveConsole(server(EVENTS));
-    await openReleases(page, app);
+    await openReleases(page, app, "billing");
     await openRecall(page, "billing@2.0.0");
     await expect(detail(page).getByRole("paragraph").first()).toContainText(
       "oidc:alice at 2026-11-13T08:00Z",
@@ -197,7 +199,7 @@ test.describe("recall detail", () => {
 
   test("no permission hides the server's text", async ({ page }) => {
     app = await serveConsole(server(EVENTS));
-    await openReleases(page, app);
+    await openReleases(page, app, "web");
     await openRecall(page, "web@3.0.0");
     await expect(detail(page)).toHaveText("No access");
     await expect(page.locator("body")).not.toContainText("environment grant");

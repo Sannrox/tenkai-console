@@ -13,7 +13,7 @@ import {
   type MockBackend,
   type Reply,
   expectDesignRules,
-  openApp,
+  gotoProduct,
   openEnvironment as openEnvObject,
   openEnvironmentTab,
   serveConsole,
@@ -285,7 +285,7 @@ test.describe("paged delivery lists", () => {
       response.url().endsWith("/products/api/webhooks/deliveries"),
     );
     await page.goto(app.url);
-    await openApp(page, "Releases");
+    await gotoProduct(page, "api");
     await deliveries;
     await expect(failureCount(page)).toHaveText(["2"]);
     await expect(failuresPartial(page)).toHaveText("in the newest 2 deliveries, more exist");

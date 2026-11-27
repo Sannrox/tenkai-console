@@ -269,6 +269,7 @@ test.describe("environment dependencies", () => {
     app = await serveConsole(server(ok(GRAPH)));
     await page.goto(app.url);
     await openEnvironment(page);
+    await openEnvironmentTab(page, "Instances");
     const subscriptions = page
       .locator("table")
       .filter({ has: page.getByRole("columnheader", { name: "Deployed" }) });
@@ -320,6 +321,7 @@ test.describe("environment dependencies", () => {
     app = await serveConsole(server(ok(GRAPH), { inspect: INSPECT_FRESH }));
     await page.goto(app.url);
     await openEnvironment(page);
+    await openEnvironmentTab(page, "Instances");
     const subscriptions = page
       .locator("table")
       .filter({ has: page.getByRole("columnheader", { name: "Deployed" }) });
@@ -368,6 +370,7 @@ test.describe("environment dependencies", () => {
     await menu.getByRole("button", { name: "Run one reconcile tick" }).click();
     await expect(page.getByText("Tick ran: 0 environments")).toBeVisible();
     await openEnvironment(page);
+    await openEnvironmentTab(page, "Instances");
     const subscriptions = page
       .locator("table")
       .filter({ has: page.getByRole("columnheader", { name: "Deployed" }) });
@@ -509,6 +512,7 @@ test.describe("environment dependencies", () => {
     app = await serveConsole(server(ok(graph), { inspect }));
     await page.goto(app.url);
     await openEnvironment(page);
+    await openEnvironmentTab(page, "Instances");
     const instances = page
       .locator("table")
       .filter({ has: page.getByRole("columnheader", { name: "Instance" }) });

@@ -232,11 +232,13 @@ test.describe("sealed secret age and rotation", () => {
     await expect(rows(page).first()).toContainText("web");
     await expect(rows(page).first()).toContainText("120d");
     await expect(rows(page).first()).toContainText("overdue");
-    await openEnvironmentTab(page, "Overview");
+    await openEnvironmentTab(page, "Instances");
     const web = page
+      .locator("table")
+      .filter({ has: page.getByRole("columnheader", { name: "Deployed" }) })
       .getByRole("row")
       .filter({ has: page.getByRole("cell", { name: "web", exact: true }) });
-    await expect(web.first()).toContainText("rotate-api-token warning");
+    await expect(web).toContainText("rotate-api-token warning");
     await capture(page, "secrets-overdue");
     await expectNoSecretMaterial(page);
     await expectDesignRules(page);

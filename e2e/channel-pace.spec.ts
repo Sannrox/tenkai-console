@@ -6,7 +6,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  gotoProduct,
   serveConsole,
 } from "./mock-backend";
 
@@ -158,7 +158,8 @@ const NOTE = "A changed pace applies from the next promotion.";
 
 const openPace = async (page: Page, app: MockBackend, channel = "api/stable") => {
   await page.goto(app.url);
-  await openApp(page, "Releases");
+  const product = channel.split("/")[0] ?? "api";
+  await gotoProduct(page, product);
   await section(page).getByRole("combobox", { name: "Channel" }).selectOption(channel);
 };
 
@@ -175,12 +176,10 @@ test.describe("channel upgrade pace", () => {
   test("offers only channels with a head and reads no pace as off", async ({ page }) => {
     app = await serveConsole(server({}));
     await openPace(page, app);
-    await expect(section(page).getByRole("option")).toHaveText([
-      "Channel",
-      "api/stable",
-      "web/stable",
-    ]);
+    await expect(section(page).getByRole("option")).toHaveText(["Channel", "api/stable"]);
     await expect(value(page)).toHaveText("off");
+    await gotoProduct(page, "web");
+    await expect(section(page).getByRole("option")).toHaveText(["Channel", "web/stable"]);
     await page.screenshot({ path: test.info().outputPath("pace-none.png"), fullPage: true });
     await expectDesignRules(page);
   });
@@ -189,6 +188,7 @@ test.describe("channel upgrade pace", () => {
     app = await serveConsole(server({}));
     await openPace(page, app);
     await expect(section(page).getByLabel("Channel grace")).toHaveText("exposure grace 7d");
+    await gotoProduct(page, "web");
     await section(page).getByRole("combobox", { name: "Channel" }).selectOption("web/stable");
     await expect(section(page).getByLabel("Channel grace")).toHaveText("exposure grace not set");
     await expectDesignRules(page);

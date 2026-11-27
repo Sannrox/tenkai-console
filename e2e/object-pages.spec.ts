@@ -10,6 +10,7 @@ import {
   openActions,
   openApp,
   openEnvironment,
+  openProductTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -222,32 +223,44 @@ test.describe("object pages at desktop width", () => {
   test("prod to api to 1.1.0 to plan without a full reload", async ({ page }) => {
     app = await serveConsole(server());
     await signIn(page, app.url);
+    await openApp(page, "Releases");
+    await expect(page.getByRole("heading", { name: "Releases", exact: true })).toBeVisible();
+    await shot(page, "releases-working");
     await openEnvironment(page);
     await expect(page.getByRole("heading", { name: "prod", exact: true })).toBeVisible();
+    await shot(page, "env-working");
     await expect(page.getByRole("link", { name: "api", exact: true }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: "tenkai:plan:1" })).toBeVisible();
-    await page.getByRole("link", { name: "api", exact: true }).first().click();
+    await page.getByRole("main").getByRole("link", { name: "api", exact: true }).first().click();
     await expect(page.getByRole("heading", { name: "api", exact: true })).toBeVisible();
     expect(new URL(page.url()).pathname.endsWith("/products/api")).toBe(true);
-    await expect(page.getByText("platform-team")).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("environment")).toBe("prod");
+    await expect(page.getByText("platform-team").first()).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Product" })).toBeVisible();
+    await expect(
+      page.getByRole("navigation", { name: "Product" }).getByRole("link", { name: "Recalls" }),
+    ).toBeVisible();
     await shot(page, "product-overview");
-    await page
-      .getByRole("navigation", { name: "Product" })
-      .getByRole("link", { name: "Linked" })
-      .click();
+    await openProductTab(page, "Linked");
     expect(new URL(page.url()).pathname.endsWith("/products/api/linked")).toBe(true);
+    expect(new URL(page.url()).searchParams.get("environment")).toBe("prod");
     await expect(page.getByRole("heading", { name: "Linked" })).toBeVisible();
-    await page
-      .getByRole("navigation", { name: "Product" })
-      .getByRole("link", { name: "Overview" })
-      .click();
-    await page.getByRole("link", { name: "api@1.1.0" }).first().click();
+    await openProductTab(page, "Overview");
+    await page.getByRole("main").getByRole("link", { name: "1.1.0", exact: true }).first().click();
     await expect(page.getByRole("heading", { name: "api@1.1.0", exact: true })).toBeVisible();
     expect(new URL(page.url()).pathname.endsWith("/releases/api/1.1.0")).toBe(true);
-    await expect(page.getByText("Not recalled.")).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("environment")).toBe("prod");
+    await expect(
+      page
+        .getByRole("navigation", { name: "Release" })
+        .getByRole("link", { name: "Installations" }),
+    ).toBeVisible();
+    await expect(page.getByText("Not recalled.")).toHaveCount(0);
     await shot(page, "release-overview");
-    await page.getByRole("link", { name: "plan", exact: true }).click();
+    await page.getByRole("main").getByRole("link", { name: "api", exact: true }).click();
+    expect(new URL(page.url()).searchParams.get("environment")).toBe("prod");
+    await openProductTab(page, "Linked");
+    await page.getByRole("main").getByRole("link", { name: "plan", exact: true }).click();
     await expect(page.getByRole("heading", { name: "api 1.0.0 → 1.1.0" })).toBeVisible();
     await expectDesignRules(page);
     await shot(page, "plan-from-release");

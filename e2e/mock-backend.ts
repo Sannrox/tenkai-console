@@ -142,6 +142,69 @@ export const openEnvironmentTab = async (page: Page, tab: EnvironmentTab) => {
     .click();
 };
 
+/** Console `/ui/` prefix, including a path prefix in front of it. */
+const uiBase = (pathname: string): string => {
+  const marker = pathname.indexOf("/ui");
+  if (marker < 0) {
+    return pathname.endsWith("/") ? pathname : `${pathname}/`;
+  }
+  return `${pathname.slice(0, marker + 3)}/`;
+};
+
+/** Object URL from the signed-in shell. Nested `/ui/` assets cannot be a full load. */
+export const gotoProduct = async (page: Page, product = "api") => {
+  await page.evaluate(
+    ({ name, path }) => {
+      history.pushState({}, "", `${path}products/${encodeURIComponent(name)}`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    },
+    { name: product, path: uiBase(new URL(page.url()).pathname) },
+  );
+  await expect(page.getByRole("heading", { name: product, exact: true })).toBeVisible();
+};
+
+export const gotoRelease = async (page: Page, product: string, version: string) => {
+  await page.evaluate(
+    ({ product: name, version: ver, path }) => {
+      history.pushState(
+        {},
+        "",
+        `${path}releases/${encodeURIComponent(name)}/${encodeURIComponent(ver)}`,
+      );
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    },
+    { product, version, path: uiBase(new URL(page.url()).pathname) },
+  );
+  await expect(
+    page.getByRole("heading", { name: `${product}@${version}`, exact: true }),
+  ).toBeVisible();
+};
+
+/** Releases table, then the named product object. */
+export const openProduct = async (page: Page, product = "api") => {
+  await openApp(page, "Releases");
+  await page.getByRole("link", { name: product, exact: true }).click();
+  await expect(page.getByRole("heading", { name: product, exact: true })).toBeVisible();
+};
+
+export type ProductTab = "Overview" | "Recalls" | "Linked";
+
+export const openProductTab = async (page: Page, tab: ProductTab) => {
+  await page
+    .getByRole("navigation", { name: "Product" })
+    .getByRole("link", { name: tab, exact: true })
+    .click();
+};
+
+/** Product object, then the named version. */
+export const openRelease = async (page: Page, product: string, version: string) => {
+  await openProduct(page, product);
+  await page.getByRole("link", { name: version, exact: true }).first().click();
+  await expect(
+    page.getByRole("heading", { name: `${product}@${version}`, exact: true }),
+  ).toBeVisible();
+};
+
 /** Heading corner Actions. The menu stays open until the caller picks an item. */
 export const openActions = async (page: Page) => {
   await page.getByRole("button", { name: "Actions" }).click();

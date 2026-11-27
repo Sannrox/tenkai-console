@@ -22,7 +22,9 @@ export const ProductLink = ({
   <Link
     to="/products/$product"
     params={{ product }}
-    search={environment === undefined ? {} : { environment }}
+    search={(prev: { environment?: string }) =>
+      environment === undefined ? prev : { ...prev, environment }
+    }
     className={objectLinkClass}
   >
     {product}
@@ -47,7 +49,9 @@ export const ReleaseLink = ({
     <Link
       to="/releases/$product/$version"
       params={parsed}
-      search={environment === undefined ? {} : { environment }}
+      search={(prev: { environment?: string }) =>
+        environment === undefined ? prev : { ...prev, environment }
+      }
       className={`font-mono ${objectLinkClass}`}
     >
       {label}

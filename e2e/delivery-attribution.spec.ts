@@ -13,6 +13,7 @@ import {
   type MockBackend,
   type Reply,
   expectDesignRules,
+  gotoProduct,
   openApp,
   openEnvironment as openEnvObject,
   openEnvironmentTab,
@@ -186,7 +187,7 @@ const openReleases = async (page: Page, app: MockBackend) => {
     response.url().endsWith("/products/api/webhooks/deliveries"),
   );
   await page.goto(app.url);
-  await openApp(page, "Releases");
+  await gotoProduct(page, "api");
   const table = page.getByRole("table", { name: "Product owners" });
   await expect(table).toBeVisible();
   await expect(table).not.toContainText("Loading");

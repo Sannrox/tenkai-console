@@ -170,6 +170,12 @@ test.describe("environment object page", () => {
     await expect(page.getByRole("heading", { name: "Dependencies" })).toBeVisible();
     await shot(page, "env-linked");
     await openEnvironmentTab(page, "Overview");
+    await expect(page.getByRole("heading", { name: "Running" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Plans" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Attention" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Wanted" })).toBeVisible();
+    await shot(page, "env-working");
+    await openEnvironmentTab(page, "Instances");
     await expect(page.getByRole("columnheader", { name: "Deployed" })).toBeVisible();
     await shot(page, "env-overview");
     await openEnvironmentTab(page, "Settings");

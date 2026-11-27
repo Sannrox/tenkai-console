@@ -35,10 +35,12 @@ export const PromotionPolicies = ({
   fleet,
   loading,
   token,
+  product,
 }: {
   fleet: FleetStatusReport | undefined;
   loading: boolean;
   token: string | undefined;
+  product: string;
 }) => {
   const [selected, setSelected] = useState<{ product: string; channel: string }>();
   // `/healthz` is public and cached for the session; only its capabilities matter here.
@@ -49,54 +51,59 @@ export const PromotionPolicies = ({
     retry: false,
   });
   const load = promotionPolicies(fleet, evaluatesPolicies(health.data));
+  const rows = load.kind === "ok" ? load.rows.filter((row) => row.product === product) : [];
   return (
     <section aria-label="Promotion policies">
       <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Promotion policies</h2>
       {loading || fleet === undefined ? null : load.kind === "ok" ? (
-        <Card className="overflow-x-auto">
-          <table aria-label="Promotion policies" className="w-full border-collapse text-xs">
-            <thead>
-              <tr>
-                <th className={th}>Product</th>
-                <th className={th}>From -&gt; to</th>
-                <th className={th}>State</th>
-                <th className={th}>Paused</th>
-                <th className={th}>Reason</th>
-                <th className={th}>Without evidence</th>
-                <th className={th}>Policy</th>
-                {token !== undefined && <th className={th} aria-label="Actions" />}
-              </tr>
-            </thead>
-            <tbody>
-              {load.rows.map((row) => {
-                const open =
-                  selected?.product === row.product && selected.channel === row.target_channel;
-                return (
-                  <PolicyRow key={`${row.product}/${row.target_channel}`} row={row}>
-                    {token !== undefined && (
-                      <td className={td}>
-                        <Button
-                          variant="ghost"
-                          aria-pressed={open}
-                          aria-label={`Detail ${row.product} ${row.target_channel}`}
-                          onClick={() =>
-                            setSelected(
-                              open
-                                ? undefined
-                                : { product: row.product, channel: row.target_channel },
-                            )
-                          }
-                        >
-                          Detail
-                        </Button>
-                      </td>
-                    )}
-                  </PolicyRow>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
+        rows.length === 0 ? (
+          <p className="m-0 text-xs">{EMPTY.none}</p>
+        ) : (
+          <Card className="overflow-x-auto">
+            <table aria-label="Promotion policies" className="w-full border-collapse text-xs">
+              <thead>
+                <tr>
+                  <th className={th}>Product</th>
+                  <th className={th}>From -&gt; to</th>
+                  <th className={th}>State</th>
+                  <th className={th}>Paused</th>
+                  <th className={th}>Reason</th>
+                  <th className={th}>Without evidence</th>
+                  <th className={th}>Policy</th>
+                  {token !== undefined && <th className={th} aria-label="Actions" />}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const open =
+                    selected?.product === row.product && selected.channel === row.target_channel;
+                  return (
+                    <PolicyRow key={`${row.product}/${row.target_channel}`} row={row}>
+                      {token !== undefined && (
+                        <td className={td}>
+                          <Button
+                            variant="ghost"
+                            aria-pressed={open}
+                            aria-label={`Detail ${row.product} ${row.target_channel}`}
+                            onClick={() =>
+                              setSelected(
+                                open
+                                  ? undefined
+                                  : { product: row.product, channel: row.target_channel },
+                              )
+                            }
+                          >
+                            Detail
+                          </Button>
+                        </td>
+                      )}
+                    </PolicyRow>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
+        )
       ) : (
         <p className="m-0 text-xs">{EMPTY[load.kind]}</p>
       )}

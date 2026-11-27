@@ -11,7 +11,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  gotoProduct,
   serveConsole,
 } from "./mock-backend";
 
@@ -150,9 +150,9 @@ const server =
 const section = (page: Page) => page.getByRole("region", { name: "Promotion policies" });
 const row = (page: Page, text: RegExp) => section(page).getByRole("row").filter({ hasText: text });
 
-const openReleases = async (page: Page, app: MockBackend) => {
+const openReleases = async (page: Page, app: MockBackend, product = "api") => {
   await page.goto(app.url);
-  await openApp(page, "Releases");
+  await gotoProduct(page, product);
   await expect(page.getByRole("heading", { name: "Promotion policies" })).toBeVisible();
 };
 
@@ -166,7 +166,7 @@ test.describe("promotion policies", () => {
   test("lists each policy, its reason, and instances without evidence", async ({ page }) => {
     app = await serveConsole(server({ ...FLEET, promotion_policies: POLICIES }));
     await openReleases(page, app);
-    await expect(section(page).getByRole("row")).toHaveCount(POLICIES.length + 1);
+    await expect(section(page).getByRole("row")).toHaveCount(3);
 
     await expect(row(page, /dev -> candidate.*soaking/).first()).toContainText(
       "channel-promotion-policy:api/candidate v2",
@@ -176,7 +176,9 @@ test.describe("promotion policies", () => {
     await expect(
       missing.getByRole("list", { name: "Instances without evidence" }).getByRole("listitem"),
     ).toHaveText(["edge-1", "edge-2"]);
+    await gotoProduct(page, "billing");
     await expect(row(page, /^billing/)).toContainText("paused");
+    await gotoProduct(page, "web");
     await expect(row(page, /^web.*dev -> candidate/)).toContainText("promoted");
     const reset = row(page, /^web.*candidate -> stable/);
     await expect(reset.getByRole("cell", { name: "reset", exact: true })).toBeVisible();
@@ -263,7 +265,7 @@ test.describe("promotion policy detail", () => {
 
   test("renders a soak reset with its cause", async ({ page }) => {
     app = await serveConsole(server({ ...FLEET, promotion_policies: POLICIES }, CAPABLE, MANAGER));
-    await openReleases(page, app);
+    await openReleases(page, app, "web");
     await openDetail(page, "web", "stable");
     await expect(rules(page).last()).toHaveText(
       "2026-11-14T10:05Z · health evidence failed on edge-3",
@@ -274,7 +276,7 @@ test.describe("promotion policy detail", () => {
 
   test("names the policy as the promoter", async ({ page }) => {
     app = await serveConsole(server({ ...FLEET, promotion_policies: POLICIES }));
-    await openReleases(page, app);
+    await openReleases(page, app, "web");
     await openDetail(page, "web", "candidate");
     await expect(rules(page).last()).toHaveText("policy channel-promotion-policy:web/candidate");
   });
@@ -287,7 +289,7 @@ test.describe("promotion policy detail", () => {
         body = request.postDataJSON();
       }
     });
-    await openReleases(page, app);
+    await openReleases(page, app, "billing");
     await openDetail(page, "billing", "stable");
     await expect(rules(page).nth(4)).toHaveText("by oidc:alice at 2026-11-14T09:30Z");
     await page.screenshot({ path: test.info().outputPath("policy-paused.png"), fullPage: true });
@@ -362,7 +364,7 @@ test.describe("promotion policies on a phone", () => {
   test("keeps the section inside the viewport without leaking internals", async ({ page }) => {
     app = await serveConsole(server({ ...FLEET, promotion_policies: POLICIES }));
     await openReleases(page, app);
-    await expect(row(page, /^billing/)).toBeVisible();
+    await expect(row(page, /^api.*dev -> candidate/).first()).toBeVisible();
     const box = await section(page).boundingBox();
     expect(box && box.x >= 0 && box.x + box.width <= 390).toBe(true);
     await page.screenshot({

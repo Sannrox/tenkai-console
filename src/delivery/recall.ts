@@ -352,6 +352,28 @@ export const remainingInScope = (rows: readonly EnvironmentRow[]): EnvironmentRo
 export const keptEnvironments = (rows: readonly EnvironmentRow[]): string[] =>
   rows.filter((row) => row.scope === "keep").map((row) => row.environment);
 
+/** Compact recall situation under the release tabs. */
+export const recallBanner = (view: RecallView): string => {
+  const rows = environmentRows(view);
+  const removing = rows.filter((row) => row.scope !== "keep").map((row) => row.environment);
+  const kept = keptEnvironments(rows);
+  if (view.removal_scope !== undefined) {
+    const removal =
+      removing.length === 0
+        ? "Limited removal."
+        : `Limited removal. ${removing.join(", ")} in removal`;
+    return kept.length === 0
+      ? removing.length === 0
+        ? removal
+        : `${removal}.`
+      : `${removal} · ${kept.join(", ")} keep.`;
+  }
+  if (removing.length === 0) {
+    return "Fleet-wide removal.";
+  }
+  return `Fleet-wide removal. ${removing.length} ${removing.length === 1 ? "environment" : "environments"} in removal.`;
+};
+
 /** `done` of `total` summed over the counted environments, undefined when none is counted. */
 export const removalTotals = (rows: RemovalRow[]): { done: number; total: number } | undefined =>
   rows.some((row) => row.counts)
