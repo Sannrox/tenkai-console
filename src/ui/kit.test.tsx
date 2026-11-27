@@ -2,7 +2,14 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ActionsMenu, ConfirmButton, headingCount, ObjectPage } from "./kit";
+import {
+  ActionsMenu,
+  ConfirmButton,
+  headingCount,
+  ObjectPage,
+  PageActionsProvider,
+  usePageActions,
+} from "./kit";
 import { reloadSaved, useSaved } from "./saved";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -159,6 +166,34 @@ describe("ActionsMenu", () => {
     expect(container.querySelector("[role='status']")?.textContent).toBe(
       "No answer from the server; the outcome is unknown until the next inspect.",
     );
+  });
+});
+
+const Probe = () => {
+  const slot = usePageActions();
+  const labels = (slot?.items ?? []).map((item) => item.label).join(",");
+  return <div data-probe={labels}>{labels}</div>;
+};
+
+describe("page actions for search", () => {
+  it("publishes this page's Actions items and clears them when omitted", async () => {
+    await act(async () => {
+      root.render(
+        <PageActionsProvider>
+          <ActionsMenu items={[{ label: "Retry", onClick: () => undefined }]} />
+          <Probe />
+        </PageActionsProvider>,
+      );
+    });
+    expect(container.querySelector("[data-probe]")?.getAttribute("data-probe")).toBe("Retry");
+    await act(async () => {
+      root.render(
+        <PageActionsProvider>
+          <Probe />
+        </PageActionsProvider>,
+      );
+    });
+    expect(container.querySelector("[data-probe]")?.getAttribute("data-probe")).toBe("");
   });
 });
 
