@@ -6,6 +6,8 @@ import {
   type Routes,
   expectDesignRules,
   openActions,
+  openApp,
+  openEnvironment,
   serveConsole,
 } from "./mock-backend";
 
@@ -151,6 +153,42 @@ const server = (): Routes => (path) => {
     return ok(PLAN);
   }
   return undefined;
+};
+
+const INSPECT = {
+  id: "env:prod",
+  name: "prod",
+  description: "fixture",
+  execution_note: "",
+  facts: {},
+  lease: { held: true, generation: 4, status: "held" },
+  latest_plan: PLAN,
+  subscriptions: [
+    { product: "api", channel: "stable", head: "1.1.0", deployed: "1.0.0", state: "behind" },
+  ],
+};
+
+const withProd = (): Routes => (path, request) => {
+  const decoded = decodeURIComponent(path);
+  if (decoded === "/v1/environments/prod") {
+    return ok(INSPECT);
+  }
+  if (decoded === "/v1/environments/prod/hold") {
+    return ok({ audit: [] });
+  }
+  if (decoded === "/v1/environments/prod/dependencies") {
+    return ok({ environment: "prod", holds: [], products: [] });
+  }
+  if (decoded === "/v1/environments/prod/status") {
+    return ok([]);
+  }
+  if (decoded === "/v1/environments/prod/runtime") {
+    return ok({ environment: "prod", components: [] });
+  }
+  if (request.method === "POST" && decoded === "/v1/reconcile") {
+    return ok({ environments: [] });
+  }
+  return server()(path, request);
 };
 
 const signIn = async (page: Page, url: string) => {
@@ -306,6 +344,79 @@ test.describe("home attention and search at desktop width", () => {
     expect(new URL(page.url()).pathname.endsWith("/environments")).toBe(false);
     await expectDesignRules(page);
   });
+
+  test("Control-K lists this page's Actions above objects and arms Reconcile in the palette", async ({
+    page,
+  }) => {
+    app = await serveConsole(withProd());
+    await signIn(page, app.url);
+    await page.keyboard.press("Control+k");
+    const dialog = page.getByRole("dialog", { name: "Search" });
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Environments", level: 1 })).toBeVisible();
+    const actions = dialog.getByRole("list", { name: "Actions" });
+    await expect(actions.getByRole("button", { name: "Reconcile" })).toBeVisible();
+    await expect(dialog.getByRole("list", { name: "Results" })).toHaveCount(0);
+    await expectDesignRules(page);
+    await shot(page, "search-commands-page");
+    await dialog.getByRole("textbox", { name: "Search" }).fill("re");
+    await expect(actions.getByRole("button", { name: "Reconcile" })).toBeVisible();
+    await expect(dialog.getByRole("list", { name: "Results" })).not.toContainText("edge");
+    await expect(dialog.getByRole("list", { name: "Results" })).not.toContainText("prod");
+    await shot(page, "search-commands-page-typed");
+    await dialog.getByRole("textbox", { name: "Search" }).fill("prod");
+    await expect(dialog.getByRole("button", { name: "Reconcile" })).toHaveCount(0);
+    await expect(dialog.getByRole("list", { name: "Results" })).toContainText("prod");
+    await dialog.getByRole("textbox", { name: "Search" }).fill("re");
+    await expect(actions.getByRole("button", { name: "Reconcile" })).toBeVisible();
+    await actions.getByRole("button", { name: "Reconcile" }).click();
+    await expect(actions.getByRole("button", { name: "Run one reconcile tick" })).toBeVisible();
+    await expect(actions.getByRole("button", { name: "Cancel" })).toBeVisible();
+    await shot(page, "search-commands-page-armed");
+    await actions.getByRole("button", { name: "Run one reconcile tick" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Environments", level: 1 })).toBeVisible();
+    expect(
+      app.sent.filter((row) => row.method === "POST" && row.path === "/v1/reconcile"),
+    ).toHaveLength(1);
+    await expectDesignRules(page);
+  });
+
+  test("Control-K on prod lists that object's Actions and Escape leaves the page", async ({
+    page,
+  }) => {
+    app = await serveConsole(withProd());
+    await signIn(page, app.url);
+    await openEnvironment(page);
+    await page.keyboard.press("Control+k");
+    const dialog = page.getByRole("dialog", { name: "Search" });
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole("heading", { name: "prod", exact: true })).toBeVisible();
+    const actions = dialog.getByRole("list", { name: "Actions" });
+    await expect(actions.getByRole("link", { name: "Open plan" })).toBeVisible();
+    await expect(actions.getByRole("button", { name: "Hold delivery" })).toBeVisible();
+    await expect(actions.getByRole("button", { name: "Roll back" })).toBeVisible();
+    await expect(actions.getByRole("button", { name: "Retire" })).toBeVisible();
+    await expect(actions.getByRole("button", { name: "Reconcile" })).toHaveCount(0);
+    await expectDesignRules(page);
+    await shot(page, "search-commands-object");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "prod", exact: true })).toBeVisible();
+  });
+
+  test("a write missing from Actions is missing from the palette", async ({ page }) => {
+    app = await serveConsole(server());
+    await signIn(page, app.url);
+    await openApp(page, "Releases");
+    await page.keyboard.press("Control+k");
+    const dialog = page.getByRole("dialog", { name: "Search" });
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Releases", exact: true })).toBeVisible();
+    await expect(dialog.getByRole("list", { name: "Actions" })).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: "Reconcile" })).toHaveCount(0);
+    await expectDesignRules(page);
+  });
 });
 
 test.describe("attention at phone width", () => {
@@ -321,5 +432,20 @@ test.describe("attention at phone width", () => {
     await openAttention(page);
     await expectDesignRules(page);
     await shot(page, "phone-attention");
+  });
+
+  test("phone Search opens the palette with this page's Actions", async ({ page }) => {
+    app = await serveConsole(server());
+    await signIn(page, app.url);
+    await page
+      .getByRole("navigation", { name: "Main" })
+      .getByRole("button", { name: "Search" })
+      .click();
+    const dialog = page.getByRole("dialog", { name: "Search" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Reconcile" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Environments", level: 1 })).toBeVisible();
+    await expectDesignRules(page);
+    await shot(page, "search-phone");
   });
 });

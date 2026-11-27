@@ -5,7 +5,7 @@ import { HOST_SIGN_OUT, signInMethod } from "../auth/identity";
 import type { Session } from "../auth/session";
 import { useSignOut } from "../auth/use-sign-out";
 import { useAttention } from "../delivery/use-attention";
-import { Button, tabClass } from "../ui/kit";
+import { Button, PageActionsProvider, tabClass } from "../ui/kit";
 import { objectKey, useSaved, type SavedObject } from "../ui/saved";
 import {
   APP_ITEMS,
@@ -100,103 +100,105 @@ export const Shell = ({
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-page">
-      <aside
-        className={`sticky top-0 flex h-screen max-phone:hidden ${collapsed ? "w-[52px]" : "w-52"} shrink-0 flex-col border-r border-line`}
-      >
-        <div
-          className={`px-3 pt-3 pb-2 text-[13px] font-semibold ${collapsed ? "text-center" : ""}`}
+    <PageActionsProvider>
+      <div className="flex min-h-screen bg-page">
+        <aside
+          className={`sticky top-0 flex h-screen max-phone:hidden ${collapsed ? "w-[52px]" : "w-52"} shrink-0 flex-col border-r border-line`}
         >
-          {collapsed ? "T" : "Tenkai"}
+          <div
+            className={`px-3 pt-3 pb-2 text-[13px] font-semibold ${collapsed ? "text-center" : ""}`}
+          >
+            {collapsed ? "T" : "Tenkai"}
+          </div>
+          <nav aria-label="Main" className="flex flex-1 flex-col gap-0.5 px-1.5">
+            {collapsed ? (
+              <button
+                type="button"
+                title="Search"
+                aria-label="Search"
+                aria-expanded={searchOpen}
+                className={`${itemClass(false, true)} w-full cursor-pointer border-0 bg-transparent`}
+                onClick={() => setSearchOpen(true)}
+              >
+                <Icon name="search" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                aria-label="Search"
+                aria-expanded={searchOpen}
+                className={`mb-1 ${searchField} cursor-pointer`}
+                onClick={() => setSearchOpen(true)}
+              >
+                Search
+              </button>
+            )}
+            {!collapsed && <SavedNav title="Pinned" items={pins} path={path} />}
+            {!collapsed && <SavedNav title="Recent" items={recent} path={path} />}
+            {APP_ITEMS.map((item) => (
+              <PlaceLink
+                key={item.label}
+                item={item}
+                path={path}
+                collapsed={collapsed}
+                attentionCount={item.to === "/" ? attentionCount : 0}
+              />
+            ))}
+          </nav>
+          <div className="mt-auto border-t border-line px-1.5 py-2">
+            <Button
+              variant="ghost"
+              className="mb-1 w-full"
+              onClick={toggle}
+              aria-pressed={collapsed}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {collapsed ? "›" : "Collapse"}
+            </Button>
+            <Account session={session} settings={settings} collapsed={collapsed} />
+          </div>
+        </aside>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <main className="min-w-0 flex-1 px-6 py-5 max-phone:px-3 max-phone:pb-16">
+            {isPlatformPath(path) && <PlatformTabs path={path} />}
+            {children}
+          </main>
         </div>
-        <nav aria-label="Main" className="flex flex-1 flex-col gap-0.5 px-1.5">
-          {collapsed ? (
-            <button
-              type="button"
-              title="Search"
-              aria-label="Search"
-              aria-expanded={searchOpen}
-              className={`${itemClass(false, true)} w-full cursor-pointer border-0 bg-transparent`}
-              onClick={() => setSearchOpen(true)}
-            >
-              <Icon name="search" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              aria-label="Search"
-              aria-expanded={searchOpen}
-              className={`mb-1 ${searchField} cursor-pointer`}
-              onClick={() => setSearchOpen(true)}
-            >
-              Search
-            </button>
-          )}
-          {!collapsed && <SavedNav title="Pinned" items={pins} path={path} />}
-          {!collapsed && <SavedNav title="Recent" items={recent} path={path} />}
-          {APP_ITEMS.map((item) => (
-            <PlaceLink
+        {searchOpen && (
+          <Suspense fallback={null}>
+            <QuickSearch onClose={() => setSearchOpen(false)} />
+          </Suspense>
+        )}
+        <nav
+          aria-label="Main"
+          className="fixed inset-x-0 bottom-0 hidden border-t border-line bg-page max-phone:flex"
+        >
+          <button
+            type="button"
+            aria-label="Search"
+            aria-expanded={searchOpen}
+            className="flex flex-1 cursor-pointer flex-col items-center gap-0.5 border-0 bg-transparent py-2 text-[11px] text-muted"
+            onClick={() => setSearchOpen(true)}
+          >
+            <Icon name="search" />
+            Search
+          </button>
+          {PHONE_ITEMS.map((item) => (
+            <Link
               key={item.label}
-              item={item}
-              path={path}
-              collapsed={collapsed}
-              attentionCount={item.to === "/" ? attentionCount : 0}
-            />
+              to={item.to}
+              aria-current={activePhone(path) === item.label ? "page" : undefined}
+              className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] no-underline ${
+                activePhone(path) === item.label ? "text-fg" : "text-muted"
+              }`}
+            >
+              <Icon name={item.icon} />
+              {item.label}
+            </Link>
           ))}
         </nav>
-        <div className="mt-auto border-t border-line px-1.5 py-2">
-          <Button
-            variant="ghost"
-            className="mb-1 w-full"
-            onClick={toggle}
-            aria-pressed={collapsed}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {collapsed ? "›" : "Collapse"}
-          </Button>
-          <Account session={session} settings={settings} collapsed={collapsed} />
-        </div>
-      </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <main className="min-w-0 flex-1 px-6 py-5 max-phone:px-3 max-phone:pb-16">
-          {isPlatformPath(path) && <PlatformTabs path={path} />}
-          {children}
-        </main>
       </div>
-      {searchOpen && (
-        <Suspense fallback={null}>
-          <QuickSearch onClose={() => setSearchOpen(false)} />
-        </Suspense>
-      )}
-      <nav
-        aria-label="Main"
-        className="fixed inset-x-0 bottom-0 hidden border-t border-line bg-page max-phone:flex"
-      >
-        <button
-          type="button"
-          aria-label="Search"
-          aria-expanded={searchOpen}
-          className="flex flex-1 cursor-pointer flex-col items-center gap-0.5 border-0 bg-transparent py-2 text-[11px] text-muted"
-          onClick={() => setSearchOpen(true)}
-        >
-          <Icon name="search" />
-          Search
-        </button>
-        {PHONE_ITEMS.map((item) => (
-          <Link
-            key={item.label}
-            to={item.to}
-            aria-current={activePhone(path) === item.label ? "page" : undefined}
-            className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] no-underline ${
-              activePhone(path) === item.label ? "text-fg" : "text-muted"
-            }`}
-          >
-            <Icon name={item.icon} />
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-    </div>
+    </PageActionsProvider>
   );
 };
 

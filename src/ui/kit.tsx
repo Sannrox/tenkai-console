@@ -3,7 +3,9 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useState,
+  useSyncExternalStore,
   type ComponentProps,
   type ReactNode,
 } from "react";
@@ -49,6 +51,68 @@ export const Notice = ({
 );
 
 const ActionsArm = createContext<((delta: 1 | -1) => void) | null>(null);
+
+export type ActionItem = {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+};
+
+/** This page's Actions contents, for the search palette. */
+export type PageActionsSlot = {
+  items: ReadonlyArray<ActionItem> | undefined;
+  children: ReactNode;
+};
+
+type PageActionsStore = {
+  publish: (slot: PageActionsSlot | null) => void;
+  subscribe: (listener: () => void) => () => void;
+  get: () => PageActionsSlot | null;
+};
+
+const PageActionsStoreContext = createContext<PageActionsStore | null>(null);
+
+const createPageActionsStore = (): PageActionsStore => {
+  let slot: PageActionsSlot | null = null;
+  const listeners = new Set<() => void>();
+  return {
+    publish: (next) => {
+      slot = next;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    get: () => slot,
+  };
+};
+
+/** Lets QuickSearch read the mounted page's Actions without a second catalog. */
+export const PageActionsProvider = ({ children }: { children: ReactNode }) => {
+  const [store] = useState(createPageActionsStore);
+  return (
+    <PageActionsStoreContext.Provider value={store}>{children}</PageActionsStoreContext.Provider>
+  );
+};
+
+/** Current page Actions, or null when Actions is omitted. */
+export const usePageActions = (): PageActionsSlot | null => {
+  const store = useContext(PageActionsStoreContext);
+  return useSyncExternalStore(
+    (onChange) => (store === null ? () => undefined : store.subscribe(onChange)),
+    () => (store === null ? null : store.get()),
+    () => null,
+  );
+};
+
+/** Menu-item look for ConfirmButton when listed outside the corner menu. */
+export const ActionsBody = ({ children }: { children: ReactNode }) => {
+  const report = useCallback((_delta: 1 | -1) => undefined, []);
+  return <ActionsArm.Provider value={report}>{children}</ActionsArm.Provider>;
+};
 
 const MENU_ITEM =
   "block w-full cursor-pointer rounded px-1.5 py-1 text-left text-xs font-medium text-fg hover:bg-selected disabled:cursor-not-allowed disabled:opacity-50";
@@ -174,7 +238,7 @@ export const ActionsMenu = ({
   needed?: boolean | undefined;
   /** Lost-write sentence; not a button. */
   status?: string | undefined;
-  items?: ReadonlyArray<{ label: string; onClick: () => void; disabled?: boolean }> | undefined;
+  items?: ReadonlyArray<ActionItem> | undefined;
   children?: ReactNode;
 }) => {
   const [open, setOpen] = useState(false);
@@ -185,6 +249,14 @@ export const ActionsMenu = ({
   const mark = Boolean(needed) || armed > 0;
   const hasChildren = children !== undefined && children !== null && children !== false;
   const hasItems = (items !== undefined && items.length > 0) || hasChildren || Boolean(status);
+  const store = useContext(PageActionsStoreContext);
+  useLayoutEffect(() => {
+    if (store === null) {
+      return undefined;
+    }
+    store.publish(hasItems ? { items, children } : null);
+    return () => store.publish(null);
+  }, [store, hasItems, items, children]);
   if (!hasItems) {
     return null;
   }
