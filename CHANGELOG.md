@@ -10,6 +10,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0-rc.1] - 2026-11-27
+
+Release candidate for 0.6.0.
+
+### Upgrade
+
+Tenkai pins the console in `ui/console.pin`, which takes only final tags, so this candidate is for manual review. Rollback is pinning the previous zip.
+
+The bundle requires `/healthz` to list contract `tenkai.http.v1`. Types are generated from a Tenkai `main` commit ahead of Tenkai `v0.9.1`. Against a 0.9.1 server, screens for later routes (debug sessions, recalled-upgrade, and other post-0.9.1 APIs) read as unavailable. Same-origin and air-gapped operation are unchanged.
+
+`/` is the Environments table. Home is gone. Search is an overlay (⌘K). Catalog publish, promote, and recall live on the product. Register environments with `tenkaictl`.
+
+### Added
+
+- **Object pages**, places rail, corner Actions, two-column overviews, and this page's Actions in the search palette (#209, #219, #220, #221, #222, #226, #227, #228, #229, #231, #232, #233, #234).
+- **Limited recall** as one environment table, with range exclusions and an optional instance count (#225).
+- **Debug sessions** on an instance (#224).
+- **Canary designations** by selector (#218).
+- **Config presets** and override conflicts (#217).
+- **Delivery metrics** on an environment (#216).
+- **Stop and start** an instance (#215).
+- **Unmanaged workloads** and adopt matching pins (#214).
+- **Upgrade onto an advisory-recalled release** with lower exposure (#213).
+- **Artifact availability** on plans and approvals (#212).
+- **Label actor, time, and history** (#210).
+
+### Changed
+
+- Signed-in default is Environments. Attention is a count on that place. Releases is the product table; catalog tools moved onto the product, release, environment, or Exposure.
+
 ## [0.4.0] - 2026-11-15
 
 The console for Tenkai 0.9. Same contents as `v0.4.0-rc.1`.
