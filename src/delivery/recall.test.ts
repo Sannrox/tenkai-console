@@ -8,6 +8,7 @@ import {
   fetchRecallRanges,
   measuredLine,
   measuredShares,
+  recallBanner,
   parseEnvironments,
   percent,
   rangeKey,
@@ -247,6 +248,31 @@ describe("limited removal and widen", () => {
         widened_by: "oidc:alice",
       }),
     ).toBe("2026-11-22T16:02Z oidc:alice covered the fleet · roll remaining");
+  });
+
+  it("names limited and fleet-wide removal as a line under the tabs", () => {
+    expect(
+      recallBanner(
+        view({
+          removal_scope: ["lab", "stage"],
+          removal_environments: [
+            { environment: "lab", done: 0, total: 1 },
+            { environment: "stage", done: 0, total: 1 },
+          ],
+          out_of_scope: [{ environment: "prod", status: "held" }],
+        }),
+      ),
+    ).toBe("Limited removal. lab, stage in removal · prod keep.");
+    expect(
+      recallBanner(
+        view({
+          removal_environments: [
+            { environment: "lab", done: 0, total: 1 },
+            { environment: "prod", done: 1, total: 1 },
+          ],
+        }),
+      ),
+    ).toBe("Fleet-wide removal. 2 environments in removal.");
   });
 
   it("sends recall as the widen operation, never both fleet and environments", () => {

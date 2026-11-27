@@ -202,6 +202,13 @@ const productLinkedRoute = createRoute({
   component: ProductPage,
 });
 
+const productRecallsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/products/$product/recalls",
+  validateSearch: productSearch,
+  component: ProductPage,
+});
+
 const releaseObjectRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/releases/$product/$version",
@@ -212,6 +219,13 @@ const releaseObjectRoute = createRoute({
 const releaseLinkedRoute = createRoute({
   getParentRoute: () => appRoute,
   path: "/releases/$product/$version/linked",
+  validateSearch: productSearch,
+  component: ReleasePage,
+});
+
+const releaseInstallationsRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: "/releases/$product/$version/installations",
   validateSearch: productSearch,
   component: ReleasePage,
 });
@@ -346,8 +360,10 @@ export const router = createRouter({
       environmentsRoute,
       productRoute,
       productLinkedRoute,
+      productRecallsRoute,
       releaseObjectRoute,
       releaseLinkedRoute,
+      releaseInstallationsRoute,
       releasesRoute,
       runnerObjectRoute,
       runnerLinkedRoute,

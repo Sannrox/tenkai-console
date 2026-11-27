@@ -14,7 +14,8 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  gotoProduct,
+  openProductTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -157,10 +158,17 @@ const detail = (page: Page) => page.getByRole("region", { name: "Policy detail" 
 const editor = (page: Page) => detail(page).getByRole("group", { name: "Recall rule" });
 const recall = (page: Page) => page.getByRole("region", { name: "Recall detail" });
 
-const openReleases = async (page: Page, app: MockBackend) => {
+const openReleases = async (page: Page, app: MockBackend, product = "api") => {
   await page.goto(app.url);
-  await openApp(page, "Releases");
+  await gotoProduct(page, product);
   await expect(page.getByRole("heading", { name: "Promotion policies" })).toBeVisible();
+};
+
+const openRecalls = async (page: Page, app: MockBackend, product: string) => {
+  await page.goto(app.url);
+  await gotoProduct(page, product);
+  await openProductTab(page, "Recalls");
+  await expect(page.getByRole("heading", { name: "Recall follow-through" })).toBeVisible();
 };
 
 const openPolicy = async (page: Page, app: MockBackend) => {
@@ -323,7 +331,7 @@ test.describe("recall rule edit", () => {
 });
 
 const openRecall = async (page: Page, app: MockBackend, release: string) => {
-  await openReleases(page, app);
+  await openRecalls(page, app, release.split("@")[0] ?? "api");
   await page.getByRole("button", { name: `Detail ${release}` }).click();
   await expect(recall(page)).toContainText(release);
   await page.waitForLoadState("networkidle");
@@ -414,6 +422,7 @@ test.describe("recall rule and measures on a phone", () => {
     const box = await detail(page).boundingBox();
     expect(box && box.x >= 0 && box.x + box.width <= 390).toBe(true);
     await shot(page, "rule-phone");
+    await openProductTab(page, "Recalls");
     await page.getByRole("button", { name: "Detail api@1.4.0" }).click();
     await expect(recall(page).getByRole("table")).toBeVisible();
     const recallBox = await recall(page).boundingBox();

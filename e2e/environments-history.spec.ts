@@ -194,6 +194,7 @@ test.describe("environment history", () => {
     );
     await page.goto(app.url);
     await openEnvironment(page);
+    await openEnvironmentTab(page, "Instances");
     const historyLink = page.locator("table").getByRole("link", { name: "History" });
     await expect(historyLink).toBeVisible();
     expect(await historyLink.getAttribute("href")).toContain("instance=api");

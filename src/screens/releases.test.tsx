@@ -13,12 +13,10 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChannelPage, ChangeEventPage, FleetStatusReport } from "../api/tenkai.gen";
 import { useSession } from "../auth/session";
-import { Releases } from "./releases";
+import { fleetTableRows } from "../delivery/configuration";
+import { RecallFollow, Releases } from "./releases";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-
-vi.mock("./compatibility", () => ({ Compatibility: () => null }));
-vi.mock("./migrations", () => ({ Migrations: () => null }));
 
 const FLEET: FleetStatusReport = {
   environment_count: 2,
@@ -57,6 +55,8 @@ const FLEET: FleetStatusReport = {
 };
 
 const CHANNELS: ChannelPage = { items: [] };
+
+const FLEET_ROWS = fleetTableRows(FLEET, undefined);
 
 const EVENTS: ChangeEventPage = {
   next_cursor: "3",
@@ -179,7 +179,7 @@ const withRouter = (ui: React.ReactNode) => {
   return <RouterProvider router={router} />;
 };
 
-const render = async () => {
+const render = async (ui = <Releases />) => {
   await act(async () => {
     root.render(
       <QueryClientProvider
@@ -189,12 +189,14 @@ const render = async () => {
           })
         }
       >
-        {withRouter(<Releases />)}
+        {withRouter(ui)}
       </QueryClientProvider>,
     );
   });
   await settle();
 };
+
+const renderFollow = () => render(<RecallFollow token="operator" fleet={FLEET_ROWS} />);
 
 const button = (label: string) =>
   [...container.querySelectorAll("button")].find((element) => element.textContent === label);
@@ -242,10 +244,20 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+describe("Releases catalog", () => {
+  it("shows the channel matrix without catalog tools", async () => {
+    serve();
+    await render();
+    expect(container.textContent).toContain("No products yet.");
+    expect(container.textContent).not.toContain("Recall follow-through");
+    expect(container.textContent).not.toContain("Promotion policies");
+  });
+});
+
 describe("Releases recall follow-through", () => {
   it("lists recalled releases and Stop shows the server hold state", async () => {
     serve();
-    await render();
+    await renderFollow();
     expect(container.textContent).toContain("api@1.0.0");
     expect(container.textContent).toContain("Recall follow-through");
     await type("Cohort", "canary,prod");
@@ -280,7 +292,7 @@ describe("Releases recall follow-through", () => {
       refused: [{ scope: "fleet", capability: "management" }],
     });
     serve();
-    await render();
+    await renderFollow();
     await type("Cohort", "canary,prod");
     expect(container.querySelector("table[aria-label='Recall cohort']")?.textContent).toContain(
       "canary",

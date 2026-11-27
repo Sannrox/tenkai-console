@@ -7,7 +7,7 @@ import type {
   ManagementLifecycleResult,
 } from "../api/tenkai.gen";
 import { type DeliveryCapability, isRefused, useSession } from "../auth/session";
-import { channelMatrix, fleetTableRows, type FleetTableRow } from "../delivery/configuration";
+import { channelMatrix, type FleetTableRow } from "../delivery/configuration";
 import { cohortNames, recallEvents } from "../delivery/exposure";
 import { useDelivery } from "../delivery/use-delivery";
 import { isReleaseSpec, parsePublish, promoteBody, recallBody } from "../management/catalog";
@@ -21,35 +21,22 @@ import {
 import { expectedGeneration, holdBody, releaseHoldBody } from "../plan/requests";
 import { ActionsMenu, Button, Card, ConfirmButton, Notice, ObjectPage } from "../ui/kit";
 import { td } from "../ui/posture";
-import { Canaries } from "./canaries";
-import { Compatibility } from "./compatibility";
-import { Migrations } from "./migrations";
 import { ProductLink, ReleaseLink } from "./object-link";
 import { releaseSpec } from "./objects";
-import { PromotionPolicies } from "./promotion-policies";
 
-const ReleaseLabels = lazy(() => import("./release-labels"));
-// Product owners and endpoints load on first visit to this screen.
-const ProductOwners = lazy(() => import("./product-owners"));
-// Who recalled, why, the range, and removal progress load on the first Detail click.
 const RecallDetail = lazy(() => import("./recall-detail"));
-// Upgrade pace reads one channel at a time, after a pick.
-const ChannelPace = lazy(() => import("./channel-pace"));
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 
 /**
- * The software catalog. Channels (decision 4D): the head each channel points
- * to, from the channel catalog; below it, upgrade pace, promotion policy status, a release's
- * compatibility per environment, product owners, publish, promote, recall,
- * release labels, and package migrations.
+ * The software catalog: product by channel heads. Writes and catalog tools
+ * live on the product, release, environment, or Exposure object they name.
  */
 export const Releases = () => {
   const token = useSession((state) => state.session?.accessToken);
   const queryClient = useQueryClient();
   const delivery = useDelivery(token);
   const table = channelMatrix(delivery.channels);
-  const names = fleetTableRows(delivery.fleet, delivery.list).map((row) => row.name);
   const failed = delivery.channelsError ?? delivery.error;
 
   return (
@@ -57,7 +44,7 @@ export const Releases = () => {
       name="Releases"
       status={
         failed
-          ? failed.message
+          ? "The channel list was not loaded."
           : delivery.channelsLoading
             ? "Loading"
             : `${table.channels.length} ${table.channels.length === 1 ? "channel" : "channels"}`
@@ -80,66 +67,49 @@ export const Releases = () => {
         ) : undefined
       }
     >
-      <Card className="overflow-x-auto">
-        <table className="w-full border-collapse text-xs">
-          <thead>
-            <tr>
-              <th className={th}>Product</th>
-              {table.channels.map((channel) => (
-                <th key={channel} className={th}>
-                  {channel}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {table.products.map((product) => (
-              <tr key={product} className="[&:last-child>td]:border-b-0">
-                <td className="border-b border-line px-3.5 py-2 font-semibold">
-                  <ProductLink product={product} />
-                </td>
-                {table.channels.map((channel) => {
-                  const cell = table.cell(product, channel);
-                  return (
-                    <td key={channel} className="border-b border-l border-line px-3.5 py-2">
-                      {cell ? (
-                        <ReleaseLink spec={releaseSpec(product, cell.version)}>
-                          {cell.version}
-                        </ReleaseLink>
-                      ) : (
-                        <span className="text-muted">·</span>
-                      )}
-                    </td>
-                  );
-                })}
+      {table.products.length === 0 ? (
+        <p className="m-0 text-xs text-muted">
+          {delivery.channelsLoading ? "Loading" : "No products yet."}
+        </p>
+      ) : (
+        <Card className="overflow-x-auto">
+          <table className="w-full border-collapse text-xs">
+            <thead>
+              <tr>
+                <th className={th}>Product</th>
+                {table.channels.map((channel) => (
+                  <th key={channel} className={th}>
+                    {channel}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-      {token !== undefined && (
-        <Suspense fallback={null}>
-          <ChannelPace token={token} items={delivery.channels?.items ?? []} />
-        </Suspense>
+            </thead>
+            <tbody>
+              {table.products.map((product) => (
+                <tr key={product} className="[&:last-child>td]:border-b-0">
+                  <td className="border-b border-line px-3.5 py-2 font-semibold">
+                    <ProductLink product={product} />
+                  </td>
+                  {table.channels.map((channel) => {
+                    const cell = table.cell(product, channel);
+                    return (
+                      <td key={channel} className="border-b border-l border-line px-3.5 py-2">
+                        {cell ? (
+                          <ReleaseLink spec={releaseSpec(product, cell.version)}>
+                            {cell.version}
+                          </ReleaseLink>
+                        ) : (
+                          <span className="text-muted">·</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       )}
-      <PromotionPolicies fleet={delivery.fleet} loading={delivery.loading} token={token} />
-      {token !== undefined && <Canaries token={token} />}
-      {token !== undefined && <Compatibility token={token} environments={names} />}
-      {token !== undefined && (
-        <Suspense fallback={null}>
-          <ProductOwners token={token} products={table.products} fleet={delivery.fleet} />
-        </Suspense>
-      )}
-      {token !== undefined && <Catalog token={token} channels={table.channels} />}
-      {token !== undefined && (
-        <Suspense>
-          <ReleaseLabels token={token} />
-        </Suspense>
-      )}
-      {token !== undefined && (
-        <RecallFollow token={token} fleet={fleetTableRows(delivery.fleet, delivery.list)} />
-      )}
-      {token !== undefined && <Migrations token={token} environments={names} />}
     </ObjectPage>
   );
 };
@@ -148,14 +118,26 @@ const field =
   "min-w-0 rounded-md border border-field bg-white/4 px-2.5 py-1.5 font-mono text-xs text-fg placeholder:text-muted";
 const message = (result: ManagementLifecycleResult) => result.message;
 
-const Catalog = ({ token, channels }: { token: string; channels: string[] }) => {
+export type CatalogMode = "publish" | "promote" | "recall";
+
+export const Catalog = ({
+  token,
+  channels,
+  product,
+  mode,
+}: {
+  token: string;
+  channels: string[];
+  product: string;
+  mode: CatalogMode;
+}) => {
   const publish = useManagementCall(token, "fleet", "publish", message);
   const promote = useManagementCall(token, "fleet", "publish", message);
   const recall = useManagementCall(token, "fleet", "management", message);
   const [manifest, setManifest] = useState("");
   const [signature, setSignature] = useState("");
   const [roots, setRoots] = useState("");
-  const [release, setRelease] = useState("");
+  const [release, setRelease] = useState(`${product}@`);
   const [channel, setChannel] = useState("");
   const pasted = Boolean(manifest && signature && roots);
   const parsed = pasted ? parsePublish(manifest, signature, roots) : undefined;
@@ -164,7 +146,10 @@ const Catalog = ({ token, channels }: { token: string; channels: string[] }) => 
   const publishRefusal = [publish, promote].find((call) => refusesCredential(call.error))?.outcome;
   const recallRefusal = refusesCredential(recall.error) ? recall.outcome : undefined;
 
-  if (!publish.allowed && !recall.allowed) {
+  const showPublish = mode === "publish" && publish.allowed;
+  const showPromote = mode === "promote" && publish.allowed;
+  const showRecall = mode === "recall" && recall.allowed;
+  if (!showPublish && !showPromote && !showRecall) {
     const refusal = publishRefusal ?? recallRefusal;
     return refusal ? (
       <div className="mt-[18px]">
@@ -174,9 +159,8 @@ const Catalog = ({ token, channels }: { token: string; channels: string[] }) => 
   }
   return (
     <>
-      {publish.allowed ? (
+      {showPublish ? (
         <>
-          <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Publish</h2>
           <div className="grid gap-3 md:grid-cols-3">
             <textarea
               rows={6}
@@ -226,9 +210,8 @@ const Catalog = ({ token, channels }: { token: string; channels: string[] }) => 
         )
       )}
 
-      {(publish.allowed || recall.allowed) && (
+      {(showPromote || showRecall) && (
         <>
-          <h2 className="mt-[18px] mb-2 text-[13px] font-semibold">Promote or recall</h2>
           <div className="flex flex-wrap items-center gap-2">
             <input
               aria-label="Release"
@@ -237,33 +220,35 @@ const Catalog = ({ token, channels }: { token: string; channels: string[] }) => 
               onChange={(event) => setRelease(event.target.value)}
               className={field}
             />
-            <input
-              aria-label="Channel"
-              placeholder="Channel"
-              list="catalog-channels"
-              value={channel}
-              onChange={(event) => setChannel(event.target.value)}
-              className={field}
-            />
-            <datalist id="catalog-channels">
-              {channels.map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
-            {publish.allowed && (
-              <ConfirmButton
-                label="Promote"
-                confirm={`Promote ${spec} to ${target}`}
-                disabled={!isReleaseSpec(spec) || !target || promote.isPending}
-                onConfirm={() =>
-                  promote.mutate({
-                    path: `v1/channels/${encodeURIComponent(target)}/promote`,
-                    body: promoteBody(spec),
-                  })
-                }
-              />
+            {showPromote && (
+              <>
+                <input
+                  aria-label="Channel"
+                  placeholder="Channel"
+                  list="catalog-channels"
+                  value={channel}
+                  onChange={(event) => setChannel(event.target.value)}
+                  className={field}
+                />
+                <datalist id="catalog-channels">
+                  {channels.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
+                <ConfirmButton
+                  label="Promote"
+                  confirm={`Promote ${spec} to ${target}`}
+                  disabled={!isReleaseSpec(spec) || !target || promote.isPending}
+                  onConfirm={() =>
+                    promote.mutate({
+                      path: `v1/channels/${encodeURIComponent(target)}/promote`,
+                      body: promoteBody(spec),
+                    })
+                  }
+                />
+              </>
             )}
-            {recall.allowed && (
+            {showRecall && (
               <ConfirmButton
                 label="Recall"
                 confirm={`Recall ${spec}`}
@@ -292,14 +277,28 @@ const Catalog = ({ token, channels }: { token: string; channels: string[] }) => 
  * reads the recorded recall, and a cohort table whose Stop/Resume are
  * environment holds so the table shows server state.
  */
-const RecallFollow = ({ token, fleet }: { token: string; fleet: FleetTableRow[] }) => {
+export const RecallFollow = ({
+  token,
+  fleet,
+  product,
+}: {
+  token: string;
+  fleet: FleetTableRow[];
+  product?: string;
+}) => {
   const events = useQuery({
     queryKey: ["events", token],
     queryFn: () => request<ChangeEventPage>("v1/events?limit=100", { token }),
     retry: false,
   });
   const recalled = events.data
-    ? [...new Set(recallEvents(events.data.events).map((event) => event.resource))]
+    ? [
+        ...new Set(
+          recallEvents(events.data.events)
+            .map((event) => event.resource)
+            .filter((release) => product === undefined || release.startsWith(`${product}@`)),
+        ),
+      ]
     : [];
   const [selected, setSelected] = useState<string>();
   const [cohort, setCohort] = useState("");

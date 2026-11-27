@@ -12,7 +12,7 @@ import { Button } from "../ui/kit";
 import { HoldRows, SubscriptionHold } from "./environment-hold";
 import { HealthChecks } from "./health-checks";
 import { PlanLink, ProductLink, ReleaseLink } from "./object-link";
-import { releaseSpec } from "./objects";
+import { releaseSpec, shortPlanId } from "./objects";
 
 const th = "border-b border-line px-3.5 py-2 text-left font-medium whitespace-nowrap text-muted";
 const td = "border-b border-line px-3.5 py-2 align-top";
@@ -61,6 +61,88 @@ export const Attention = ({
     <HoldRows report={report} view={holdView} />
   </dl>
 );
+
+/** Product, running version, wanted head for the environment overview. */
+export const RunningTable = ({ report }: { report: EnvironmentInspectReport }) => {
+  if (report.subscriptions.length === 0) {
+    return <p className="m-0 text-xs text-muted">none</p>;
+  }
+  return (
+    <table className="w-full border-collapse text-xs">
+      <thead>
+        <tr>
+          <th className={th}>Product</th>
+          <th className={th}>Running</th>
+          <th className={th}>Wanted</th>
+        </tr>
+      </thead>
+      <tbody>
+        {report.subscriptions.map((subscription) => {
+          const wanted = channelHeadLabel(subscription.head);
+          const behind = subscription.state !== "current" && subscription.state !== "stopped";
+          return (
+            <tr key={`${subscription.product}:${subscription.channel}`}>
+              <td className={td}>
+                <ProductLink product={subscription.product} environment={report.name} />
+              </td>
+              <td className={`${td} font-mono`}>
+                {subscription.deployed ? (
+                  <ReleaseLink
+                    spec={releaseSpec(subscription.product, subscription.deployed)}
+                    environment={report.name}
+                  >
+                    {subscription.deployed}
+                  </ReleaseLink>
+                ) : (
+                  "none"
+                )}
+              </td>
+              <td className={`${td} font-mono ${behind ? "text-warning" : ""}`}>
+                <ReleaseLink
+                  spec={releaseSpec(subscription.product, wanted)}
+                  environment={report.name}
+                >
+                  {wanted}
+                </ReleaseLink>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+};
+
+/** Latest plan as a row; the plan id opens it. */
+export const PlansTable = ({ report }: { report: EnvironmentInspectReport }) => {
+  const plan = report.latest_plan;
+  if (!plan) {
+    return <p className="m-0 text-xs text-muted">none</p>;
+  }
+  const pending = plan.approval?.source === "required" || plan.state === "blocked";
+  return (
+    <table className="w-full border-collapse text-xs">
+      <thead>
+        <tr>
+          <th className={th}>Plan</th>
+          <th className={th}>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td className={`${td} font-mono`}>
+            <PlanLink environment={report.name} planId={plan.id}>
+              {shortPlanId(plan.id)}
+            </PlanLink>
+          </td>
+          <td className={`${td} ${pending ? "text-warning" : ""}`}>
+            {pending ? "pending approval" : plan.state}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  );
+};
 
 export const LinkedColumn = ({ report }: { report: EnvironmentInspectReport }) => {
   const products = [...new Set(report.subscriptions.map((item) => item.product))];

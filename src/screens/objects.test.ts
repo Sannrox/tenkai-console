@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  PRODUCT_TABS,
+  RELEASE_TABS,
   findingSearch,
   objectEnvironment,
   parseReleaseSpec,
@@ -17,6 +19,15 @@ describe("object tabs", () => {
     expect(tabAfter("/releases/api/1.1.0/linked", "releases", 2)).toBe("linked");
     expect(tabAfter("/runners/sha256:abc", "runners", 1)).toBe("overview");
     expect(tabAfter("/findings/CVE-1/linked", "findings", 1)).toBe("linked");
+  });
+
+  it("reads product recalls and release installations from the last segment", () => {
+    expect(tabAfter("/products/api/recalls", "products", 1, PRODUCT_TABS)).toBe("recalls");
+    expect(tabAfter("/products/api", "products", 1, PRODUCT_TABS)).toBe("overview");
+    expect(tabAfter("/releases/api/1.1.0/installations", "releases", 2, RELEASE_TABS)).toBe(
+      "installations",
+    );
+    expect(tabAfter("/releases/api/1.1.0/linked", "releases", 2, RELEASE_TABS)).toBe("overview");
   });
 
   it("does not treat an id named linked as the linked tab", () => {

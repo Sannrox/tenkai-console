@@ -7,6 +7,7 @@ import {
   type Routes,
   expectDesignRules,
   openEnvironment,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -185,8 +186,9 @@ test.describe("environment instance health", () => {
     await expect(fleetHealth(page, "ok")).toHaveCount(1);
     await expect(fleetHealth(page, "unknown")).toHaveCount(0);
     await openEnvironment(page);
-    await expect(instanceRow(page, "api").getByRole("cell", { name: "healthy" })).toBeVisible();
     await expect(rollup(page)).toHaveText("2 healthy");
+    await openEnvironmentTab(page, "Instances");
+    await expect(instanceRow(page, "api").getByRole("cell", { name: "healthy" })).toBeVisible();
     // This server sends no observation time: none is shown.
     await expect(page.getByText(/^observed /)).toHaveCount(0);
     await capture(page, "health-all-healthy");
@@ -200,6 +202,8 @@ test.describe("environment instance health", () => {
     await expect(fleetHealth(page, "error")).toHaveCount(1);
     await expect(fleetHealth(page, "unknown")).toHaveCount(0);
     await openEnvironment(page);
+    await expect(rollup(page)).toHaveText("1 failing · 1 warning · 1 healthy");
+    await openEnvironmentTab(page, "Instances");
     const api = instanceRow(page, "api");
     await expect(api).toContainText("failing");
     await expect(api).toContainText("disk failing: 97% full on /var");
@@ -207,7 +211,6 @@ test.describe("environment instance health", () => {
     const web = instanceRow(page, "web");
     await expect(web).toContainText("warning");
     await expect(web).toContainText("truncated warning: probe output over 64 KiB");
-    await expect(rollup(page)).toHaveText("1 failing · 1 warning · 1 healthy");
     await capture(page, "health-failing-checks");
     await expectDesignRules(page);
     expect(app.sent.some((sent) => sent.path === "/v1/environments/prod/status")).toBe(true);
@@ -227,12 +230,13 @@ test.describe("environment instance health", () => {
     await expect(fleetHealth(page, "error")).toHaveCount(0);
     await expect(fleetHealth(page, "unknown")).toHaveCount(1);
     await openEnvironment(page);
+    await expect(rollup(page)).toHaveText("1 unknown · 1 healthy");
+    await openEnvironmentTab(page, "Instances");
     const api = instanceRow(page, "api");
-    await expect(api.getByRole("cell", { name: "unknown", exact: true })).toBeVisible();
+    await expect(api.getByRole("cell", { name: /^unknown/ })).toBeVisible();
     await expect(api).not.toContainText("healthy");
     await expect(api).toContainText("observed 2026-11-14T08:12Z");
     await expect(instanceRow(page, "web")).toContainText("observed 2026-11-14T09:12Z");
-    await expect(rollup(page)).toHaveText("1 unknown · 1 healthy");
     await capture(page, "health-stale");
     await expectDesignRules(page);
   });
@@ -262,6 +266,8 @@ test.describe("environment instance health", () => {
     );
     await page.goto(app.url);
     await openEnvironment(page);
+    await expect(rollup(page)).toHaveText("1 failing · 1 repairing");
+    await openEnvironmentTab(page, "Instances");
     const api = instanceRow(page, "api");
     await expect(api.getByRole("cell", { name: /^repairing/ })).toBeVisible();
     await expect(api).toContainText("pool repairing: reconnecting to primary");
@@ -269,7 +275,6 @@ test.describe("environment instance health", () => {
     const web = instanceRow(page, "web");
     await expect(web).toContainText("disk failing: 97% full on /var");
     await expect(web).toContainText("cache repairing");
-    await expect(rollup(page)).toHaveText("1 failing · 1 repairing");
     await capture(page, "health-repairing");
     await expectDesignRules(page);
   });
@@ -295,6 +300,7 @@ test.describe("environment instance health", () => {
     await page.waitForLoadState("networkidle");
     await page.clock.runFor(31_000);
     await expect(rollup(page)).toHaveText("1 unknown");
+    await openEnvironmentTab(page, "Instances");
     await expect(instanceRow(page, "api")).toContainText("observed 2026-11-14T09:12Z");
     expect(reads).toBeGreaterThanOrEqual(2);
   });
@@ -312,6 +318,7 @@ test.describe("environment instance health", () => {
     await page.goto(app.url);
     await openEnvironment(page);
     await expect(rollup(page)).toHaveText("2 unknown");
+    await openEnvironmentTab(page, "Instances");
     await expect(page.getByRole("cell", { name: "healthy", exact: true })).toHaveCount(0);
     await capture(page, "health-agent-silent");
     await expectDesignRules(page);
@@ -326,8 +333,9 @@ test.describe("environment instance health", () => {
     );
     await page.goto(app.url);
     await openEnvironment(page);
-    await expect(instanceRow(page, "api").getByRole("cell", { name: "healthy" })).toBeVisible();
     await expect(rollup(page)).toHaveText("1 healthy");
+    await openEnvironmentTab(page, "Instances");
+    await expect(instanceRow(page, "api").getByRole("cell", { name: "healthy" })).toBeVisible();
     await expectDesignRules(page);
   });
 
@@ -369,8 +377,9 @@ test.describe("environment instance health on a phone", () => {
     app = await serveConsole(server(FAILING, "error"));
     await page.goto(app.url);
     await openEnvironment(page);
-    await expect(instanceRow(page, "api")).toContainText("disk failing: 97% full on /var");
     await expect(rollup(page)).toHaveText("1 failing · 1 warning · 1 healthy");
+    await openEnvironmentTab(page, "Instances");
+    await expect(instanceRow(page, "api")).toContainText("disk failing: 97% full on /var");
     await instanceRow(page, "api").getByRole("cell").nth(5).scrollIntoViewIfNeeded();
     await capture(page, "health-phone");
     // The top navigation overflows a phone on every screen today; hold the health

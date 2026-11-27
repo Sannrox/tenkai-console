@@ -38,11 +38,17 @@ const TONE = {
 } as const;
 
 /**
- * Package migrations on Releases (decision 4D). Create (preview, then apply)
+ * Package migrations for this environment. Create (preview, then apply)
  * sits above the stored list; resume and rollback stay on the selected row.
  * The browser never signs: declaration, approval, and trust roots are pasted.
  */
-export const Migrations = ({ token, environments }: { token: string; environments: string[] }) => {
+export const Migrations = ({
+  token,
+  environment: locked,
+}: {
+  token: string;
+  environment: string;
+}) => {
   const refused = useSession((state) => state.refused);
   const list = useQuery({
     queryKey: ["migrations", token],
@@ -51,7 +57,7 @@ export const Migrations = ({ token, environments }: { token: string; environment
   });
   const [selected, setSelected] = useState<string>();
   const [name, setName] = useState("");
-  const [environment, setEnvironment] = useState("");
+  const [environment, setEnvironment] = useState(locked);
   const [generation, setGeneration] = useState("0");
   const [backup, setBackup] = useState("");
   const [declarationText, setDeclarationText] = useState("");
@@ -65,7 +71,7 @@ export const Migrations = ({ token, environments }: { token: string; environment
   const envScope = `environment:${env}` as const;
   const preview = useManagementCall(token, envScope, "read", describeMigration);
   const manage = useManagementCall(token, envScope, "management", describeMigration);
-  const rows = list.data ?? [];
+  const rows = (list.data ?? []).filter((row) => row.environment === locked);
   const shown = selected ?? rows[0]?.name;
   const selectRow = (row: MigrationListEntry) => {
     setSelected(row.name);
@@ -195,19 +201,6 @@ export const Migrations = ({ token, environments }: { token: string; environment
           onChange={(event) => setName(event.target.value)}
           className={field}
         />
-        <input
-          aria-label="Migration environment"
-          placeholder="Environment"
-          list="migration-environments"
-          value={environment}
-          onChange={(event) => setEnvironment(event.target.value)}
-          className={field}
-        />
-        <datalist id="migration-environments">
-          {environments.map((item) => (
-            <option key={item} value={item} />
-          ))}
-        </datalist>
         <input
           aria-label="Expected generation"
           placeholder="Generation"

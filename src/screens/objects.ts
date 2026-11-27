@@ -8,26 +8,50 @@ export const OBJECT_TABS = [
   { id: "linked", label: "Linked" },
 ] as const;
 
-export type ObjectTab = (typeof OBJECT_TABS)[number]["id"];
+export const PRODUCT_TABS = [
+  { id: "overview", label: "Overview" },
+  { id: "recalls", label: "Recalls" },
+  { id: "linked", label: "Linked" },
+] as const;
 
-const TAB_IDS = new Set<string>(OBJECT_TABS.map((tab) => tab.id));
+export const RELEASE_TABS = [
+  { id: "overview", label: "Overview" },
+  { id: "installations", label: "Installations" },
+] as const;
+
+export type ObjectTab = (typeof OBJECT_TABS)[number]["id"];
+export type ProductTab = (typeof PRODUCT_TABS)[number]["id"];
+export type ReleaseTab = (typeof RELEASE_TABS)[number]["id"];
 
 /**
  * Tab after `root` plus `idSegments` id parts. `/ui` prefixes are ignored;
  * an id that looks like a tab stays an id.
  */
-export const tabAfter = (pathname: string, root: string, idSegments: number): ObjectTab => {
+export function tabAfter(pathname: string, root: string, idSegments: number): ObjectTab;
+export function tabAfter<T extends string>(
+  pathname: string,
+  root: string,
+  idSegments: number,
+  tabs: readonly { id: T }[],
+): T;
+export function tabAfter(
+  pathname: string,
+  root: string,
+  idSegments: number,
+  tabs: readonly { id: string }[] = OBJECT_TABS,
+): string {
+  const ids = new Set(tabs.map((tab) => tab.id));
   const parts = pathname.split("/").filter(Boolean);
   const start = parts.lastIndexOf(root);
   if (start < 0) {
     return "overview";
   }
   const tab = parts[start + 1 + idSegments];
-  if (tab !== undefined && TAB_IDS.has(tab) && tab !== "overview") {
-    return tab as ObjectTab;
+  if (tab !== undefined && ids.has(tab) && tab !== "overview") {
+    return tab;
   }
   return "overview";
-};
+}
 
 /** `product@version` as the catalog writes it. */
 export const parseReleaseSpec = (

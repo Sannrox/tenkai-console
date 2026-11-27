@@ -149,6 +149,7 @@ test.describe("environment instance identity", () => {
     );
     await page.goto(app.url);
     await openEnvironment(page);
+    await openEnvironmentTab(page, "Instances");
     await expect(instanceIdentity(page)).toBeVisible();
     await openEnvironmentTab(page, "Security");
     const table = identity(page);

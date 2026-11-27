@@ -166,7 +166,7 @@ const undesignate = (page: Page) => page.getByRole("button", { name: "Undesignat
 
 const open = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await openApp(page, "Releases");
+  await openApp(page, "Exposure");
   await expect(section(page).getByRole("heading", { name: "Canary designations" })).toBeVisible();
 };
 

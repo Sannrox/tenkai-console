@@ -5,7 +5,7 @@ import {
   type MockBackend,
   type Reply,
   expectDesignRules,
-  openApp,
+  gotoRelease,
   openEnvironment as openEnvObject,
   openEnvironmentTab,
   serveConsole,
@@ -123,8 +123,7 @@ const openEnvironment = async (page: Page, app: MockBackend) => {
 
 const openRelease = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
-  await openApp(page, "Releases");
-  await page.getByLabel("Labelled release").fill("api@1.2.0");
+  await gotoRelease(page, "api", "1.2.0");
   await expect(releaseLabels(page)).not.toHaveText("Loading");
   await page.waitForLoadState("networkidle");
 };

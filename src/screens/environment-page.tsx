@@ -52,12 +52,15 @@ import {
   Attention,
   InstanceTable,
   LinkedColumn,
+  PlansTable,
   RollbackDialog,
+  RunningTable,
   useMinuteClock,
   useRefreshAt,
 } from "./environment-object";
 import { Runtime } from "./environment-runtime";
 import { EnvironmentStopStart } from "./environment-stop";
+import { Migrations } from "./migrations";
 
 const EnvironmentDelivery = lazy(() => import("./environment-delivery"));
 const EnvironmentDependencies = lazy(() => import("./environment-dependencies"));
@@ -101,8 +104,8 @@ export const tabFromPath = (pathname: string): EnvTab => {
 };
 
 /**
- * Environment object page: one tab per URL, existing sections mounted in
- * the Issue 1 layout. Deep links `?instance=` open History.
+ * Environment object page: one tab per URL, overview as Running, Plans,
+ * Attention, and Linked. Deep links `?instance=` open History.
  */
 export const EnvironmentPage = () => {
   const { environment } = useParams({ strict: false }) as { environment: string };
@@ -154,11 +157,14 @@ const EnvironmentObject = ({
 
   if (inspect.error) {
     return (
-      <ObjectPage kind="Environment" name={environment}>
-        <Notice tone="bad">
-          {inspect.error instanceof Error ? inspect.error.message : String(inspect.error)}
-        </Notice>
-      </ObjectPage>
+      <ObjectPage
+        kind="Environment"
+        name={environment}
+        status="The environment could not be loaded."
+        actions={
+          <ActionsMenu needed items={[{ label: "Retry", onClick: () => void inspect.refetch() }]} />
+        }
+      />
     );
   }
   if (inspect.isLoading || !report || token === undefined) {
@@ -412,229 +418,253 @@ const LoadedPage = ({
           })}
         </nav>
       }
-      attention={
-        tab === "overview" ? (
-          <Attention
-            rollup={rollup}
-            pendingApproval={pendingApproval}
-            hold={report.delivery_hold}
-            report={report}
-            holdView={holdView}
-          />
-        ) : undefined
-      }
-      main={
-        <>
-          {action === "hold" && hold.allowed && (
-            <ActionPanel>
-              {report.delivery_hold ? (
+    >
+      <>
+        {action === "hold" && hold.allowed && (
+          <ActionPanel>
+            {report.delivery_hold ? (
+              <ConfirmButton
+                label="Release hold"
+                confirm={`Release hold on ${report.name}`}
+                disabled={hold.isPending}
+                onConfirm={() =>
+                  hold.mutate({
+                    path: `${path}/hold/release`,
+                    body: releaseHoldBody(report.name, generation),
+                  })
+                }
+              />
+            ) : (
+              <>
+                <input
+                  aria-label="Hold reason"
+                  placeholder="Reason to hold"
+                  value={holdReason}
+                  onChange={(event) => setHoldReason(event.target.value)}
+                  className={field}
+                />
                 <ConfirmButton
-                  label="Release hold"
-                  confirm={`Release hold on ${report.name}`}
-                  disabled={hold.isPending}
+                  label="Hold"
+                  confirm={`Hold ${report.name}`}
+                  disabled={!holdReason.trim() || hold.isPending}
                   onConfirm={() =>
                     hold.mutate({
-                      path: `${path}/hold/release`,
-                      body: releaseHoldBody(report.name, generation),
+                      path: `${path}/hold`,
+                      body: holdBody(report.name, generation, holdReason.trim()),
                     })
                   }
                 />
-              ) : (
-                <>
-                  <input
-                    aria-label="Hold reason"
-                    placeholder="Reason to hold"
-                    value={holdReason}
-                    onChange={(event) => setHoldReason(event.target.value)}
-                    className={field}
-                  />
-                  <ConfirmButton
-                    label="Hold"
-                    confirm={`Hold ${report.name}`}
-                    disabled={!holdReason.trim() || hold.isPending}
-                    onConfirm={() =>
-                      hold.mutate({
-                        path: `${path}/hold`,
-                        body: holdBody(report.name, generation, holdReason.trim()),
-                      })
-                    }
-                  />
-                </>
-              )}
-              {hold.outcome && <Notice tone={hold.outcome.tone}>{hold.outcome.text}</Notice>}
-            </ActionPanel>
-          )}
-          {action === "rollback" && rollback.allowed && deployed.length > 0 && (
-            <ActionPanel>
-              {deployed.length > 1 && (
-                <select
-                  aria-label="Product to roll back"
-                  value={selectedProduct}
-                  onChange={(event) => setRollbackProduct(event.target.value)}
-                  className={field}
-                >
-                  {deployed.map((subscription) => (
-                    <option key={subscription.product} value={subscription.product}>
-                      {subscription.product}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <RollbackDialog
-                environment={report.name}
-                summary={rollbackSummary(report, selectedProduct, previous)}
-                disabled={!selectedProduct || rollback.isPending}
-                onConfirm={(why) =>
-                  rollback.mutate({
-                    path: `${path}/rollback`,
-                    body: rollbackBody(report.name, generation, selectedProduct, why),
-                  })
-                }
-              />
-              {rollback.outcome && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Notice tone={rollback.outcome.tone}>{rollback.outcome.text}</Notice>
-                  {rollback.outcome.tone === "ok" && (
-                    <Link
-                      to="/environments/$environment/plan"
-                      params={{ environment: report.name }}
-                      className="text-xs font-medium text-muted"
-                    >
-                      Open plan
-                    </Link>
-                  )}
-                </div>
-              )}
-            </ActionPanel>
-          )}
-          {action === "retire" && retire.allowed && (
-            <ActionPanel>
-              <input
-                aria-label="Retirement reason"
-                placeholder="Reason to retire"
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                className={field}
-              />
-              <Button
-                disabled={!reason.trim() || retire.isPending}
-                onClick={() =>
-                  retire.mutate({
-                    path: `${path}/retire`,
-                    body: {
-                      version: 1,
-                      operation: "retire",
-                      reason,
-                    } satisfies RetireEnvironmentRequest,
-                  })
-                }
-              >
-                Retire
-              </Button>
-              {retire.outcome && <Notice tone={retire.outcome.tone}>{retire.outcome.text}</Notice>}
-            </ActionPanel>
-          )}
-          {(tab === "overview" || tab === "instances") && (
-            <Card className="min-w-0 overflow-x-auto">
-              {instanceTable}
-              {tab === "instances" && subscribeRow}
-              {tab === "instances" && subscribe.outcome && (
-                <div className="px-3.5 pb-3">
-                  <Notice tone={subscribe.outcome.tone}>{subscribe.outcome.text}</Notice>
-                </div>
-              )}
-              {tab === "instances" && (
-                <EnvironmentStopStart report={report} token={token} instances={instances} />
-              )}
-            </Card>
-          )}
-          {tab === "instances" &&
-            report.subscriptions.some((subscription) => subscription.state === "behind") && (
-              <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
-                <RecalledUpgrade report={report} token={token} />
-              </Suspense>
+              </>
             )}
-          {tab === "instances" && showAdopt && (
+            {hold.outcome && <Notice tone={hold.outcome.tone}>{hold.outcome.text}</Notice>}
+          </ActionPanel>
+        )}
+        {action === "rollback" && rollback.allowed && deployed.length > 0 && (
+          <ActionPanel>
+            {deployed.length > 1 && (
+              <select
+                aria-label="Product to roll back"
+                value={selectedProduct}
+                onChange={(event) => setRollbackProduct(event.target.value)}
+                className={field}
+              >
+                {deployed.map((subscription) => (
+                  <option key={subscription.product} value={subscription.product}>
+                    {subscription.product}
+                  </option>
+                ))}
+              </select>
+            )}
+            <RollbackDialog
+              environment={report.name}
+              summary={rollbackSummary(report, selectedProduct, previous)}
+              disabled={!selectedProduct || rollback.isPending}
+              onConfirm={(why) =>
+                rollback.mutate({
+                  path: `${path}/rollback`,
+                  body: rollbackBody(report.name, generation, selectedProduct, why),
+                })
+              }
+            />
+            {rollback.outcome && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Notice tone={rollback.outcome.tone}>{rollback.outcome.text}</Notice>
+                {rollback.outcome.tone === "ok" && (
+                  <Link
+                    to="/environments/$environment/plan"
+                    params={{ environment: report.name }}
+                    className="text-xs font-medium text-muted"
+                  >
+                    Open plan
+                  </Link>
+                )}
+              </div>
+            )}
+          </ActionPanel>
+        )}
+        {action === "retire" && retire.allowed && (
+          <ActionPanel>
+            <input
+              aria-label="Retirement reason"
+              placeholder="Reason to retire"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              className={field}
+            />
+            <Button
+              disabled={!reason.trim() || retire.isPending}
+              onClick={() =>
+                retire.mutate({
+                  path: `${path}/retire`,
+                  body: {
+                    version: 1,
+                    operation: "retire",
+                    reason,
+                  } satisfies RetireEnvironmentRequest,
+                })
+              }
+            >
+              Retire
+            </Button>
+            {retire.outcome && <Notice tone={retire.outcome.tone}>{retire.outcome.text}</Notice>}
+          </ActionPanel>
+        )}
+        {tab === "overview" && (
+          <>
+            <p className="mb-3 flex flex-wrap justify-between gap-2 text-xs">
+              <span>
+                {instances.length} {instances.length === 1 ? "instance" : "instances"}
+                {instances.length > 0
+                  ? ` · ${instances.filter((item) => item.subscription.state === "current").length} current · ${instances.filter((item) => item.subscription.state === "behind").length} behind`
+                  : ""}
+              </span>
+              {pendingApproval && report.latest_plan ? (
+                <span className="text-warning">
+                  {report.latest_plan.id.split(":").at(-1)} needs approval
+                </span>
+              ) : null}
+            </p>
+            <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+              <section className="min-w-0">
+                <h2 className="mt-0 mb-2 text-[13px] font-semibold">Running</h2>
+                <RunningTable report={report} />
+              </section>
+              <section className="min-w-0">
+                <h2 className="mt-0 mb-2 text-[13px] font-semibold">Plans</h2>
+                <PlansTable report={report} />
+              </section>
+              <section className="min-w-0">
+                <h2 className="mt-0 mb-2 text-[13px] font-semibold">Attention</h2>
+                <Attention
+                  rollup={rollup}
+                  pendingApproval={pendingApproval}
+                  hold={report.delivery_hold}
+                  report={report}
+                  holdView={holdView}
+                />
+              </section>
+              <LinkedColumn report={report} />
+            </div>
+          </>
+        )}
+        {tab === "instances" && (
+          <Card className="min-w-0 overflow-x-auto">
+            {instanceTable}
+            {subscribeRow}
+            {subscribe.outcome && (
+              <div className="px-3.5 pb-3">
+                <Notice tone={subscribe.outcome.tone}>{subscribe.outcome.text}</Notice>
+              </div>
+            )}
+            <EnvironmentStopStart report={report} token={token} instances={instances} />
+          </Card>
+        )}
+        {tab === "instances" &&
+          report.subscriptions.some((subscription) => subscription.state === "behind") && (
             <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
-              <EnvironmentAdopt report={report} token={token} unmanaged={unmanaged} />
+              <RecalledUpgrade report={report} token={token} />
             </Suspense>
           )}
-          {explain !== undefined && (tab === "overview" || tab === "instances") && (
+        {tab === "instances" && showAdopt && (
+          <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
+            <EnvironmentAdopt report={report} token={token} unmanaged={unmanaged} />
+          </Suspense>
+        )}
+        {explain !== undefined && tab === "instances" && (
+          <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
+            <InstanceExplain
+              key={explain}
+              environment={report.name}
+              instance={explain}
+              token={token}
+              onClose={() => setExplain(undefined)}
+            />
+          </Suspense>
+        )}
+        {debug !== undefined && tab === "instances" && (
+          <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
+            <InstanceDebug
+              key={debug}
+              environment={report.name}
+              instance={debug}
+              token={token}
+              onClose={() => setDebug(undefined)}
+            />
+          </Suspense>
+        )}
+        {tab === "history" && (
+          <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
+            <EnvironmentHistory
+              environment={report.name}
+              token={token}
+              instances={instanceNames}
+              {...(historyInstance === undefined ? {} : { instance: historyInstance })}
+              onInstance={onInstance}
+            />
+            <EnvironmentDelivery environment={report.name} token={token} />
+          </Suspense>
+        )}
+        {tab === "settings" && (
+          <>
             <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
-              <InstanceExplain
-                key={explain}
-                environment={report.name}
-                instance={explain}
-                token={token}
-                onClose={() => setExplain(undefined)}
-              />
+              <EnvironmentOverlays report={report} />
+              <EnvironmentDrift report={report} />
             </Suspense>
-          )}
-          {debug !== undefined && (tab === "overview" || tab === "instances") && (
-            <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
-              <InstanceDebug
-                key={debug}
-                environment={report.name}
-                instance={debug}
-                token={token}
-                onClose={() => setDebug(undefined)}
-              />
-            </Suspense>
-          )}
-          {tab === "history" && (
-            <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
-              <EnvironmentHistory
-                environment={report.name}
-                token={token}
-                instances={instanceNames}
-                {...(historyInstance === undefined ? {} : { instance: historyInstance })}
-                onInstance={onInstance}
-              />
-              <EnvironmentDelivery environment={report.name} token={token} />
-            </Suspense>
-          )}
-          {tab === "settings" && (
-            <>
-              <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
-                <EnvironmentOverlays report={report} />
-                <EnvironmentDrift report={report} />
-              </Suspense>
-              <ConfigSections report={report} token={token} holdView={holdView.data} />
-              <Runtime report={report} token={token} />
-            </>
-          )}
-          {tab === "security" && (
-            <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
-              <EnvironmentIdentity
-                environment={report.name}
-                instances={instanceNames}
-                load={status.data}
-                now={now}
-              />
-              <EnvironmentIssuer report={report} />
-              <EnvironmentSecrets environment={report.name} token={token} />
-              <EnvironmentDependencies
-                environment={report.name}
-                token={token}
-                subscriptions={report.subscriptions}
-                parts={["grants"]}
-              />
-            </Suspense>
-          )}
-          {tab === "linked" && (
-            <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
-              <EnvironmentDependencies
-                environment={report.name}
-                token={token}
-                subscriptions={report.subscriptions}
-                parts={["holds", "graph", "bindings"]}
-              />
-              <EnvironmentOwner report={report} token={token} />
-            </Suspense>
-          )}
-        </>
-      }
-      linked={tab === "overview" ? <LinkedColumn report={report} /> : undefined}
-    />
+            <ConfigSections report={report} token={token} holdView={holdView.data} />
+            <Runtime report={report} token={token} />
+            <Migrations token={token} environment={report.name} />
+          </>
+        )}
+        {tab === "security" && (
+          <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
+            <EnvironmentIdentity
+              environment={report.name}
+              instances={instanceNames}
+              load={status.data}
+              now={now}
+            />
+            <EnvironmentIssuer report={report} />
+            <EnvironmentSecrets environment={report.name} token={token} />
+            <EnvironmentDependencies
+              environment={report.name}
+              token={token}
+              subscriptions={report.subscriptions}
+              parts={["grants"]}
+            />
+          </Suspense>
+        )}
+        {tab === "linked" && (
+          <Suspense fallback={<p className="mt-3 text-xs text-muted">Loading</p>}>
+            <EnvironmentDependencies
+              environment={report.name}
+              token={token}
+              subscriptions={report.subscriptions}
+              parts={["holds", "graph", "bindings"]}
+            />
+            <EnvironmentOwner report={report} token={token} />
+          </Suspense>
+        )}
+      </>
+    </ObjectPage>
   );
 };

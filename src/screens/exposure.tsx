@@ -25,6 +25,7 @@ import {
 } from "../management/use-management";
 import { Button, Card, ConfirmButton, Notice } from "../ui/kit";
 import { RefreshFailed, td, th } from "../ui/posture";
+import { Canaries } from "./canaries";
 import { Findings } from "./exposure-waivers";
 import { EnvironmentLink, ReleaseLink } from "./object-link";
 
@@ -143,6 +144,7 @@ export const Exposure = () => {
         />
       )}
       {feed.data && <Findings token={token} matches={feed.data.matches} />}
+      <Canaries token={token} />
       <Suspense fallback={null}>
         <WaiverList token={token} />
       </Suspense>

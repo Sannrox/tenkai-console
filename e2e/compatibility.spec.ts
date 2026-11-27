@@ -6,7 +6,7 @@ import {
   type Reply,
   type Routes,
   expectDesignRules,
-  openApp,
+  gotoRelease,
   serveConsole,
 } from "./mock-backend";
 
@@ -99,9 +99,8 @@ test.describe("release compatibility", () => {
   }) => {
     app = await serveConsole(server({ prod: ok(PASS), "edge-1": ok(BLOCKED) }));
     await page.goto(app.url);
-    await openApp(page, "Releases");
+    await gotoRelease(page, "shop", "2.1.0");
     await expect(page.getByRole("heading", { name: "Compatibility" })).toBeVisible();
-    await page.getByLabel("Release to check").fill("shop@2.1.0");
     const table = page
       .locator("table")
       .filter({ has: page.getByRole("columnheader", { name: "Matched" }) });
@@ -148,8 +147,7 @@ test.describe("release compatibility", () => {
       }),
     );
     await page.goto(app.url);
-    await openApp(page, "Releases");
-    await page.getByLabel("Release to check").fill("shop@2.1.0");
+    await gotoRelease(page, "shop", "2.1.0");
     await expect(page.getByText("compatible").first()).toBeVisible();
     await expect(page.getByText("none").first()).toBeVisible();
     await expect(page.getByText("incompatible_contract")).toHaveCount(0);

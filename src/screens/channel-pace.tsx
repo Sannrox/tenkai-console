@@ -49,14 +49,22 @@ const LOAD_TEXT = {
 } as const;
 
 /**
- * Upgrade pace on the Releases screen: pick a channel with a head, read the
+ * Upgrade pace on a product: pick a channel with a head, read the
  * pace and progress on its current head, set or turn off the pace, and admit
  * one instance early. The picked channel's declared exposure grace shows
  * too. Loaded lazily, and one read per picked channel, so a large catalog
  * costs nothing up front.
  */
-const ChannelPace = ({ token, items }: { token: string; items: readonly ChannelListEntry[] }) => {
-  const channels = paceChannels(items);
+const ChannelPace = ({
+  token,
+  items,
+  product,
+}: {
+  token: string;
+  items: readonly ChannelListEntry[];
+  product: string;
+}) => {
+  const channels = paceChannels(items).filter((entry) => entry.product === product);
   const [picked, setPicked] = useState("");
   const target = channels.find((entry) => `${entry.product}/${entry.channel}` === picked);
   if (channels.length === 0) {
@@ -72,9 +80,12 @@ const ChannelPace = ({ token, items }: { token: string; items: readonly ChannelL
         className={field}
       >
         <option value="">Channel</option>
-        {channels.map(({ product, channel }) => (
-          <option key={`${product}/${channel}`} value={`${product}/${channel}`}>
-            {product}/{channel}
+        {channels.map((entry) => (
+          <option
+            key={`${entry.product}/${entry.channel}`}
+            value={`${entry.product}/${entry.channel}`}
+          >
+            {entry.product}/{entry.channel}
           </option>
         ))}
       </select>

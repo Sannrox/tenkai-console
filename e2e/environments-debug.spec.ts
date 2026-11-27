@@ -7,6 +7,7 @@ import {
   type Routes,
   expectDesignRules,
   openEnvironment,
+  openEnvironmentTab,
   serveConsole,
 } from "./mock-backend";
 
@@ -186,6 +187,7 @@ const section = (page: Page) => page.getByRole("region", { name: "Debug api" });
 const openDebug = async (page: Page, app: MockBackend) => {
   await page.goto(app.url);
   await openEnvironment(page);
+  await openEnvironmentTab(page, "Instances");
   await page.getByRole("button", { name: "Debug api" }).click();
   await expect(section(page)).toBeVisible();
 };
@@ -206,6 +208,7 @@ test.describe("debug sessions on an instance", () => {
     app = await serveConsole(server({ me: { ...HOST_ME, capabilities: ["read", "management"] } }));
     await page.goto(app.url);
     await openEnvironment(page);
+    await openEnvironmentTab(page, "Instances");
     await expect(page.getByRole("button", { name: "Debug api" })).toHaveCount(0);
     expect(app.sent.some((sent) => sent.path.startsWith("/v1/debug-sessions"))).toBe(false);
   });
@@ -214,6 +217,7 @@ test.describe("debug sessions on an instance", () => {
     app = await serveConsole(server({ me: { ...HOST_ME, kind: "agent", principal: "agent:bot" } }));
     await page.goto(app.url);
     await openEnvironment(page);
+    await openEnvironmentTab(page, "Instances");
     await expect(page.getByRole("button", { name: "Debug api" })).toHaveCount(0);
   });
 
@@ -221,6 +225,7 @@ test.describe("debug sessions on an instance", () => {
     app = await serveConsole(server());
     await page.goto(app.url);
     await openEnvironment(page);
+    await openEnvironmentTab(page, "Instances");
     await expect(page.getByRole("button", { name: "Debug api" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Debug web" })).toBeVisible();
     expect(app.sent.some((sent) => sent.path.startsWith("/v1/debug-sessions"))).toBe(false);
